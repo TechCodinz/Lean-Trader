@@ -131,8 +131,8 @@ class UltraLauncher:
             'exchange': 'multi',  # Use all configured exchanges
             'market_types': ['spot', 'futures', 'perpetual', 'margin'],
             'scan_all_pairs': True,
-            'max_positions': 20,
-            'risk_per_trade': 0.02,
+            'max_positions': 5,      # Optimized for small balance
+            'risk_per_trade': 0.10,  # 10% for aggressive growth from $48
             'confidence_threshold': 0.65,
             'evolution_enabled': True,
             'online_learning': True,
