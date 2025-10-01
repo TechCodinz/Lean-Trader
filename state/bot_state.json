@@ -1,0 +1,13 @@
+{
+  "positions": {
+    "BTC/USDT": {
+      "amount": 0.1
+    }
+  },
+  "balance": 10000,
+  "timestamp": 1759302524.0071325,
+  "_metadata": {
+    "timestamp": "2025-10-01T07:08:44.007188",
+    "version": "1.0"
+  }
+}

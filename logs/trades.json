@@ -1,0 +1,3 @@
+{"timestamp": "2025-10-01T07:06:17.669840", "trade_id": "test-001", "symbol": "BTC/USDT", "side": "BUY", "price": 50000, "amount": 0.1, "status": "filled", "metadata": {}}
+{"timestamp": "2025-10-01T07:08:22.126831", "trade_id": "test-001", "symbol": "BTC/USDT", "side": "BUY", "price": 50000, "amount": 0.1, "status": "filled", "metadata": {}}
+{"timestamp": "2025-10-01T07:08:44.006274", "trade_id": "test-001", "symbol": "BTC/USDT", "side": "BUY", "price": 50000, "amount": 0.1, "status": "filled", "metadata": {}}

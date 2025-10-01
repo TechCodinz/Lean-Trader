@@ -1,0 +1,2 @@
+{"timestamp": "2025-10-01T07:06:17.670498", "metric": "latency", "value": 125.5, "tags": {"exchange": "binance"}}
+{"timestamp": "2025-10-01T07:06:17.670626", "metric": "cpu_usage", "value": 45.2, "tags": {}}

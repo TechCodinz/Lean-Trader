@@ -1,0 +1,48 @@
+2025-10-01 07:05:50,564 | ERROR | TradingBot | log_error:142 | ERROR: Connection lost
+NoneType: None
+{"timestamp": "2025-10-01T07:05:50.564175", "error_type": "ConnectionError", "error_message": "Connection lost", "traceback": "NoneType: None\n", "context": {"test": 1}}
+2025-10-01 07:05:55,564 | ERROR | TradingBot | log_error:142 | ERROR: Rate limit exceeded
+NoneType: None
+{"timestamp": "2025-10-01T07:05:55.564889", "error_type": "RateLimitError", "error_message": "Rate limit exceeded", "traceback": "NoneType: None\n", "context": {"attempt": 1}}
+2025-10-01 07:05:57,565 | ERROR | TradingBot | log_error:142 | ERROR: Not enough funds
+NoneType: None
+{"timestamp": "2025-10-01T07:05:57.565424", "error_type": "InsufficientBalanceError", "error_message": "Not enough funds", "traceback": "NoneType: None\n", "context": {"required": 1000}}
+2025-10-01 07:05:57,565 | ERROR | TradingBot | insufficient_balance_recovery:599 | Insufficient balance, adjusting position size...
+2025-10-01 07:05:57,565 | ERROR | TradingBot | log_error:142 | ERROR: Unknown error
+NoneType: None
+{"timestamp": "2025-10-01T07:05:57.565723", "error_type": "ValueError", "error_message": "Unknown error", "traceback": "NoneType: None\n", "context": {}}
+2025-10-01 07:05:57,565 | ERROR | TradingBot | log_error:142 | ERROR: Connection lost attempt 1
+NoneType: None
+{"timestamp": "2025-10-01T07:05:57.565863", "error_type": "ConnectionError", "error_message": "Connection lost attempt 1", "traceback": "NoneType: None\n", "context": {"attempt": 1}}
+2025-10-01 07:06:02,566 | ERROR | TradingBot | log_error:142 | ERROR: Connection lost attempt 2
+NoneType: None
+{"timestamp": "2025-10-01T07:06:02.566276", "error_type": "ConnectionError", "error_message": "Connection lost attempt 2", "traceback": "NoneType: None\n", "context": {"attempt": 2}}
+2025-10-01 07:06:07,566 | ERROR | TradingBot | log_error:142 | ERROR: Connection lost attempt 3
+NoneType: None
+{"timestamp": "2025-10-01T07:06:07.566845", "error_type": "ConnectionError", "error_message": "Connection lost attempt 3", "traceback": "NoneType: None\n", "context": {"attempt": 3}}
+2025-10-01 07:06:12,567 | ERROR | TradingBot | log_error:142 | ERROR: Connection lost attempt 4
+NoneType: None
+{"timestamp": "2025-10-01T07:06:12.567449", "error_type": "ConnectionError", "error_message": "Connection lost attempt 4", "traceback": "NoneType: None\n", "context": {"attempt": 4}}
+2025-10-01 07:06:17,669 | ERROR | TradingBot | log_error:142 | ERROR: Service down
+Traceback (most recent call last):
+  File "/workspace/production_enhancements.py", line 440, in run_checks
+    status = check['func']()
+  File "/workspace/test_error_recovery.py", line 132, in check_failing_service
+    raise Exception("Service down")
+Exception: Service down
+{"timestamp": "2025-10-01T07:06:17.668520", "error_type": "Exception", "error_message": "Service down", "traceback": "Traceback (most recent call last):\n  File \"/workspace/production_enhancements.py\", line 440, in run_checks\n    status = check['func']()\n  File \"/workspace/test_error_recovery.py\", line 132, in check_failing_service\n    raise Exception(\"Service down\")\nException: Service down\n", "context": {"health_check": "failing_service"}}
+2025-10-01 07:06:17,670 | ERROR | TestBot | log_error:142 | ERROR: Test error
+Traceback (most recent call last):
+  File "/workspace/test_error_recovery.py", line 192, in test_logging_system
+    raise ValueError("Test error")
+ValueError: Test error
+2025-10-01 07:06:17,670 | ERROR | TestBot | log_error:142 | ERROR: Test error
+Traceback (most recent call last):
+  File "/workspace/test_error_recovery.py", line 192, in test_logging_system
+    raise ValueError("Test error")
+ValueError: Test error
+{"timestamp": "2025-10-01T07:06:17.670192", "error_type": "ValueError", "error_message": "Test error", "traceback": "Traceback (most recent call last):\n  File \"/workspace/test_error_recovery.py\", line 192, in test_logging_system\n    raise ValueError(\"Test error\")\nValueError: Test error\n", "context": {"context": "test"}}
+2025-10-01 07:06:17,670 | ERROR | TradingBot | _handle_discrepancies:339 | HIGH SEVERITY DISCREPANCY: {'type': 'MISSING_ON_EXCHANGE', 'symbol': 'ETH/USDT', 'internal': {'side': 'short', 'amount': 1.0, 'entry_price': 3500}, 'exchange': None, 'severity': 'HIGH'}
+2025-10-01 07:08:44,007 | ERROR | TradingBot | log_error:142 | ERROR: test
+NoneType: None
+{"timestamp": "2025-10-01T07:08:44.007506", "error_type": "TestError", "error_message": "test", "traceback": "NoneType: None\n", "context": {}}

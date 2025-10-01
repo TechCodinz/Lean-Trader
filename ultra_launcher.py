@@ -37,6 +37,32 @@ except ImportError:
     logger.warning("⚠️ Production safety features not available")
     SAFETY_FEATURES_AVAILABLE = False
 
+# Import production enhancements
+try:
+    from production_enhancements import (
+        integrate_production_enhancements,
+        ComprehensiveLogger
+    )
+    ENHANCEMENTS_AVAILABLE = True
+    # Use comprehensive logger if available
+    enhanced_logger = ComprehensiveLogger("UltraLauncher")
+except ImportError:
+    logger.warning("⚠️ Production enhancements not available")
+    ENHANCEMENTS_AVAILABLE = False
+    enhanced_logger = None
+
+# Import production optimizations
+try:
+    from production_optimizations import (
+        integrate_optimizations,
+        shutdown_manager
+    )
+    OPTIMIZATIONS_AVAILABLE = True
+except ImportError:
+    logger.warning("⚠️ Production optimizations not available")
+    OPTIMIZATIONS_AVAILABLE = False
+    shutdown_manager = None
+
 # Add paths for imports
 sys.path.append(str(Path(__file__).parent))
 sys.path.append(str(Path(__file__).parent / "tools"))
@@ -232,11 +258,43 @@ class UltraLauncher:
             self.pipeline = integrate_safety_features(self.pipeline)
             logger.info("✅ Safety features activated: Rate limiting, Order validation, Circuit breakers")
         
+        # Apply production enhancements if available
+        if ENHANCEMENTS_AVAILABLE:
+            logger.info("🚀 Applying production enhancements...")
+            self.pipeline = integrate_production_enhancements(self.pipeline)
+            logger.info("✅ Enhancements activated: Comprehensive logging, Position reconciliation, Health checks")
+            
+            # Start monitoring tasks
+            if hasattr(self.pipeline, 'start_monitoring'):
+                asyncio.create_task(self.pipeline.start_monitoring())
+        
+        # Apply production optimizations if available
+        if OPTIMIZATIONS_AVAILABLE:
+            logger.info("⚡ Applying production optimizations...")
+            self.pipeline = integrate_optimizations(self.pipeline)
+            logger.info("✅ Optimizations activated: Graceful shutdown, Memory management, State persistence")
+        
         # Apply production safety features if available
         if SAFETY_FEATURES_AVAILABLE and hasattr(self.pipeline, 'exchange'):
             logger.info("🛡️ Applying production safety features...")
             self.pipeline = integrate_safety_features(self.pipeline)
             logger.info("✅ Safety features activated: Rate limiting, Order validation, Circuit breakers")
+        
+        # Apply production enhancements if available
+        if ENHANCEMENTS_AVAILABLE:
+            logger.info("🚀 Applying production enhancements...")
+            self.pipeline = integrate_production_enhancements(self.pipeline)
+            logger.info("✅ Enhancements activated: Comprehensive logging, Position reconciliation, Health checks")
+            
+            # Start monitoring tasks
+            if hasattr(self.pipeline, 'start_monitoring'):
+                asyncio.create_task(self.pipeline.start_monitoring())
+        
+        # Apply production optimizations if available
+        if OPTIMIZATIONS_AVAILABLE:
+            logger.info("⚡ Applying production optimizations...")
+            self.pipeline = integrate_optimizations(self.pipeline)
+            logger.info("✅ Optimizations activated: Graceful shutdown, Memory management, State persistence")
 
         # Only try to activate features if pipeline components are available
         if pipeline_available:

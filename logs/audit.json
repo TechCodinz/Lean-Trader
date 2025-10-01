@@ -1,0 +1,4 @@
+{"timestamp": "2025-10-01T07:06:17.670040", "action": "CONFIG_CHANGE", "details": {"user": "admin", "change": "Updated risk limit", "old_value": 1000, "new_value": 2000}, "user": "admin", "ip": "localhost"}
+{"timestamp": "2025-10-01T07:06:17.670876", "action": "POSITION_RECONCILIATION", "details": {"timestamp": "2025-10-01T07:06:17.670804", "internal_count": 2, "exchange_count": 1, "discrepancies": [{"type": "MISSING_ON_EXCHANGE", "symbol": "ETH/USDT", "internal": {"side": "short", "amount": 1.0, "entry_price": 3500}, "exchange": null, "severity": "HIGH"}], "reconciled": false}, "user": "system", "ip": "localhost"}
+{"timestamp": "2025-10-01T07:08:22.126957", "action": "TEST_ACTION", "details": {"user": "test", "action": "test"}, "user": "test", "ip": "localhost"}
+{"timestamp": "2025-10-01T07:08:44.006414", "action": "TEST_ACTION", "details": {"user": "test", "action": "test"}, "user": "test", "ip": "localhost"}
