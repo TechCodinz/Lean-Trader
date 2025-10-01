@@ -78,8 +78,8 @@ class UltraMLPipeline:
         self.aggregator = MultiExchangeAggregator() if ULTRA_MODULES_AVAILABLE else None
 
         # System integration
-        self.scout = UltraScout() if SYSTEM_MODULES_AVAILABLE else None
-        self.router = ExchangeRouter() if SYSTEM_MODULES_AVAILABLE else None
+        self.scout = None  # UltraScout will be initialized when available
+        self.router = None  # ExchangeRouter will be initialized when available
         self.memory = Memory() if SYSTEM_MODULES_AVAILABLE else None
 
         # State management

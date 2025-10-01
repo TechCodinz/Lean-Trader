@@ -1,0 +1,50 @@
+nohup: ignoring input
+✅ Production safety features loaded successfully!
+Use integrate_safety_features(bot) to add safety to your bot
+✅ Production optimizations loaded successfully!
+Features:
+  1. Graceful shutdown for all loops
+  2. Specific exception handling
+  3. Memory management for long runs
+  4. State persistence and recovery
+
+Use: integrate_optimizations(bot)
+
+╔════════════════════════════════════════════════════════════════════════════╗
+║                                                                            ║
+║   ██╗   ██╗██╗  ████████╗██████╗  █████╗     ████████╗██████╗  █████╗    ║
+║   ██║   ██║██║  ╚══██╔══╝██╔══██╗██╔══██╗    ╚══██╔══╝██╔══██╗██╔══██╗   ║
+║   ██║   ██║██║     ██║   ██████╔╝███████║       ██║   ██████╔╝███████║   ║
+║   ██║   ██║██║     ██║   ██╔══██╗██╔══██║       ██║   ██╔══██╗██╔══██║   ║
+║   ╚██████╔╝███████╗██║   ██║  ██║██║  ██║       ██║   ██║  ██║██║  ██║   ║
+║    ╚═════╝ ╚══════╝╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝       ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝   ║
+║                                                                            ║
+║         THE MOST BRILLIANT SELF-EVOLVING TRADER EVER DESIGNED            ║
+║                                                                            ║
+║                    🧠 AI-Powered 🚀 Self-Evolving 💎 Ultra-Smart         ║
+║                                                                            ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+🚀 Starting Ultra Trading System in LIVE mode...
+📊 Symbols: BTC/USDT, ETH/USDT, SOL/USDT
+⏰ Timeframes: 1m, 5m, 15m, 1h
+💰 Risk per trade: 2.0%
+🧬 Evolution: Enabled
+📚 Online Learning: Enabled
+
+💰 Running LIVE Trading Mode...
+============================================================
+⚠️ WARNING: This will execute REAL trades with REAL money!
+============================================================
+
+⚠️ Are you sure you want to run LIVE trading? (type 'YES' to confirm): Traceback (most recent call last):
+  File "/workspace/ultra_launcher.py", line 729, in async_main
+    await launcher.start(args.mode)
+  File "/workspace/ultra_launcher.py", line 591, in start
+    await self.run_live()
+  File "/workspace/ultra_launcher.py", line 428, in run_live
+    confirm = input("\n⚠️ Are you sure you want to run LIVE trading? (type 'YES' to confirm): ")
+              ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [Errno 9] Bad file descriptor
+❌ Fatal error: [Errno 9] Bad file descriptor
+✅ System stopped
