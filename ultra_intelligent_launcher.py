@@ -147,19 +147,28 @@ class IntelligentEnvironmentManager:
         """Select the optimal configuration based on analysis"""
         
         config = {
-            'mode': 'paper',  # Default safe mode
+            'mode': 'hybrid',  # Can run multiple modes
             'exchanges': [],
             'features': {
                 'arbitrage': False,
                 'training': False,
                 'telegram': False,
                 'swarm': False,
-                'evolution': True
+                'evolution': True,
+                'parallel_modes': False
             }
         }
         
-        # Determine mode
-        if analysis['production_ready'] and analysis['arbitrage_possible']:
+        # Check if we can run parallel modes (production + training)
+        if analysis['production_ready'] and analysis['training_environment']:
+            config['mode'] = 'hybrid'
+            config['features']['parallel_modes'] = True
+            config['exchanges'] = analysis['exchanges_available']
+            config['features']['arbitrage'] = True
+            config['features']['training'] = True
+            config['features']['swarm'] = True
+            logger.info("🎯 HYBRID MODE: Running production arbitrage + testnet training in parallel")
+        elif analysis['production_ready'] and analysis['arbitrage_possible']:
             config['mode'] = 'arbitrage'
             config['exchanges'] = analysis['exchanges_available']
             config['features']['arbitrage'] = True
