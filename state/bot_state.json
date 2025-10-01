@@ -1,8 +1,13 @@
 {
+  "positions": {},
+  "orders": {},
+  "balance": {},
+  "metrics": {},
+  "config": {},
   "test": "data",
   "timestamp": 1759303244.782043,
   "_metadata": {
-    "timestamp": "2025-10-01T07:20:44.784292",
+    "timestamp": "2025-10-01T08:03:23.947714",
     "version": "1.0"
   }
 }

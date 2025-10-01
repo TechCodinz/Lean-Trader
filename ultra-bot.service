@@ -1,0 +1,29 @@
+[Unit]
+Description=Ultra Trading Bot with Evolution
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/workspace
+Environment="PYTHONUNBUFFERED=1"
+Environment="PRODUCTION=true"
+Environment="LOG_LEVEL=INFO"
+ExecStart=/usr/bin/python3 /workspace/run_production.py
+Restart=always
+RestartSec=60
+StandardOutput=append:/workspace/logs/ultra-bot.log
+StandardError=append:/workspace/logs/ultra-bot-error.log
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+
+# Resource Limits
+LimitNOFILE=65536
+LimitNPROC=4096
+MemoryMax=2G
+CPUQuota=80%
+
+[Install]
+WantedBy=multi-user.target
