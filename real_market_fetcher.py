@@ -1,3 +1,4 @@
+import os
 
 #!/usr/bin/env python3
 """
@@ -28,8 +29,8 @@ class RealMarketDataFetcher:
             # Bybit (Primary)
             self.exchanges['bybit'] = ccxt.bybit(
                 {
-                    'apiKey': 'g1mhPqKrOBp9rnqb4G',
-                    'secret': 's9KCIelCqPwJOOWAXNoWqFHtiauRQr9PLeqG',
+                    'apiKey': os.getenv('BYBIT_API_KEY', ''),
+                    'secret': os.getenv('BYBIT_SECRET', ''),
                     'sandbox': True,
                     'testnet': True,
                     'enableRateLimit': True,

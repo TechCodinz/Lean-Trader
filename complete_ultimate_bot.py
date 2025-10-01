@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 import asyncio
 import ccxt
 from datetime import datetime
@@ -21,8 +22,8 @@ class CompleteUltimateBot:
         # Bybit configuration
         self.bybit = ccxt.bybit(
             {
-                'apiKey': 'g1mhPqKrOBp9rnqb4G',
-                'secret': 's9KCIelCqPwJOOWAXNoWqFHtiauRQr9PLeqG',
+                'apiKey': os.getenv('BYBIT_API_KEY', ''),
+                'secret': os.getenv('BYBIT_SECRET', ''),
                 'sandbox': True,
                 'testnet': True,
             }

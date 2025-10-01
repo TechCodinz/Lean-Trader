@@ -25,6 +25,18 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Import production safety features
+try:
+    from production_fixes import (
+        RateLimiter, OrderValidator, WebSocketManager,
+        FinancialCalculator, CircuitBreaker, ProductionSafetyWrapper,
+        integrate_safety_features
+    )
+    SAFETY_FEATURES_AVAILABLE = True
+except ImportError:
+    logger.warning("⚠️ Production safety features not available")
+    SAFETY_FEATURES_AVAILABLE = False
+
 # Add paths for imports
 sys.path.append(str(Path(__file__).parent))
 sys.path.append(str(Path(__file__).parent / "tools"))
@@ -213,6 +225,18 @@ class UltraLauncher:
         from ultra_core import get_ultra_pipeline, integrate_god_mode, integrate_moon_spotter, integrate_forex_master, integrate_telegram_signals
         self.pipeline = get_ultra_pipeline(self.config)
         pipeline_available = True  # Pipeline is always available now
+        
+        # Apply production safety features if available
+        if SAFETY_FEATURES_AVAILABLE and hasattr(self.pipeline, 'exchange'):
+            logger.info("🛡️ Applying production safety features...")
+            self.pipeline = integrate_safety_features(self.pipeline)
+            logger.info("✅ Safety features activated: Rate limiting, Order validation, Circuit breakers")
+        
+        # Apply production safety features if available
+        if SAFETY_FEATURES_AVAILABLE and hasattr(self.pipeline, 'exchange'):
+            logger.info("🛡️ Applying production safety features...")
+            self.pipeline = integrate_safety_features(self.pipeline)
+            logger.info("✅ Safety features activated: Rate limiting, Order validation, Circuit breakers")
 
         # Only try to activate features if pipeline components are available
         if pipeline_available:

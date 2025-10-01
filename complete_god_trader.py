@@ -1,3 +1,4 @@
+import os
 from concurrent.futures import ThreadPoolExecutor
 from sklearn.ensemble import RandomForestClassifier
 
@@ -213,8 +214,8 @@ class CompleteGodTraderBot:
         # Bybit
         self.exchanges['bybit'] = ccxt.bybit(
             {
-                'apiKey': 'g1mhPqKrOBp9rnqb4G',
-                'secret': 's9KCIelCqPwJOOWAXNoWqFHtiauRQr9PLeqG',
+                'apiKey': os.getenv('BYBIT_API_KEY', ''),
+                'secret': os.getenv('BYBIT_SECRET', ''),
                 'sandbox': True,
                 'enableRateLimit': True,
             }

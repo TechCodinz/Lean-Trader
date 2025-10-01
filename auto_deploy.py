@@ -16,7 +16,7 @@ TELEGRAM_BOT_TOKEN = "8291641352:AAFTGq-hIY_iS47aMOoGXrBDFlR_B3nCupg"
 TG_ADMIN_CHAT_ID = "5329503447"
 TG_FREE_CHAT_ID = "-1002930953007"
 TG_VIP_CHAT_ID = "-1002983007302"
-BYBIT_API_KEY = "g1mhPqKrOBp9rnqb4G"
+BYBIT_API_KEY = os.getenv("BYBIT_API_KEY", "")
 BYBIT_API_SECRET = "s9KCIelCqPwJOOWAXNoWqFHtiauRQr9PLeqG"
 
 # Read the bot code
@@ -207,8 +207,8 @@ class BybitTradingBot:
     def __init__(self):
         self.exchange = None
         self.running = False
-        self.api_key = "g1mhPqKrOBp9rnqb4G"
-        self.secret_key = "s9KCIelCqPwJOOWAXNoWqFHtiauRQr9PLeqG"
+        self.api_key = os.getenv("BYBIT_API_KEY", "")
+        self.secret_key = os.getenv("BYBIT_SECRET", "")
         self.sandbox = True
         
     async def initialize(self):
@@ -367,8 +367,8 @@ class BybitTradingBot:
     def __init__(self):
         self.exchange = None
         self.running = False
-        self.api_key = "g1mhPqKrOBp9rnqb4G"
-        self.secret_key = "s9KCIelCqPwJOOWAXNoWqFHtiauRQr9PLeqG"
+        self.api_key = os.getenv("BYBIT_API_KEY", "")
+        self.secret_key = os.getenv("BYBIT_SECRET", "")
         self.sandbox = True
         
     async def initialize(self):

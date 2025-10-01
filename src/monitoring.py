@@ -155,6 +155,10 @@ class DatabaseMonitor:
             counts: Dict[str, int] = {}
             for table in tables:
                 try:
+                    # Validate table name to prevent SQL injection
+                    if not table.replace('_', '').isalnum():
+                        logger.warning(f"Invalid table name: {table}")
+                        continue
                     cursor.execute(f'SELECT COUNT(*) FROM {table}')
                     counts[table] = cursor.fetchone()[0]
                 except Exception:

@@ -6,6 +6,7 @@ FULL POTENTIAL PROFESSIONAL TRADING BOT
 - Advanced AI learning and adaptation
 - All trading features active
 """
+import os
 
 import asyncio
 import ccxt
@@ -25,8 +26,8 @@ class FullPotentialTradingBot:
         # Bybit configuration
         self.bybit = ccxt.bybit(
             {
-                'apiKey': 'g1mhPqKrOBp9rnqb4G',
-                'secret': 's9KCIelCqPwJOOWAXNoWqFHtiauRQr9PLeqG',
+                'apiKey': os.getenv('BYBIT_API_KEY', ''),
+                'secret': os.getenv('BYBIT_SECRET', ''),
                 'sandbox': True,
                 'testnet': True,
             }

@@ -1,3 +1,4 @@
+import os
 from concurrent.futures import ThreadPoolExecutor
 
 #!/usr/bin/env python3
@@ -40,8 +41,8 @@ class CompleteEnhancedUltraTradingSystem:
 
         # Bybit Testnet Configuration
         self.bybit_config = {
-            'api_key': 'g1mhPqKrOBp9rnqb4G',
-            'secret': 's9KCIelCqPwJOOWAXNoWqFHtiauRQr9PLeqG',
+            'api_key': os.getenv('BYBIT_API_KEY', ''),
+            'secret': os.getenv('BYBIT_SECRET', ''),
             'sandbox': True,
             'testnet': True,
         }
