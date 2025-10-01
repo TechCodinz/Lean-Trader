@@ -199,61 +199,6 @@ class UltraLauncher:
             json.dump(backtest_results, f, indent=2, default=str)
         print(f"📊 Results saved to {results_path}")
 
-    def _create_mock_pipeline(self):
-        """Create a mock pipeline for simulation when components are missing"""
-        class MockPipeline:
-            def __init__(self, config):
-                self.config = config
-                self.running = False
-                
-            async def run_forever(self):
-                """Run simulated trading"""
-                self.running = True
-                print("🚀 Starting simulated trading pipeline...")
-                iteration = 0
-                while self.running:
-                    iteration += 1
-                    print(f"\n📊 Iteration {iteration} - {datetime.now().strftime('%H:%M:%S')}")
-                    
-                    # Simulate trading for each symbol
-                    for symbol in self.config.get('symbols', []):
-                        price = random.uniform(40000, 60000) if 'BTC' in symbol else random.uniform(100, 5000)
-                        change = random.uniform(-5, 5)
-                        
-                        # Generate random signal
-                        if abs(change) > 3:
-                            action = "BUY" if change > 0 else "SELL"
-                            confidence = min(90, 60 + abs(change) * 5)
-                            print(f"  📈 {symbol}: ${price:.2f} ({change:+.2f}%) - Signal: {action} (Confidence: {confidence:.1f}%)")
-                    
-                    # Simulate performance
-                    if iteration % 5 == 0:
-                        print(f"\n  💰 Simulated Balance: ${10000 + iteration * random.uniform(-50, 100):.2f}")
-                        print(f"  📊 Win Rate: {random.uniform(45, 65):.1f}%")
-                    
-                    await asyncio.sleep(5)
-            
-            def get_status(self):
-                return {
-                    'metrics': {
-                        'total_trades': random.randint(10, 100),
-                        'win_rate': random.uniform(0.45, 0.65),
-                        'total_pnl': random.uniform(-0.1, 0.3),
-                        'sharpe_ratio': random.uniform(0.5, 2.5),
-                        'max_drawdown': random.uniform(0.05, 0.20)
-                    },
-                    'evolution': {
-                        'generation': random.randint(1, 10),
-                        'fitness': random.uniform(0.5, 0.9),
-                        'mutations': []
-                    },
-                    'active_positions': random.randint(0, 5)
-                }
-            
-            def stop(self):
-                self.running = False
-                
-        return MockPipeline(self.config)
     
     async def run_paper(self):
         """Run paper trading mode."""
@@ -264,16 +209,10 @@ class UltraLauncher:
         # Override config for paper trading
         self.config['mode'] = 'paper'
 
-        # Initialize pipeline with fallback
-        pipeline_available = False
-        try:
-            from ultra_core import get_ultra_pipeline, integrate_god_mode, integrate_moon_spotter, integrate_forex_master, integrate_telegram_signals
-            self.pipeline = get_ultra_pipeline(self.config)
-            pipeline_available = True
-        except ImportError as e:
-            print(f"⚠️ Some components not available: {e}")
-            print("Running in simulation mode...")
-            self.pipeline = self._create_mock_pipeline()
+        # Initialize pipeline - get_ultra_pipeline always returns a valid pipeline
+        from ultra_core import get_ultra_pipeline, integrate_god_mode, integrate_moon_spotter, integrate_forex_master, integrate_telegram_signals
+        self.pipeline = get_ultra_pipeline(self.config)
+        pipeline_available = True  # Pipeline is always available now
 
         # Only try to activate features if pipeline components are available
         if pipeline_available:
@@ -348,17 +287,13 @@ class UltraLauncher:
             except Exception as e:
                 print(f"⚠️ Telegram integration error: {e}")
 
-        # Run pipeline
-        if self.pipeline:
-            try:
-                await self.pipeline.run_forever()
-            except Exception as e:
-                print(f"⚠️ Pipeline error: {e}")
-                print("Falling back to simulation mode...")
-                mock_pipeline = self._create_mock_pipeline()
-                await mock_pipeline.run_forever()
-        else:
-            print("❌ No pipeline available")
+        # Run pipeline - pipeline is always available
+        try:
+            await self.pipeline.run_forever()
+        except Exception as e:
+            print(f"⚠️ Pipeline error: {e}")
+            import traceback
+            traceback.print_exc()
 
     async def run_live(self):
         """Run live trading mode."""
@@ -447,17 +382,13 @@ class UltraLauncher:
             except Exception as e:
                 print(f"⚠️ Telegram integration error: {e}")
 
-        # Run pipeline
-        if self.pipeline:
-            try:
-                await self.pipeline.run_forever()
-            except Exception as e:
-                print(f"⚠️ Pipeline error: {e}")
-                print("Falling back to simulation mode...")
-                mock_pipeline = self._create_mock_pipeline()
-                await mock_pipeline.run_forever()
-        else:
-            print("❌ No pipeline available")
+        # Run pipeline - pipeline is always available
+        try:
+            await self.pipeline.run_forever()
+        except Exception as e:
+            print(f"⚠️ Pipeline error: {e}")
+            import traceback
+            traceback.print_exc()
 
     async def monitor_performance(self):
         """Monitor system performance in real-time."""

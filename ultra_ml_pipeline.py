@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
 """Ultra ML Pipeline - The Brain of the Ultra Trading System.
 
@@ -8,7 +9,11 @@ making ultra-brilliant trading decisions that evolve and adapt in real-time.
 
 import time
 from datetime import datetime
+from typing import Dict, List, Any, Optional
+from collections import deque
 import asyncio
+import random
+import json
 
 # Import our ultra components
 import sys
@@ -35,6 +40,27 @@ try:
 except ImportError as e:
     print(f"[UltraML] Warning: System modules not available: {e}")
     SYSTEM_MODULES_AVAILABLE = False
+
+# Import pandas/numpy with fallback
+try:
+    import pandas as pd
+    import numpy as np
+    DATA_LIBS_AVAILABLE = True
+except ImportError:
+    DATA_LIBS_AVAILABLE = False
+    # Create minimal fallbacks
+    class pd:
+        @staticmethod
+        def DataFrame(*args, **kwargs):
+            return DummyDataFrame()
+    
+    class DummyDataFrame:
+        def __init__(self):
+            self.empty = True
+        def to_dict(self, *args, **kwargs):
+            return {}
+            
+    np = None
 
 class UltraMLPipeline:
     """The Ultra-Brilliant ML Pipeline that evolves and learns."""
@@ -204,7 +230,7 @@ class UltraMLPipeline:
 
         return analysis
 
-    async def _fetch_mtf_data_async(self, symbol: str) -> Dict[str, pd.DataFrame]:
+    async def _fetch_mtf_data_async(self, symbol: str) -> Dict[str, Any]:
         """Fetch multi-timeframe data asynchronously."""
         if not self.market_data:
             return {}
