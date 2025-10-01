@@ -3,6 +3,8 @@ Exchange Manager
 Manages multiple exchange connections and provides unified interface
 """
 
+from dataclasses import dataclass
+from typing import List, Dict, Any, Optional
 import json
 import time
 import logging

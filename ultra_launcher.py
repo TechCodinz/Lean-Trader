@@ -63,6 +63,22 @@ except ImportError:
     OPTIMIZATIONS_AVAILABLE = False
     shutdown_manager = None
 
+# Import ultimate fixes
+try:
+    from ultimate_fixes import integrate_ultimate_fixes
+    ULTIMATE_FIXES_AVAILABLE = True
+except ImportError:
+    logger.warning("⚠️ Ultimate fixes not available")
+    ULTIMATE_FIXES_AVAILABLE = False
+
+# Import architectural alignment
+try:
+    from architectural_alignment import align_architecture
+    ARCHITECTURE_ALIGNED = True
+except ImportError:
+    logger.warning("⚠️ Architectural alignment not available")
+    ARCHITECTURE_ALIGNED = False
+
 # Add paths for imports
 sys.path.append(str(Path(__file__).parent))
 sys.path.append(str(Path(__file__).parent / "tools"))
@@ -274,6 +290,18 @@ class UltraLauncher:
             self.pipeline = integrate_optimizations(self.pipeline)
             logger.info("✅ Optimizations activated: Graceful shutdown, Memory management, State persistence")
         
+        # Apply ultimate fixes if available
+        if ULTIMATE_FIXES_AVAILABLE:
+            logger.info("🔧 Applying ultimate fixes...")
+            self.pipeline = integrate_ultimate_fixes(self.pipeline)
+            logger.info("✅ Ultimate fixes activated: Network resilience, Data validation, Complete implementations")
+        
+        # Align architecture if available
+        if ARCHITECTURE_ALIGNED:
+            logger.info("🏗️ Aligning system architecture...")
+            self.pipeline = align_architecture(self.pipeline)
+            logger.info("✅ Architecture aligned: Components wired, Dependencies injected, Pipeline orchestrated")
+        
         # Apply production safety features if available
         if SAFETY_FEATURES_AVAILABLE and hasattr(self.pipeline, 'exchange'):
             logger.info("🛡️ Applying production safety features...")
@@ -295,6 +323,18 @@ class UltraLauncher:
             logger.info("⚡ Applying production optimizations...")
             self.pipeline = integrate_optimizations(self.pipeline)
             logger.info("✅ Optimizations activated: Graceful shutdown, Memory management, State persistence")
+        
+        # Apply ultimate fixes if available
+        if ULTIMATE_FIXES_AVAILABLE:
+            logger.info("🔧 Applying ultimate fixes...")
+            self.pipeline = integrate_ultimate_fixes(self.pipeline)
+            logger.info("✅ Ultimate fixes activated: Network resilience, Data validation, Complete implementations")
+        
+        # Align architecture if available
+        if ARCHITECTURE_ALIGNED:
+            logger.info("🏗️ Aligning system architecture...")
+            self.pipeline = align_architecture(self.pipeline)
+            logger.info("✅ Architecture aligned: Components wired, Dependencies injected, Pipeline orchestrated")
 
         # Only try to activate features if pipeline components are available
         if pipeline_available:
