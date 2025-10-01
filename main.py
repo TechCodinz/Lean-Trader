@@ -8,22 +8,69 @@ import asyncio
 import sys
 import os
 import signal
-from dotenv import load_dotenv
+from pathlib import Path
+import logging
+
+# Setup basic logging first
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 # Add project root to path
 sys.path.append(str(Path(__file__).parent))
 
-# Load environment variables
-load_dotenv()
+# Try to load environment variables if available
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    logger.warning("python-dotenv not installed, using system environment variables")
 
 # Import bot components
-from src.bot import TradingBot
-from src.data_collector import DataCollector
-from src.ml_engine import MLEngine
-from src.risk_manager import RiskManager
-from src.notification_manager import NotificationManager
-from src.dashboard import Dashboard
-from src.database import Database
+# Import bot components with error handling
+try:
+    from src.bot import TradingBot
+except ImportError:
+    logger.error("Could not import TradingBot")
+    from trading_bot_stub import TradingBot
+
+try:
+    from src.data_collector import DataCollector
+except ImportError:
+    logger.error("Could not import DataCollector")
+    from data_collector_stub import DataCollector
+
+try:
+    from src.ml_engine import MLEngine
+except ImportError:
+    logger.error("Could not import MLEngine")
+    from ml_engine_stub import MLEngine
+
+try:
+    from src.risk_manager import RiskManager
+except ImportError:
+    logger.error("Could not import RiskManager")
+    from risk_manager_stub import RiskManager
+
+try:
+    from src.notification_manager import NotificationManager
+except ImportError:
+    logger.error("Could not import NotificationManager")
+    from notification_manager_stub import NotificationManager
+
+try:
+    from src.dashboard import Dashboard
+except ImportError:
+    logger.error("Could not import Dashboard")
+    from dashboard_stub import Dashboard
+
+try:
+    from src.database import Database
+except ImportError:
+    logger.error("Could not import Database")
+    from database_stub import Database
 
 class TradingBotOrchestrator:
     """Main orchestrator for the trading bot system"""
@@ -46,19 +93,44 @@ class TradingBotOrchestrator:
         log_dir = Path("logs")
         log_dir.mkdir(exist_ok=True)
 
-        logger.remove()  # Remove default handler
-        logger.add(
-            "logs/trading/trading_bot.log",
-            rotation="1 day",
-            retention="30 days",
-            level=os.getenv("LOG_LEVEL", "INFO"),
-            format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {name}:{function}:{line} | {message}",
-        )
-        logger.add(
-            sys.stdout,
-            level=os.getenv("LOG_LEVEL", "INFO"),
-            format="<green>{time:HH:mm:ss}</green> | <level>{level}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan> | {message}",
-        )
+        # Use standard logging instead of loguru if not available
+        try:
+            from loguru import logger as loguru_logger
+            loguru_logger.remove()  # Remove default handler
+            loguru_logger.add(
+                "logs/trading/trading_bot.log",
+                rotation="1 day",
+                retention="30 days",
+                level=os.getenv("LOG_LEVEL", "INFO"),
+                format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {name}:{function}:{line} | {message}",
+            )
+            loguru_logger.add(
+                sys.stdout,
+                level=os.getenv("LOG_LEVEL", "INFO"),
+                format="<green>{time:HH:mm:ss}</green> | <level>{level}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan> | {message}",
+            )
+            global logger
+            logger = loguru_logger
+        except ImportError:
+            # Fallback to standard logging
+            log_dir = Path("logs/trading")
+            log_dir.mkdir(parents=True, exist_ok=True)
+            
+            file_handler = logging.FileHandler(log_dir / "trading_bot.log")
+            file_handler.setLevel(logging.INFO)
+            
+            console_handler = logging.StreamHandler(sys.stdout)
+            console_handler.setLevel(logging.INFO)
+            
+            formatter = logging.Formatter(
+                '%(asctime)s | %(levelname)s | %(name)s:%(funcName)s:%(lineno)d | %(message)s'
+            )
+            
+            file_handler.setFormatter(formatter)
+            console_handler.setFormatter(formatter)
+            
+            logger.addHandler(file_handler)
+            logger.addHandler(console_handler)
 
     async def initialize(self):
         """Initialize all bot components"""

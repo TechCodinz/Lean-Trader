@@ -1,14 +1,44 @@
 #!/usr/bin/env python3
 import asyncio
-import ccxt
-from datetime import datetime
+import logging
 import sqlite3
-from sklearn.ensemble import (
-    RandomForestClassifier,
-    GradientBoostingClassifier,
+import os
+from datetime import datetime
+from pathlib import Path
+
+# Setup logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
-from sklearn.neural_network import MLPClassifier
-from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
+logger = logging.getLogger(__name__)
+
+# Import with error handling
+try:
+    import ccxt
+except ImportError:
+    logger.error("ccxt not installed. Please install with: pip install ccxt")
+    ccxt = None
+
+try:
+    from sklearn.ensemble import (
+        RandomForestClassifier,
+        GradientBoostingClassifier,
+    )
+    from sklearn.neural_network import MLPClassifier
+except ImportError:
+    logger.error("scikit-learn not installed. ML features will be disabled")
+    RandomForestClassifier = None
+    GradientBoostingClassifier = None
+    MLPClassifier = None
+
+try:
+    from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
+except ImportError:
+    logger.error("python-telegram-bot not installed. Telegram features will be disabled")
+    Bot = None
+    InlineKeyboardButton = None
+    InlineKeyboardMarkup = None
 
 class AutoTradingBot:
     def __init__(self):
@@ -16,19 +46,42 @@ class AutoTradingBot:
         self.exchanges = {}
         self.initialize_exchanges()
 
-        # Bybit configuration with REAL trading enabled
-        self.bybit = ccxt.bybit(
-            {
-                'apiKey': 'g1mhPqKrOBp9rnqb4G',
-                'secret': 's9KCIelCqPwJOOWAXNoWqFHtiauRQr9PLeqG',
-                'sandbox': True,
-                'testnet': True,
-                'enableRateLimit': True,
-            }
-        )
+        # Bybit configuration - NEVER hardcode API keys in production!
+        # Use environment variables instead
+        self.bybit = None
+        if ccxt:
+            api_key = os.getenv('BYBIT_API_KEY', '')
+            api_secret = os.getenv('BYBIT_API_SECRET', '')
+            
+            if not api_key or not api_secret:
+                logger.warning("Bybit API keys not found in environment variables. Using demo mode.")
+                logger.warning("Set BYBIT_API_KEY and BYBIT_API_SECRET environment variables for live trading.")
+            
+            self.bybit = ccxt.bybit(
+                {
+                    'apiKey': api_key,
+                    'secret': api_secret,
+                    'sandbox': True,  # Always use testnet for safety
+                    'testnet': True,
+                    'enableRateLimit': True,
+                    'options': {
+                        'defaultType': 'spot',  # Use spot trading by default
+                    }
+                }
+            )
+        else:
+            logger.error("ccxt not available, exchange features disabled")
 
-        # Telegram configuration
-        self.channels = {'admin': '5329503447', 'free': '-1002930953007', 'vip': '-1002983007302'}
+        # Telegram configuration - Use environment variables
+        self.telegram_token = os.getenv('TELEGRAM_BOT_TOKEN', '')
+        self.channels = {
+            'admin': os.getenv('TELEGRAM_ADMIN_CHANNEL', ''),
+            'free': os.getenv('TELEGRAM_FREE_CHANNEL', ''),
+            'vip': os.getenv('TELEGRAM_VIP_CHANNEL', '')
+        }
+        
+        if not self.telegram_token:
+            logger.warning("Telegram bot token not found. Set TELEGRAM_BOT_TOKEN environment variable.")
 
         # Trading pairs
         self.crypto_pairs = [
@@ -128,6 +181,10 @@ class AutoTradingBot:
     def initialize_ai_models(self):
         """Initialize AI models"""
         try:
+            if RandomForestClassifier is None:
+                logger.warning("ML models not available - scikit-learn not installed")
+                return
+                
             ml_model_types = [
                 'trend_analysis',
                 'volume_analysis',
@@ -171,8 +228,12 @@ class AutoTradingBot:
     async def get_bybit_balance(self):
         """Get Bybit testnet balance"""
         try:
-            balance = await self.bybit.fetch_balance()
-            usdt_balance = balance['USDT']['free']
+            if not self.bybit:
+                logger.warning("Bybit not initialized")
+                return 10000.0  # Default demo balance
+                
+            balance = self.bybit.fetch_balance()
+            usdt_balance = balance.get('USDT', {}).get('free', 0)
             return float(usdt_balance) if usdt_balance else 10000.0  # Default testnet balance
         except Exception as e:
             logger.error(f"Balance fetch error: {e}")
@@ -181,7 +242,15 @@ class AutoTradingBot:
     async def send_telegram(self, message, channel):
         """Send Telegram message"""
         try:
-            bot = Bot(token="8291641352:AAFTGq-hIY_iS47aMOoGXrBDFlR_B3nCupg")
+            if not Bot or not self.telegram_token:
+                logger.warning("Telegram not configured")
+                return
+                
+            if channel not in self.channels or not self.channels[channel]:
+                logger.warning(f"Channel {channel} not configured")
+                return
+                
+            bot = Bot(token=self.telegram_token)
             await bot.send_message(chat_id=self.channels[channel], text=message)
             logger.info(f"📱 Message sent to {channel}")
         except Exception as e:
@@ -190,7 +259,15 @@ class AutoTradingBot:
     async def send_telegram_with_buttons(self, message, channel, symbol, signal_data):
         """Send Telegram message with trading buttons"""
         try:
-            bot = Bot(token="8291641352:AAFTGq-hIY_iS47aMOoGXrBDFlR_B3nCupg")
+            if not Bot or not self.telegram_token:
+                logger.warning("Telegram not configured")
+                return
+                
+            if channel not in self.channels or not self.channels[channel]:
+                logger.warning(f"Channel {channel} not configured")
+                return
+                
+            bot = Bot(token=self.telegram_token)
 
             # Create inline keyboard with trading buttons
             keyboard = []
@@ -481,8 +558,12 @@ class AutoTradingBot:
                 logger.warning(f"Trade amount too small: {amount}")
                 return False
 
-            # Execute market order
-            order = await self.bybit.create_market_order(
+            # Execute market order with error handling
+            if not self.bybit:
+                logger.error("Bybit not initialized, cannot execute trade")
+                return False
+                
+            order = self.bybit.create_market_order(
                 symbol=symbol, side=action.lower(), amount=amount, params={'timeInForce': 'IOC'}
             )
 
