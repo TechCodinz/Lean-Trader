@@ -1,18 +1,56 @@
-venv/
-.venv/
-# Local environment variables
+# Environment files with sensitive data
 .env
-# Python artifacts
+env.live
+env.testnet
+env.arbitrage
+env.paper
+*.env
+
+# API Keys and secrets
+*api_key*
+*secret*
+*token*
+
+# Logs
+*.log
+logs/
+log/
+
+# Python
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
-build/
-dist/
-*.egg-info/
-runtime/
-tools/*.txt
-tools/*_out.txt
-*.pkl
-flake_report.txt
-pytest_report.txt
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# Trading data
+*.csv
+*.db
+*.sqlite
+*.json
+data/
+state/
+checkpoints/
+models/
+reports/
+backups/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# System
+.DS_Store
+Thumbs.db
+
+# Temporary
+tmp/
+temp/
+*.tmp
+*.temp

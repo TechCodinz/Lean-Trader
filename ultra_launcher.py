@@ -126,10 +126,12 @@ class UltraLauncher:
         """Load configuration from file or use defaults."""
         default_config = {
             'mode': 'live',  # 'live', 'paper', 'backtest'
-            'symbols': ['BTC/USDT', 'ETH/USDT', 'SOL/USDT'],
-            'timeframes': ['1m', '5m', '15m', '1h'],
-            'exchange': 'binance',
-            'max_positions': 5,
+            'symbols': 'ALL',  # Scan ALL available trading pairs
+            'timeframes': ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d'],
+            'exchange': 'multi',  # Use all configured exchanges
+            'market_types': ['spot', 'futures', 'perpetual', 'margin'],
+            'scan_all_pairs': True,
+            'max_positions': 20,
             'risk_per_trade': 0.02,
             'confidence_threshold': 0.65,
             'evolution_enabled': True,
