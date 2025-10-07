@@ -3,8 +3,12 @@
 import json
 import os as _os
 import time
+from pathlib import Path
+from dataclasses import dataclass
+from typing import Dict
 
 STATE_PATH = Path("runtime/risk_state.json")
+STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
 # Ultra Pro tighter defaults (opt-in via env ULTRA_PRO_MODE=true)
 _ULTRA = _os.getenv("ULTRA_PRO_MODE", "false").strip().lower() in ("1", "true", "yes")
 
