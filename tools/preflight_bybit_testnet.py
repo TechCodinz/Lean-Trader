@@ -1,5 +1,12 @@
 import os
 import json
+import sys
+
+# Ensure project root is on sys.path for `from router import ExchangeRouter`
+proj_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if proj_root not in sys.path:
+	# insert at position 0 to prioritize project root
+	sys.path.insert(0, proj_root)
 
 def main() -> int:
     # Env expected
