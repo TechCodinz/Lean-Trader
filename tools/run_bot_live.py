@@ -165,11 +165,20 @@ def main(symbol: str = None, timeframe: str = "1m", limit: int = 200):
                 last.get("close") or (df["close"].iloc[-1] if not df.empty else 0.0) or 0.0
             )
             amount = (usd_target / price) if price > 0 else 0.0
-        # session weighting (lower size off-peak)
+        # session weighting (lower size off-peak) and hard gate
         try:
             _, w = crypto_session_weight(symbol)
-            amount = float(max(0.0, amount * w))
             out["results"]["session_weight"] = w
+            # Hard gate: skip below threshold
+            min_w = float(os.getenv("SESSION_MIN_WEIGHT", "0.90"))
+            if w < min_w:
+                out["results"]["placed_order"] = {
+                    "ok": False,
+                    "note": f"session weight {w:.2f} < {min_w:.2f}",
+                }
+                print(json.dumps(out, indent=2))
+                return
+            amount = float(max(0.0, amount * w))
         except Exception:
             pass
         # per-symbol hard caps
