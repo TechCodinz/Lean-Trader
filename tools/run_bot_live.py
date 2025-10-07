@@ -98,8 +98,19 @@ def main(symbol: str = None, timeframe: str = "1m", limit: int = 200):
 
     # pick symbol
     if not symbol:
-        syms = ex.spot_symbols("USDT") or list(getattr(ex, "markets", {}).keys())
-        symbol = syms[0] if syms else "BTC/USDT"
+        # Prefer curated list via env
+        prefs = os.getenv("LIVE_SYMBOLS", "BTC/USDT,ETH/USDT,SOL/USDT,XRP/USDT,DOGE/USDT").split(",")
+        prefs = [p.strip() for p in prefs if p.strip()]
+        markets = set(getattr(ex, "markets", {}).keys())
+        chosen = None
+        for cand in prefs:
+            if cand in markets:
+                chosen = cand
+                break
+        if not chosen:
+            syms = ex.spot_symbols("USDT") or list(getattr(ex, "markets", {}).keys())
+            chosen = syms[0] if syms else "BTC/USDT"
+        symbol = chosen
     out["results"]["symbol"] = symbol
 
     try:
