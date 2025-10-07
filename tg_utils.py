@@ -95,6 +95,35 @@ def send_signal(title: str, lines: List[str]) -> bool:
     }
     return _post_json("sendMessage", payload)
 
+# New: targeted send to specific chat id (admin/VIP)
+def send_signal_to(chat_id: str, title: str, lines: List[str]) -> bool:
+    if not _enabled() or not chat_id:
+        return False
+    pretty = os.getenv("PRETTY_SIGNALS", "true").strip().lower() in ("1", "true", "yes")
+    if pretty:
+        # Reuse premium formatting but override chat_id
+        header = f"*{_md(title)}*\n"
+        boxed = lines[0] if lines else ""
+        boxed_block = f"`{_md(boxed)}`\n"
+        bullets = "\n".join(_md(s) for s in lines[1:]) if len(lines) > 1 else ""
+        text = header + boxed_block + ("\n" + bullets if bullets else "")
+        payload = {
+            "chat_id": chat_id,
+            "text": text,
+            "parse_mode": "Markdown",
+            "disable_web_page_preview": True,
+        }
+        return _post_json("sendMessage", payload)
+    # basic
+    text = f"*{_md(title)}*\n" + "\n".join(_md(line) for line in lines)
+    payload = {
+        "chat_id": chat_id,
+        "text": text,
+        "parse_mode": "Markdown",
+        "disable_web_page_preview": True,
+    }
+    return _post_json("sendMessage", payload)
+
 def send_premium_signal(title: str, lines: List[str]) -> bool:
     """Send an upgraded, clean-looking MarkdownV2 message with sections and code helpers.
 
@@ -134,6 +163,18 @@ def send_text(msg: str) -> bool:
         return False
     payload = {
         "chat_id": CHAT_ID,
+        "text": _md(msg),
+        "parse_mode": "Markdown",
+        "disable_web_page_preview": True,
+    }
+    return _post_json("sendMessage", payload)
+
+# New: admin text to specific chat id
+def send_text_to(chat_id: str, msg: str) -> bool:
+    if not _enabled() or not chat_id:
+        return False
+    payload = {
+        "chat_id": chat_id,
         "text": _md(msg),
         "parse_mode": "Markdown",
         "disable_web_page_preview": True,
