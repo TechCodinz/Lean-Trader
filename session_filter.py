@@ -2,6 +2,7 @@
 # Tags current market session and returns weights for decision making.
 
 import datetime as dt
+from typing import Tuple
 
 def _utcnow() -> dt.datetime:
     return dt.datetime.now(dt.timezone.utc)

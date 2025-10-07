@@ -1,0 +1,24 @@
+[Unit]
+Description=Ultra Live Trading (Gate.io)
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+Environment=EXCHANGE_ID=gateio
+Environment=ENABLE_LIVE=true
+Environment=ALLOW_LIVE=true
+Environment=LIVE_CONFIRM=YES
+Environment=LIVE_ORDER_USD=5
+Environment=DAILY_MAX_LOSS=2
+Environment=CIRCUIT_BREAKER_ENABLED=true
+Environment=LIVE_SYMBOLS=BTC/USDT,ETH/USDT,SOL/USDT
+# Place secrets via EnvironmentFile
+EnvironmentFile=/etc/ultra-live.env
+WorkingDirectory=/workspace
+ExecStart=/usr/bin/bash -lc '/workspace/start_persistent.sh'
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

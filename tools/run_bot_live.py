@@ -9,6 +9,7 @@ if proj_root not in sys.path:
     sys.path.insert(0, proj_root)
 
 from router import ExchangeRouter
+from session_filter import crypto_session_weight
 
 def bars_to_df(bars):
     """Convert ccxt OHLCV list to a pandas DataFrame.
@@ -164,6 +165,24 @@ def main(symbol: str = None, timeframe: str = "1m", limit: int = 200):
                 last.get("close") or (df["close"].iloc[-1] if not df.empty else 0.0) or 0.0
             )
             amount = (usd_target / price) if price > 0 else 0.0
+        # session weighting (lower size off-peak)
+        try:
+            _, w = crypto_session_weight(symbol)
+            amount = float(max(0.0, amount * w))
+            out["results"]["session_weight"] = w
+        except Exception:
+            pass
+        # per-symbol hard caps
+        per_caps = {
+            "BTC/USDT": float(os.getenv("MAX_ORDER_SIZE_BTC", "0.00005")),
+            "ETH/USDT": float(os.getenv("MAX_ORDER_SIZE_ETH", "0.001")),
+            "SOL/USDT": float(os.getenv("MAX_ORDER_SIZE_SOL", "0.05")),
+        }
+        sym_cap = per_caps.get(symbol)
+        if sym_cap is not None and amount > sym_cap:
+            out["results"]["order_rejected"] = f"amount {amount} > sym cap {sym_cap}"
+            print(json.dumps(out, indent=2))
+            return
         max_order = os.getenv("MAX_ORDER_SIZE")
         if max_order:
             try:
