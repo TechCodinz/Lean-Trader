@@ -69,6 +69,11 @@ CHILDREN = [
         "name": "online_trainer",
         "cmd": [PYTHON_EXE, "-u", "-m", "tools.child_wrapper", "tools.online_trainer"],
     },
+    {
+        "name": "learning_pipeline",
+        # run the opt-in learning pipeline periodically via child_wrapper (it respects ENABLE_LEARNING)
+        "cmd": [PYTHON_EXE, "-u", "-m", "tools.child_wrapper", "tools.pipeline"],
+    },
 ]
 
 PROCS = {}
