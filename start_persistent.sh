@@ -12,10 +12,11 @@ export EXCHANGE_ID=gateio
 export ENABLE_LIVE=true
 export ALLOW_LIVE=true
 export LIVE_CONFIRM=YES
-export LIVE_ORDER_USD=${LIVE_ORDER_USD:-5}
+export LIVE_ORDER_USD=${LIVE_ORDER_USD:-6}
 export DAILY_MAX_LOSS=${DAILY_MAX_LOSS:-2}
 export CIRCUIT_BREAKER_ENABLED=true
-export LIVE_SYMBOLS=${LIVE_SYMBOLS:-"BTC/USDT,ETH/USDT,SOL/USDT"}
+export SESSION_MIN_WEIGHT=${SESSION_MIN_WEIGHT:-0.85}
+export LIVE_SYMBOLS=${LIVE_SYMBOLS:-"BTC/USDT,ETH/USDT,SOL/USDT,XRP/USDT,DOGE/USDT"}
 # Per-symbol hard caps
 export MAX_ORDER_SIZE_BTC=${MAX_ORDER_SIZE_BTC:-0.00005}
 export MAX_ORDER_SIZE_ETH=${MAX_ORDER_SIZE_ETH:-0.001}
@@ -48,7 +49,7 @@ tmux send-keys -t "$SESSION":0.1 "$cmd2" C-m
 
 # Optional pane 3: periodic scanner signals (publish)
 tmux split-window -v -t "$SESSION":0.1
-cmd3="SCAN_TF=5m TOP_N=5 SCAN_LIMIT=200 python3 -u signals_scanner.py --publish --repeat 300 2>&1 | tee -a runtime/logs/scanner_console.log"
+cmd3="SCAN_TF=5m TOP_N=7 SCAN_LIMIT=250 python3 -u signals_scanner.py --publish --repeat 300 2>&1 | tee -a runtime/logs/scanner_console.log"
 tmux send-keys -t "$SESSION":0.2 "$cmd3" C-m
 
 # Attach hint
