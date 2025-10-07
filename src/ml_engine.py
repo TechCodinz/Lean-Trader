@@ -4,7 +4,16 @@ Advanced ML models for price prediction and signal generation
 """
 
 from sklearn.ensemble import RandomForestClassifier
-import tensorflow as tf
+try:
+    import tensorflow as tf  # type: ignore
+    from tensorflow.keras.models import Sequential  # type: ignore
+    from tensorflow.keras.layers import LSTM, Dense, Dropout, Conv1D, MaxPooling1D  # type: ignore
+    from tensorflow.keras.optimizers import Adam  # type: ignore
+    from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint  # type: ignore
+except Exception:  # pragma: no cover - optional heavy dep
+    tf = None  # type: ignore
+    Sequential = LSTM = Dense = Dropout = Conv1D = MaxPooling1D = None  # type: ignore
+    Adam = EarlyStopping = ModelCheckpoint = None  # type: ignore
 
 import asyncio
 import os
@@ -21,13 +30,49 @@ from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.preprocessing import StandardScaler, RobustScaler
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense, Dropout, Conv1D, MaxPooling1D
-from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 
 # Technical Analysis
-import talib
+try:
+    import talib  # type: ignore
+except Exception:  # pragma: no cover - optional dep
+    talib = None  # type: ignore
+    import pandas as _pd
+    import numpy as _np
+
+    def _sma(values: _np.ndarray, period: int) -> _np.ndarray:
+        s = _pd.Series(values, dtype=float)
+        return s.rolling(window=period, min_periods=period).mean().to_numpy()
+
+    def _ema(values: _np.ndarray, period: int) -> _np.ndarray:
+        s = _pd.Series(values, dtype=float)
+        return s.ewm(span=period, adjust=False).mean().to_numpy()
+
+    def _rsi(values: _np.ndarray, period: int = 14) -> _np.ndarray:
+        s = _pd.Series(values, dtype=float)
+        d = s.diff()
+        up = d.clip(lower=0.0)
+        down = -d.clip(upper=0.0)
+        roll_up = up.ewm(alpha=1 / period, adjust=False).mean()
+        roll_down = down.ewm(alpha=1 / period, adjust=False).mean()
+        rs = roll_up / (roll_down + 1e-12)
+        return (100 - (100 / (1 + rs))).to_numpy()
+
+    def _macd(values: _np.ndarray, fast: int = 12, slow: int = 26, signal: int = 9):
+        ef = _ema(values, fast)
+        es = _ema(values, slow)
+        macd = ef - es
+        sig = _pd.Series(macd).ewm(span=signal, adjust=False).mean().to_numpy()
+        hist = macd - sig
+        return macd, sig, hist
+
+    def _bbands(values: _np.ndarray, period: int = 20, num_std: float = 2.0):
+        s = _pd.Series(values, dtype=float)
+        ma = s.rolling(window=period, min_periods=period).mean()
+        sd = s.rolling(window=period, min_periods=period).std()
+        upper = (ma + num_std * sd).to_numpy()
+        middle = ma.to_numpy()
+        lower = (ma - num_std * sd).to_numpy()
+        return upper, middle, lower
 
 if TYPE_CHECKING:
     from src.bot import TradeSignal  # for type hints only
@@ -114,8 +159,8 @@ class MLEngine:
 
             if model_path.exists():
                 try:
-                    if model_name == 'lstm':
-                        self.models[model_name] = tf.keras.models.load_model(model_path)
+                    if model_name == 'lstm' and tf is not None:
+                        self.models[model_name] = tf.keras.models.load_model(model_path)  # type: ignore
                     else:
                         self.models[model_name] = joblib.load(model_path)
                     logger.info(f"✅ Loaded {model_name} model")
@@ -198,20 +243,33 @@ class MLEngine:
 
             # Technical indicators (robust to dtype)
             close_vals = data['close'].astype(float).values
-            data['rsi'] = talib.RSI(close_vals, timeperiod=14)
-            macd, macd_sig, macd_hist = talib.MACD(close_vals)
-            data['macd'], data['macd_signal'], data['macd_hist'] = macd, macd_sig, macd_hist
-            bb_u, bb_m, bb_l = talib.BBANDS(close_vals)
-            data['bb_upper'], data['bb_middle'], data['bb_lower'] = bb_u, bb_m, bb_l
-            data['sma_20'] = talib.SMA(close_vals, timeperiod=20)
-            data['sma_50'] = talib.SMA(close_vals, timeperiod=50)
-            data['ema_12'] = talib.EMA(close_vals, timeperiod=12)
-            data['ema_26'] = talib.EMA(close_vals, timeperiod=26)
+            if talib is not None:
+                data['rsi'] = talib.RSI(close_vals, timeperiod=14)
+                m, s, h = talib.MACD(close_vals)
+                data['macd'], data['macd_signal'], data['macd_hist'] = m, s, h
+                bb_u, bb_m, bb_l = talib.BBANDS(close_vals)
+                data['bb_upper'], data['bb_middle'], data['bb_lower'] = bb_u, bb_m, bb_l
+                data['sma_20'] = talib.SMA(close_vals, timeperiod=20)
+                data['sma_50'] = talib.SMA(close_vals, timeperiod=50)
+                data['ema_12'] = talib.EMA(close_vals, timeperiod=12)
+                data['ema_26'] = talib.EMA(close_vals, timeperiod=26)
+            else:
+                data['rsi'] = _rsi(close_vals, period=14)
+                m, s, h = _macd(close_vals)
+                data['macd'], data['macd_signal'], data['macd_hist'] = m, s, h
+                bb_u, bb_m, bb_l = _bbands(close_vals, period=20, num_std=2.0)
+                data['bb_upper'], data['bb_middle'], data['bb_lower'] = bb_u, bb_m, bb_l
+                data['sma_20'] = _sma(close_vals, period=20)
+                data['sma_50'] = _sma(close_vals, period=50)
+                data['ema_12'] = _ema(close_vals, period=12)
+                data['ema_26'] = _ema(close_vals, period=26)
 
             # Volume features
             vol_vals = data['volume'].astype(float).values
-            data['volume_sma'] = talib.SMA(vol_vals, timeperiod=20)
-            data['volume_ratio'] = data['volume'] / data['volume_sma']
+            if talib is not None:
+                data['volume_sma'] = talib.SMA(vol_vals, timeperiod=20)
+            else:
+                data['volume_sma'] = pd.Series(vol_vals).rolling(window=20, min_periods=20).mean().to_numpy()
 
             # Price position features
             data['price_vs_sma20'] = data['close'] / data['sma_20'] - 1
@@ -272,6 +330,10 @@ class MLEngine:
     async def _create_lstm_model(self, data: pd.DataFrame):
         """Create LSTM model for sequence prediction"""
         try:
+            # Skip if TensorFlow is not available
+            if Sequential is None:
+                logger.info("TensorFlow not available; skipping LSTM model creation")
+                return
             # Prepare features for LSTM
             feature_columns = [
                 col
@@ -339,10 +401,11 @@ class MLEngine:
             )
 
             # Train model
-            callbacks = [
-                EarlyStopping(patience=10, restore_best_weights=True),
-                ModelCheckpoint('models/ml/lstm_best_model.h5', save_best_only=True),
-            ]
+            callbacks = []
+            if EarlyStopping is not None:
+                callbacks.append(EarlyStopping(patience=10, restore_best_weights=True))
+            if ModelCheckpoint is not None:
+                callbacks.append(ModelCheckpoint('models/ml/lstm_best_model.h5', save_best_only=True))
 
             model.fit(
                 X_train,
@@ -461,12 +524,13 @@ class MLEngine:
         """Create dummy models when insufficient data is available"""
         logger.info("🎭 Creating dummy models for demonstration...")
 
-        # Dummy LSTM model
-        dummy_lstm = Sequential(
-            [Dense(10, activation='relu', input_shape=(10,)), Dense(3, activation='softmax')]
-        )
-        dummy_lstm.compile(optimizer='adam', loss='sparse_categorical_crossentropy')
-        self.models['lstm'] = dummy_lstm
+        # Dummy LSTM model (only if TF available)
+        if Sequential is not None:
+            dummy_lstm = Sequential(
+                [Dense(10, activation='relu', input_shape=(10,)), Dense(3, activation='softmax')]
+            )
+            dummy_lstm.compile(optimizer='adam', loss='sparse_categorical_crossentropy')
+            self.models['lstm'] = dummy_lstm
 
         # Dummy ensemble models
         self.models['random_forest'] = RandomForestClassifier(n_estimators=10, random_state=42)
@@ -485,8 +549,8 @@ class MLEngine:
                 try:
                     model_path = models_dir / f"{model_name}_model.joblib"
 
-                    if model_name == 'lstm':
-                        model.save(model_path)
+                    if model_name == 'lstm' and tf is not None:
+                        model.save(model_path)  # type: ignore
                     else:
                         joblib.dump(model, model_path)
 
@@ -823,7 +887,7 @@ class MLEngine:
             for model_name, model in self.models.items():
                 if model is not None:
                     try:
-                        if model_name == 'lstm':
+                        if model_name == 'lstm' and tf is not None:
                             model.predict(dummy_features.reshape(1, 1, -1), verbose=0)
                         else:
                             model.predict(dummy_features)
