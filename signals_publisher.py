@@ -37,10 +37,20 @@ except Exception:
 
 # ---- Telegram helper (safe no-op if disabled) ----
 try:
-    from tg_utils import send_signal as tg_send  # expects (title: str, lines: list[str])
+    from tg_utils import (
+        send_signal as tg_send,  # expects (title: str, lines: list[str])
+        send_signal_to as tg_send_to,
+        send_text_to as tg_text_to,
+    )
 except Exception:
 
-    def tg_send(_: str, __: List[str]) -> bool:
+    def tg_send(_: str, __: List[str]) -> bool:  # type: ignore
+        return False
+
+    def tg_send_to(_: str, __: str, ___: List[str]) -> bool:  # type: ignore
+        return False
+
+    def tg_text_to(_: str, __: str) -> bool:  # type: ignore
         return False
 
 # ------------ config ------------
@@ -514,6 +524,29 @@ def publish_signal(sig: Dict[str, Any]) -> Dict[str, Any]:
         except Exception as _e:
             print("[telegram] error:", _e)
         notified["webhook"] = _post_webhook(s)
+
+        # --- Optional multi-channel broadcast (Free/VIP/Admin) ---
+        try:
+            free_chat = os.getenv("TG_FREE_CHAT_ID", "").strip()
+            vip_chat = os.getenv("TG_VIP_CHAT_ID", "").strip()
+            admin_chat = os.getenv("TG_ADMIN_CHAT_ID", "").strip()
+            vip_min = float(os.getenv("VIP_MIN_CONF", "0.80"))
+
+            # Free channel: send all published signals (already rate limited)
+            if free_chat:
+                _ = tg_send_to(free_chat, title, lines)
+            # VIP: only higher confidence
+            try:
+                if vip_chat and float(s.get("confidence", 0.0)) >= vip_min:
+                    _ = tg_send_to(vip_chat, title, lines)
+            except Exception:
+                pass
+            # Admin brief
+            if admin_chat:
+                brief = f"Signal {s.get('symbol','')} {s.get('side','').upper()} Q={float(s.get('confidence',0.0)):.2f} TF={s.get('tf','?')}"
+                _ = tg_text_to(admin_chat, brief)
+        except Exception:
+            pass
     else:
         notified["rate_limited"] = True
 
