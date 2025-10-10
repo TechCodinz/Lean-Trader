@@ -1,52 +1,62 @@
 # router.py
 import os
 from pprint import pprint
+from typing import Any, Dict, List, Optional
 
 import ccxt
 
+
 class ExchangeRouter:
     def __init__(self):
-        self.mode = os.getenv("EXCHANGE_MODE", "spot").lower()  # spot | linear
-        self.live = os.getenv("ENABLE_LIVE", "false").lower() == "true"
+        self.mode = os.getenv("MARKET_MODE", os.getenv("EXCHANGE_MODE", "spot")).lower()
+        # mode: spot | swap (linear USDT perp) | futures
+        self.live = os.getenv("ENABLE_LIVE", "false").strip().lower() in ("1", "true", "yes", "on")
         self.paper = os.getenv("EXCHANGE_ID", "paper").lower() == "paper"
-        self.testnet = os.getenv("BYBIT_TESTNET", "false").lower() == "true"
-        self.quote_as_notional = os.getenv("CCXT_QUOTE_AS_NOTIONAL", "true").lower() == "true"
+        self.testnet = os.getenv("BYBIT_TESTNET", "false").strip().lower() in ("1", "true", "yes", "on")
+        self.quote_as_notional = (
+            os.getenv("CCXT_QUOTE_AS_NOTIONAL", "true").strip().lower() in ("1", "true", "yes", "on")
+        )
+
+        # cache
+        self.markets: Dict[str, Any] = {}
+        self.id: str = os.getenv("EXCHANGE_ID", "bybit").lower()
 
         if self.paper:
             start_cash = float(os.getenv("PAPER_START_CASH", "5000"))
             self.ex = PaperBroker(start_cash)
         else:
-            ex_id = os.getenv("EXCHANGE_ID", "bybit")
-            apiKey = os.getenv("API_KEY", "")
-            secret = os.getenv("API_SECRET", "")
-            opts = {"enableRateLimit": True}
+            ex_id = self.id
+            apiKey = os.getenv("API_KEY", "") or os.getenv(f"{ex_id.upper()}_API_KEY", "")
+            secret = os.getenv("API_SECRET", "") or os.getenv(f"{ex_id.upper()}_API_SECRET", "")
+            opts: Dict[str, Any] = {
+                "enableRateLimit": True,
+                "timeout": int(os.getenv("CCXT_TIMEOUT_MS", "20000")),
+                "options": {
+                    # respect futures default type
+                    "defaultType": os.getenv("CCXT_DEFAULT_TYPE", "spot").lower(),
+                },
+            }
+            # Testnet URLs where applicable
             if ex_id == "bybit" and self.testnet:
                 opts["urls"] = {
-                    "api": "https://api-testnet.bybit.com",
+                    "api": {
+                        "public": "https://api-testnet.bybit.com",
+                        "private": "https://api-testnet.bybit.com",
+                    }
                 }
+            # Gate swap needs defaultType=swap for futures
+            if ex_id == "gateio" and self.mode.startswith("swap"):
+                opts["options"]["defaultType"] = "swap"
 
-            self.ex = getattr(
-                ccxt,
-                ex_id,
-            )(
-                {
-                    "apiKey": apiKey,
-                    "secret": secret,
-                    **opts,
-                }
-            )
+            self.ex = getattr(ccxt, ex_id)({"apiKey": apiKey, "secret": secret, **opts})
+            # try to set unified params for linear
+            try:
+                if self.mode in ("swap", "linear") and hasattr(self.ex, "set_sandbox_mode"):
+                    self.ex.set_sandbox_mode(bool(self.testnet))
+            except Exception:
+                pass
 
-        try:
-            # try ccxt load_markets; some adapters return odd types
-            if hasattr(self.ex, "load_markets"):
-                self.markets = self.ex.load_markets()
-            elif hasattr(self.ex, "fetch_markets"):
-                self.markets = self.ex.fetch_markets()
-            else:
-                self.markets = {}
-        except Exception as _e:
-            print("[router] load_markets error:", _e)
-            self.markets = {}
+        self.markets = self._load_markets_safe()
 
     # -------- info / account --------
     def info(self) -> Dict[str, Any]:
@@ -55,6 +65,7 @@ class ExchangeRouter:
             "testnet": self.testnet,
             "mode": self.mode,
             "live": self.live,
+            "id": self.id,
         }
 
     def account(self) -> Dict[str, Any]:
@@ -64,8 +75,8 @@ class ExchangeRouter:
                     "ok": True,
                     "paper_cash": getattr(self.ex, "cash", 0.0),
                 }
-            if hasattr(self.ex, "safe_fetch_balance"):
-                return {"ok": True, "balance": self.ex.safe_fetch_balance()}
+            if hasattr(self, "safe_fetch_balance"):
+                return {"ok": True, "balance": self.safe_fetch_balance()}
             try:
                 return {"ok": True, "balance": self.ex.fetch_balance()}
             except Exception:
@@ -92,8 +103,6 @@ class ExchangeRouter:
         try:
             if ex is None:
                 return []
-            if hasattr(ex, "safe_fetch_ohlcv"):
-                return ex.safe_fetch_ohlcv(symbol, timeframe=tf, limit=limit)
             try:
                 return ex.fetch_ohlcv(
                     symbol,
@@ -113,13 +122,97 @@ class ExchangeRouter:
 
     def last_price(self, symbol: str) -> float:
         try:
-            if hasattr(self.ex, "safe_fetch_ticker"):
-                t = self.ex.safe_fetch_ticker(symbol)
-            else:
-                t = self.ex.fetch_ticker(symbol)
+            t = self.safe_fetch_ticker(symbol)
             return float(t.get("last") or t.get("close") or 0)
         except Exception:
             return 0.0
+
+    # -------- safe helpers (uniform APIs) --------
+    def _load_markets_safe(self) -> Dict[str, Any]:
+        try:
+            mkts = {}
+            try:
+                mkts = self.ex.load_markets() or {}
+            except Exception:
+                pass
+            if not isinstance(mkts, dict):
+                # Some adapters might return a list; convert to dict if possible
+                try:
+                    mkts = {m.get("symbol") or m.get("id"): m for m in (mkts or []) if isinstance(m, dict)}
+                except Exception:
+                    mkts = {}
+            return mkts
+        except Exception as e:
+            print("[router] load_markets error:", e)
+            return {}
+
+    def safe_fetch_ticker(self, symbol: str) -> Dict[str, Any]:
+        try:
+            return self.ex.fetch_ticker(symbol) or {}
+        except Exception as e:
+            print("[router] fetch_ticker failed for", symbol, e)
+            return {}
+
+    def safe_fetch_balance(self) -> Dict[str, Any]:
+        try:
+            return self.ex.fetch_balance() or {}
+        except Exception as e:
+            print("[router] fetch_balance failed:", e)
+            return {}
+
+    def safe_fetch_ohlcv(self, symbol: str, timeframe: str = "1m", limit: int = 120) -> List[List[float]]:
+        try:
+            return self.ex.fetch_ohlcv(symbol, timeframe=timeframe, limit=limit) or []
+        except Exception as e:
+            print("[router] fetch_ohlcv failed for", symbol, e)
+            return []
+
+    def spot_symbols(self, quote: str = "USDT") -> List[str]:
+        try:
+            syms: List[str] = []
+            for sym, m in self.markets.items():
+                if (m.get("spot") or m.get("type") == "spot") and str(m.get("quote", "")).upper() == quote.upper():
+                    syms.append(sym)
+            return syms
+        except Exception:
+            return []
+
+    def linear_symbols(self, quote: str = "USDT") -> List[str]:
+        try:
+            syms: List[str] = []
+            for sym, m in self.markets.items():
+                # CCXT unified market flags
+                if (m.get("swap") or m.get("linear")) and str(m.get("quote", "")).upper() == quote.upper():
+                    syms.append(sym)
+            return syms
+        except Exception:
+            return []
+
+    def safe_place_order(self, symbol: str, side: str, amount: float, price: Optional[float] = None, params: Optional[Dict[str, Any]] = None):
+        params = params or {}
+        try:
+            order_type = "market" if not price else "limit"
+            px = None if order_type == "market" else float(price)
+            # precision helpers
+            try:
+                if px is not None:
+                    px = float(self.ex.price_to_precision(symbol, px))
+                amount = float(self.ex.amount_to_precision(symbol, amount))
+            except Exception:
+                pass
+            o = self.ex.create_order(symbol, order_type, side, amount, px, params)
+            return {"ok": True, "order": o}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    def safe_close_position(self, symbol: str):
+        try:
+            params = {"reduceOnly": True}
+            side = "sell"
+            # Try to infer position direction to close oppositely (best-effort)
+            return self.safe_place_order(symbol, side, 0.0, params=params)
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
 
     # -------- spot --------
     def place_spot_market(self, symbol: str, side: str, qty: float = None, notional: float = None):

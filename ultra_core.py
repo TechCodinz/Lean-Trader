@@ -398,13 +398,30 @@ class UltraCore:
 
         Returns a USD-denominated stake (or abstract units) suitable for `safe_place_order`.
         """
-        # Enhanced: Kelly criterion for sizing
+        # Enhanced: Kelly criterion for sizing + trainer mean_score scaling when available
         try:
             win_rate = float(self.knowledge_base.get("win_rate", 0.5))
             avg_win = float(self.knowledge_base.get("avg_win", 1.0))
             avg_loss = float(self.knowledge_base.get("avg_loss", 1.0))
             kelly = (win_rate * avg_win - (1 - win_rate) * avg_loss) / avg_win if avg_win > 0 else 0.1
             base_usd = 50.0
+            # trainer-produced mean_score (0..1) downscales in cold regimes
+            try:
+                from pathlib import Path
+                import json
+
+                models_dir = Path("runtime") / "models"
+                latest = None
+                if models_dir.exists():
+                    allm = sorted(models_dir.glob("model_*.json"))
+                    if allm:
+                        latest = allm[-1]
+                if latest is not None:
+                    obj = json.loads(latest.read_text(encoding="utf-8"))
+                    mean_score = float(obj.get("mean_score", 0.5))
+                    base_usd *= max(0.5, min(1.5, 0.5 + mean_score))
+            except Exception:
+                pass
             stake = base_usd * max(0.01, min(0.5, kelly))
             return max(1.0, stake)
         except Exception:

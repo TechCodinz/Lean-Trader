@@ -17,6 +17,7 @@ import signal
 import subprocess
 import sys
 import time
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 RUNTIME = ROOT / "runtime"
@@ -73,6 +74,14 @@ CHILDREN = [
         "name": "learning_pipeline",
         # run the opt-in learning pipeline periodically via child_wrapper (it respects ENABLE_LEARNING)
         "cmd": [PYTHON_EXE, "-u", "-m", "tools.child_wrapper", "tools.pipeline"],
+    },
+    {
+        "name": "tg_status_pinger",
+        "cmd": [PYTHON_EXE, "-u", "-m", "tools.child_wrapper", "tools.heartbeat"],
+    },
+    {
+        "name": "tg_pnl_watcher",
+        "cmd": [PYTHON_EXE, "-u", "-m", "tools.child_wrapper", "tools.pnl_watcher"],
     },
 ]
 

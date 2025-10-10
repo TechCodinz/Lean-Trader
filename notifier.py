@@ -20,9 +20,19 @@ def _envb(name: str, default: str = "") -> str:
 
 class TelegramNotifier:
     def __init__(self):
-        self.enabled = _envb("TELEGRAM_ENABLED", "false").lower() == "true"
-        self.token = _envb("TELEGRAM_BOT_TOKEN", "")
-        self.chat_id = _envb("TELEGRAM_CHAT_ID", "")
+        self.enabled = _envb("TELEGRAM_ENABLED", "false").strip().lower() in ("1", "true", "yes", "on")
+        # Prefer TG_BOT_TOKEN if set, else TELEGRAM_BOT_TOKEN
+        self.token = (
+            _envb("TG_BOT_TOKEN", "")
+            or _envb("TELEGRAM_BOT_TOKEN", "")
+        )
+        # Choose channel precedence: ADMIN, VIP, then FREE, then fallback TELEGRAM_CHAT_ID
+        self.chat_id = (
+            _envb("TG_ADMIN_CHAT_ID", "")
+            or _envb("TG_VIP_CHAT_ID", "")
+            or _envb("TG_FREE_CHAT_ID", "")
+            or _envb("TELEGRAM_CHAT_ID", "")
+        )
         self.base_send = f"https://api.telegram.org/bot{self.token}/sendMessage"
         self.base_updates = f"https://api.telegram.org/bot{self.token}/getUpdates"
         self.username = None
