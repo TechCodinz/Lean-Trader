@@ -1,3 +1,5 @@
+import streamlit as st
+
 #!/usr/bin/env python3
 """
 Standalone Dashboard Application
@@ -7,7 +9,6 @@ Run this to start the trading bot dashboard
 import asyncio
 import sys
 from pathlib import Path
-import streamlit as st
 
 # Add project root to path
 sys.path.append(str(Path(__file__).parent))

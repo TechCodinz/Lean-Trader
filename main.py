@@ -10,7 +10,6 @@ import os
 import signal
 from pathlib import Path
 from dotenv import load_dotenv
-from loguru import logger
 
 # Add project root to path
 sys.path.append(str(Path(__file__).parent))
