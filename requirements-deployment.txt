@@ -1,0 +1,35 @@
+# Deployment Requirements - NumPy 2.x Compatibility Fix
+# This file ensures NumPy 1.x compatibility to prevent cv2 and other modules from crashing
+
+# Core dependencies with NumPy 1.x compatibility
+numpy>=1.26.4,<2.0
+pandas>=2.2.0
+scikit-learn>=1.4.0
+scipy>=1.13.0
+
+# OpenCV and computer vision (compatible with NumPy 1.x)
+opencv-python>=4.8.0,<5.0
+opencv-contrib-python>=4.8.0,<5.0
+
+# PyTorch (compatible with NumPy 1.x)
+torch>=2.0.0,<3.0
+torchvision>=0.15.0,<1.0
+
+# Streamlit and web framework
+streamlit>=1.36.0
+fastapi>=0.111.0
+uvicorn>=0.30.0
+
+# Data processing
+pandas>=2.2.0
+numpy>=1.26.4,<2.0
+
+# Machine learning
+scikit-learn>=1.4.0
+xgboost>=2.0.0
+lightgbm>=4.3.0
+
+# Other dependencies
+requests>=2.32.0
+python-dotenv>=1.0.0
+ccxt>=4.2.0
