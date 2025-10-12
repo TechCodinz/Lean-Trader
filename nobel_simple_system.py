@@ -360,6 +360,15 @@ class NobelSimpleSystem:
         except Exception as e:
             logger.error(f"Main trading cycle error: {e}")
 
+    async def generate_trading_signals(self):
+        """Generate trading signals - main method"""
+        try:
+            # Generate all types of signals
+            await self.generate_all_signals()
+            
+        except Exception as e:
+            logger.error(f"Trading signal generation error: {e}")
+
     async def data_collection_loop(self):
         """Continuous data collection loop"""
         while self.running:
