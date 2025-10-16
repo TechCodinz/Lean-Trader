@@ -23,6 +23,10 @@ class SmartPositionSizer:
         self.max_position_pct = 0.10  # 10% max position size
         self.min_position_usd = 10.0  # $10 minimum
         
+        # Dynamic sizing based on confidence
+        self.use_dynamic_sizing = True
+        self.aggressive_mode = True  # Grow account faster
+        
     def calculate_position_size(self, 
                                confidence: float,
                                volatility: float = 0.02,
@@ -59,10 +63,23 @@ class SmartPositionSizer:
         # Calculate final position size
         position_size = (base_risk / stop_loss_pct) * kelly_fraction * volatility_adjustment * confidence_adjustment
         
+        # AGGRESSIVE MODE: Grow account faster with high confidence trades
+        if self.aggressive_mode and confidence >= 0.85:
+            # Increase size by up to 50% for very high confidence
+            confidence_boost = 1.0 + ((confidence - 0.85) * 2.0)  # 85% conf = 1.0x, 100% conf = 1.3x
+            position_size *= confidence_boost
+            logger.info(f"🚀 Aggressive sizing: confidence {confidence:.1%} → {confidence_boost:.2f}x boost")
+        
         # Apply limits
         max_position = self.balance * self.max_position_pct
         position_size = min(position_size, max_position)
         position_size = max(position_size, self.min_position_usd)
+        
+        # Balance-aware: As balance grows, increase position sizes proportionally
+        if self.balance > 1000:
+            growth_multiplier = (self.balance / 1000) ** 0.5  # Square root scaling
+            position_size *= growth_multiplier
+            logger.debug(f"💰 Balance-aware sizing: ${self.balance:.0f} → {growth_multiplier:.2f}x multiplier")
         
         return position_size
     
@@ -409,14 +426,63 @@ class ExecutionOrchestrator:
             return None
     
     async def get_current_price(self, symbol: str) -> Optional[float]:
-        """Get current market price"""
+        """Get current market price from engines or fresh exchange connection"""
         try:
             # Try to get from router
-            if hasattr(self, 'router'):
+            if hasattr(self, 'router') and self.router:
                 ticker = await self.router.fetch_ticker(symbol)
-                return ticker.get('last', 0)
-        except:
-            pass
+                if ticker and ticker.get('last'):
+                    return ticker.get('last', 0)
+        except Exception as e:
+            logger.debug(f"Router fetch failed: {str(e)[:50]}")
+        
+        # Try engines
+        if self.engines:
+            for engine_name, engine in self.engines.items():
+                try:
+                    # Check if engine has an exchange object
+                    if hasattr(engine, 'exchange') and engine.exchange:
+                        ticker = await engine.exchange.fetch_ticker(symbol)
+                        if ticker and ticker.get('last'):
+                            logger.debug(f"Got price from {engine_name}: ${ticker['last']:.2f}")
+                            return ticker['last']
+                except Exception as e:
+                    logger.debug(f"{engine_name} fetch failed: {str(e)[:50]}")
+                    continue
+        
+        # Fallback: Create fresh exchange connection
+        try:
+            import ccxt.async_support as ccxt
+            import os
+            
+            logger.debug(f"Trying fresh exchange connection for {symbol}...")
+            
+            # Try Gate.io first (user's main exchange)
+            if os.getenv('GATE_API_KEY'):
+                try:
+                    exchange = ccxt.gateio({
+                        'apiKey': os.getenv('GATE_API_KEY'),
+                        'secret': os.getenv('GATE_SECRET'),
+                        'enableRateLimit': True
+                    })
+                    ticker = await exchange.fetch_ticker(symbol)
+                    price = ticker['last']
+                    await exchange.close()
+                    logger.debug(f"Got ${price:.2f} from Gate.io")
+                    return price
+                except Exception as e:
+                    logger.debug(f"Gate.io failed: {str(e)[:50]}")
+            
+            # Try Binance public API
+            exchange = ccxt.binance({'enableRateLimit': True})
+            ticker = await exchange.fetch_ticker(symbol)
+            price = ticker['last']
+            await exchange.close()
+            logger.debug(f"Got ${price:.2f} from Binance")
+            return price
+            
+        except Exception as e:
+            logger.error(f"All price fetch attempts failed for {symbol}: {e}")
         
         return None
     
