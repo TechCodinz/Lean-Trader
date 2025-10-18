@@ -81,6 +81,15 @@ try:
     )
     DIVINE_FEATURES_AVAILABLE = True
     logger.info("✅ DIVINE INTELLIGENCE FEATURES LOADED - Consciousness-level trading!")
+    
+    # Auto Live Trigger
+    try:
+        from AUTO_LIVE_TRIGGER import AutoLiveTrigger
+        AUTO_LIVE_TRIGGER_AVAILABLE = True
+        logger.info("✅ AUTO LIVE TRIGGER LOADED - Ready for auto-start!")
+    except ImportError as e:
+        logger.warning(f"Auto Live Trigger not available: {e}")
+        AUTO_LIVE_TRIGGER_AVAILABLE = False
 except Exception as e:
     logger.error(f"❌ DIVINE INTELLIGENCE FAILED TO LOAD: {e}")
     logger.error("   These features use advanced physics & mathematics")
@@ -540,6 +549,22 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
         else:
             logger.warning("⚠️  Divine intelligence features NOT available")
             self.divine_intelligence = None
+        
+        # ====================================================================
+        # 12. AUTO LIVE TRIGGER - Intelligent Auto-Start System 🤖
+        # ====================================================================
+        if AUTO_LIVE_TRIGGER_AVAILABLE:
+            logger.info("\n🤖 Wiring AUTO LIVE TRIGGER...")
+            
+            self.auto_live_trigger = AutoLiveTrigger()
+            self.advanced_orchestrators['auto_live_trigger'] = self.auto_live_trigger
+            
+            logger.info("✅ 🤖 AUTO LIVE TRIGGER WIRED - Ready to auto-start live trading!")
+            logger.info("   Approval: 10+ trades, 60%+ win rate")
+            logger.info("   Pause threshold: 15% drawdown")
+        else:
+            logger.warning("⚠️  Auto Live Trigger NOT available")
+            self.auto_live_trigger = None
         
         # ========================================================================
         # CROSS-EXCHANGE ARBITRAGE ENGINE
@@ -1193,5 +1218,38 @@ if __name__ == "__main__":
     ║                                                                   ║
     ╚═══════════════════════════════════════════════════════════════════╝
     """)
+    
+    def log_goldmine_signal(self, signal_type: str, signal_data: Dict[str, Any], confidence: float = 0.0):
+        """Log goldmine signals using the new logging method"""
+        if self.ultra_goldmine and hasattr(self.ultra_goldmine, 'log_signal'):
+            return self.ultra_goldmine.log_signal(signal_type, signal_data, confidence)
+        else:
+            logger.warning("Goldmine logging not available")
+            return None
+    
+    def log_consciousness_computation(self, computation_type: str, consciousness_level: float, 
+                                    quantum_state: Dict[str, Any], fractal_dimension: float = 0.0):
+        """Log consciousness computations using the new logging method"""
+        if self.divine_intelligence and hasattr(self.divine_intelligence, 'log_consciousness_computation'):
+            return self.divine_intelligence.log_consciousness_computation(
+                computation_type, consciousness_level, quantum_state, fractal_dimension
+            )
+        else:
+            logger.warning("Divine intelligence logging not available")
+            return None
+    
+    def add_trade_to_auto_trigger(self, trade_data: Dict[str, Any]):
+        """Add trade data to auto live trigger for performance tracking"""
+        if self.auto_live_trigger and hasattr(self.auto_live_trigger, 'add_trade'):
+            return self.auto_live_trigger.add_trade(trade_data)
+        else:
+            logger.warning("Auto live trigger not available")
+            return None
+    
+    def check_auto_live_ready(self) -> bool:
+        """Check if system is ready for live trading"""
+        if self.auto_live_trigger and hasattr(self.auto_live_trigger, 'check_ready_for_live'):
+            return self.auto_live_trigger.check_ready_for_live()
+        return False
     
     asyncio.run(main())
