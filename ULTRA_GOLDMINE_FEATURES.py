@@ -916,6 +916,21 @@ class UltraGoldmineManager:
         
         logger.info("🌟 Ultra Goldmine Features initialized!")
         logger.info("   ✅ Gamma Squeeze Detector")
+        
+    def log_signal(self, signal_type: str, signal_data: Dict[str, Any], confidence: float = 0.0):
+        """
+        Log all goldmine signals with detailed information
+        """
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        log_entry = {
+            'timestamp': timestamp,
+            'signal_type': signal_type,
+            'confidence': confidence,
+            'data': signal_data
+        }
+        
+        logger.info(f"🌟 GOLDMINE SIGNAL: {signal_type} | Confidence: {confidence:.2f} | Data: {signal_data}")
+        return log_entry
         logger.info("   ✅ Whale Shadow Tracker")
         logger.info("   ✅ Order Book Toxicity Scanner")
         logger.info("   ✅ Cross-Exchange Latency Arbitrage")

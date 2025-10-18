@@ -637,6 +637,24 @@ class DivineIntelligenceManager:
         logger.info("   ✅ Nash Equilibrium Predictor")
         logger.info("   ✅ Chaos Theory Attractor Mapper")
         
+    def log_consciousness_computation(self, computation_type: str, consciousness_level: float, 
+                                    quantum_state: Dict[str, Any], fractal_dimension: float = 0.0):
+        """
+        Log consciousness-level computations with quantum and fractal data
+        """
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        log_entry = {
+            'timestamp': timestamp,
+            'computation_type': computation_type,
+            'consciousness_level': consciousness_level,
+            'quantum_state': quantum_state,
+            'fractal_dimension': fractal_dimension
+        }
+        
+        logger.info(f"🔮 CONSCIOUSNESS COMPUTATION: {computation_type} | Level: {consciousness_level:.3f} | "
+                   f"Quantum: {quantum_state} | Fractal: {fractal_dimension:.3f}")
+        return log_entry
+        
     async def get_divine_signals(self, market_data: Dict) -> Dict:
         """
         Get signals from ALL divine intelligence features
