@@ -29,8 +29,20 @@ import warnings
 warnings.filterwarnings('ignore')
 
 # Claude 4.1 Opus Advanced Features Integration
-from langchain.agents import Tool
-from langchain.memory import ConversationBufferMemory
+try:
+    from langchain.tools import BaseTool as Tool
+    from langchain.memory import ConversationBufferMemory
+except ImportError:
+    # Fallback if LangChain is not available
+    class Tool:
+        def __init__(self, name, description, func):
+            self.name = name
+            self.description = description
+            self.func = func
+    
+    class ConversationBufferMemory:
+        def __init__(self):
+            self.buffer = []
 
 class ULTIMATE_EVOLUTION_ENGINE:
     def __init__(self, data_hub=None):
