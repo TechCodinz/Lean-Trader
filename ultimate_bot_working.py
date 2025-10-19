@@ -7,6 +7,7 @@ from datetime import datetime
 from aiogram import Bot
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from loguru import logger
 
 class UltimateBot450Models:
     def __init__(self):

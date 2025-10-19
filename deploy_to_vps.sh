@@ -1,66 +1,48 @@
 #!/bin/bash
+# Deploy Complete Ultimate Orchestrator to VPS
 
-# VPS Deployment Script for Ultimate Trading Bot
-VPS_IP="75.119.149.117"
-VPS_USER="root"
+echo "🚀 DEPLOYING COMPLETE ULTIMATE ORCHESTRATOR TO VPS"
+echo "=================================================="
 
-echo "🚀 DEPLOYING ULTIMATE 450+ MODELS TRADING BOT TO VPS..."
+# Stop any running bot
+echo "🛑 Stopping current bot..."
+pkill -f RUN_BOT.py || true
+sleep 2
 
-# Create deployment package
-echo "📦 Creating deployment package..."
-tar -czf ultimate_bot_deployment.tar.gz ultimate_bot_working.py
+# Test the integration
+echo "🧪 Testing integration..."
+python3 test_integration.py
 
-# Upload to VPS
-echo "📤 Uploading to VPS..."
-scp ultimate_bot_deployment.tar.gz $VPS_USER@$VPS_IP:~/
-
-# Deploy on VPS
-echo "🔧 Deploying on VPS..."
-ssh $VPS_USER@$VPS_IP << 'EOF'
-    echo "🚀 ULTIMATE BOT VPS DEPLOYMENT STARTING..."
+if [ $? -eq 0 ]; then
+    echo "✅ Integration test passed!"
     
-    # Stop any existing bot processes
-    pkill -f "ultimate_bot_working.py" || true
-    pkill -f "python.*bot" || true
+    # Start the bot
+    echo "🚀 Starting bot with complete integration..."
+    nohup python3 RUN_BOT.py --testnet --auto-confirm > bot.log 2>&1 &
     
-    # Extract deployment
-    tar -xzf ultimate_bot_deployment.tar.gz
-    rm ultimate_bot_deployment.tar.gz
-    
-    # Activate virtual environment
-    source venv/bin/activate
-    
-    # Install dependencies
-    pip install aiogram ccxt scikit-learn loguru numpy
-    
-    # Make script executable
-    chmod +x ultimate_bot_working.py
-    
-    # Start the bot in background
-    echo "🚀 STARTING ULTIMATE 450+ MODELS TRADING BOT..."
-    nohup python3 ultimate_bot_working.py > bot.log 2>&1 &
-    
-    # Get process ID
-    BOT_PID=$!
-    echo "🤖 Bot started with PID: $BOT_PID"
-    echo "📊 Bot is running in background"
-    echo "📝 Logs: tail -f bot.log"
-    
-    # Wait a moment and check if running
+    # Wait a moment
     sleep 5
-    if ps -p $BOT_PID > /dev/null; then
-        echo "✅ ULTIMATE BOT DEPLOYED AND RUNNING!"
-        echo "🔗 VPS IP: 75.119.149.117"
-        echo "🤖 Bot Status: ACTIVE"
-        echo "📱 Telegram: ACTIVE"
-        echo "💰 Trading: ENABLED"
+    
+    # Check if bot is running
+    if ps aux | grep RUN_BOT.py | grep -v grep > /dev/null; then
+        echo "✅ Bot is running successfully!"
+        echo "📊 Bot process:"
+        ps aux | grep RUN_BOT.py | grep -v grep
+        
+        echo "🔍 Recent logs:"
+        tail -20 bot.log | grep -E "(ULTRA|QUANTUM|SWARM|FLUID|ARBITRAGE|SCALPING|MOON|ML|TRADE|BOT|UNIFIED|WIRING|INITIALIZING)"
+        
+        echo ""
+        echo "🎉 DEPLOYMENT COMPLETE!"
+        echo "   Bot is running with all systems integrated"
+        echo "   Monitor with: tail -f bot.log"
+        echo "   Stop with: pkill -f RUN_BOT.py"
     else
-        echo "❌ Bot failed to start. Check logs: tail -f bot.log"
+        echo "❌ Bot failed to start!"
+        echo "📋 Error logs:"
+        tail -20 bot.log
     fi
-EOF
-
-echo "✅ DEPLOYMENT COMPLETE!"
-echo "🔗 VPS: 75.119.149.117"
-echo "🤖 Bot Status: RUNNING"
-echo "📱 Telegram Channels: ACTIVE"
-echo "💰 Auto Trading: ENABLED"
+else
+    echo "❌ Integration test failed!"
+    echo "📋 Check the errors above"
+fi
