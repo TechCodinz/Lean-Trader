@@ -1,7 +1,8 @@
 import pandas as pd
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Any, List, Optional, Tuple
 from concurrent.futures import ThreadPoolExecutor
+from collections import deque
 
 """Ultra ML Pipeline - The Brain of the Ultra Trading System.
 
@@ -22,11 +23,14 @@ sys.path.append(str(Path(__file__).parent / "tools"))
 try:
     from tools.ultra_trainer import UltraFeatureEngine, MarketRegimeDetector, UltraTrainer
     from tools.market_data import MarketDataManager, StreamingDataManager, MultiExchangeAggregator
+    from ultra_scout import UltraScout
 
     ULTRA_MODULES_AVAILABLE = True
+    SYSTEM_MODULES_AVAILABLE = True
 except ImportError as e:
     print(f"[UltraML] Warning: Some modules not available: {e}")
     ULTRA_MODULES_AVAILABLE = False
+    SYSTEM_MODULES_AVAILABLE = False
 
 # Import existing system components
 try:

@@ -29,8 +29,18 @@ import warnings
 warnings.filterwarnings('ignore')
 
 # Claude 4.1 Opus Advanced Features Integration
-from langchain.agents import Tool
-from langchain.memory import ConversationBufferMemory
+from langchain.tools import BaseTool
+# from langchain_core.memory import ConversationBufferMemory
+# Using a simple dict as memory for now
+class ConversationBufferMemory:
+    def __init__(self):
+        self.chat_memory = []
+    
+    def save_context(self, inputs, outputs):
+        self.chat_memory.append({"inputs": inputs, "outputs": outputs})
+    
+    def load_memory_variables(self, inputs):
+        return {"history": str(self.chat_memory)}
 
 class ULTIMATE_EVOLUTION_ENGINE:
     def __init__(self, data_hub=None):

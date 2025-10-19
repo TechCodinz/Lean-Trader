@@ -497,6 +497,19 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
     def __init__(self, mode: str = "testnet"):
         super().__init__(mode)
         
+        # Required attributes for parent class
+        self.brain = None
+        self.awareness = None
+        self.ledger = None
+        self.pattern_memory = None
+        self.risk_engine = None
+        self.ai_systems = {
+            'swarm': None,
+            'quantum': None,
+            'fluid': None,
+            'ml': None
+        }
+        
         # Additional advanced systems
         self.advanced_systems = {}
         self.advanced_orchestrators = {}
@@ -691,7 +704,12 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
         # Ultra Arbitrage Engine
         if ULTRA_ARBITRAGE_AVAILABLE:
             logger.info("\n💰 Wiring ULTRA ARBITRAGE ENGINE...")
-            self.ultra_arbitrage = UltraArbitrageEngine()
+            # Create mock objects for required parameters
+            class MockUltraCore:
+                pass
+            class MockRiskEngine:
+                pass
+            self.ultra_arbitrage = UltraArbitrageEngine(MockUltraCore(), MockRiskEngine())
             self.advanced_orchestrators['ultra_arbitrage'] = self.ultra_arbitrage
             logger.info("✅ 💰 ULTRA ARBITRAGE ENGINE WIRED - Risk-free profit capture!")
         else:
@@ -701,7 +719,7 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
         # Ultra Scalping Engine
         if ULTRA_SCALPING_AVAILABLE:
             logger.info("\n⚡ Wiring ULTRA SCALPING ENGINE...")
-            self.ultra_scalping = UltraScalpingEngine()
+            self.ultra_scalping = UltraScalpingEngine(MockUltraCore(), MockRiskEngine())
             self.advanced_orchestrators['ultra_scalping'] = self.ultra_scalping
             logger.info("✅ ⚡ ULTRA SCALPING ENGINE WIRED - Micro-profit accumulation!")
         else:
@@ -735,7 +753,7 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
         # Ultra Swarm Consciousness
         if ULTRA_SWARM_AVAILABLE:
             logger.info("\n🐝 Wiring ULTRA SWARM CONSCIOUSNESS...")
-            self.ultra_swarm = UltraSwarmConsciousness()
+            self.ultra_swarm = UltraSwarmConsciousness(MockUltraCore(), MockRiskEngine())
             self.advanced_orchestrators['ultra_swarm'] = self.ultra_swarm
             logger.info("✅ 🐝 ULTRA SWARM CONSCIOUSNESS WIRED - Collective intelligence!")
         else:
@@ -745,7 +763,7 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
         # Ultra Fluid Mechanics
         if ULTRA_FLUID_AVAILABLE:
             logger.info("\n🌊 Wiring ULTRA FLUID MECHANICS...")
-            self.ultra_fluid = FluidMechanicsEngine()
+            self.ultra_fluid = FluidMechanicsEngine(MockUltraCore(), MockRiskEngine())
             self.advanced_orchestrators['ultra_fluid'] = self.ultra_fluid
             logger.info("✅ 🌊 ULTRA FLUID MECHANICS WIRED - Sentinel brilliance!")
         else:
@@ -803,7 +821,14 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
         # Trader Core
         if TRADER_CORE_AVAILABLE:
             logger.info("\n⚙️ Wiring TRADER CORE...")
-            self.trader_core = TraderCore()
+            self.trader_core = TraderCore(
+                fx_symbols=['EURUSD', 'GBPUSD', 'USDJPY'],
+                fx_tfs=['5m', '15m', '1h'],
+                crypto_spot=['BTC/USDT', 'ETH/USDT', 'SOL/USDT'],
+                crypto_spot_tfs=['5m', '15m', '1h'],
+                crypto_fut=['BTC/USDT:USDT', 'ETH/USDT:USDT'],
+                crypto_fut_tfs=['5m', '15m', '1h']
+            )
             self.advanced_orchestrators['trader_core'] = self.trader_core
             logger.info("✅ ⚙️ TRADER CORE WIRED - Core trading engine!")
         else:
@@ -1618,4 +1643,136 @@ if __name__ == "__main__":
             logger.warning("Unified Trading System not available")
             return {}
     
+    async def initialize_all_systems(self):
+        """Initialize all Ultra systems for maximum performance"""
+        logger.info('\n🚀 Initializing Ultra Systems...')
+        
+        # Initialize Ultra Arbitrage Engine
+        if ULTRA_ARBITRAGE_AVAILABLE:
+            logger.info('💰 Initializing Ultra Arbitrage Engine...')
+            # Create mock objects for required parameters
+            class MockUltraCore:
+                pass
+            class MockRiskEngine:
+                pass
+            self.ultra_arbitrage = UltraArbitrageEngine(MockUltraCore(), MockRiskEngine())
+            self.advanced_orchestrators['ultra_arbitrage'] = self.ultra_arbitrage
+            logger.info('✅ Ultra Arbitrage Engine initialized')
+        else:
+            logger.warning('⚠️  Ultra Arbitrage Engine not available')
+            self.ultra_arbitrage = None
+        
+        # Initialize Ultra Scalping Engine
+        if ULTRA_SCALPING_AVAILABLE:
+            logger.info('⚡ Initializing Ultra Scalping Engine...')
+            self.ultra_scalping = UltraScalpingEngine(MockUltraCore(), MockRiskEngine())
+            self.advanced_orchestrators['ultra_scalping'] = self.ultra_scalping
+            logger.info('✅ Ultra Scalping Engine initialized')
+        else:
+            logger.warning('⚠️  Ultra Scalping Engine not available')
+            self.ultra_scalping = None
+        
+        # Initialize Ultra Moon Spotter
+        if ULTRA_MOON_SPOTTER_AVAILABLE:
+            logger.info('🌙 Initializing Ultra Moon Spotter...')
+            self.ultra_moon_spotter = UltraMoonSpotter(MockUltraCore(), MockRiskEngine())
+            self.advanced_orchestrators['ultra_moon_spotter'] = self.ultra_moon_spotter
+            logger.info('✅ Ultra Moon Spotter initialized')
+        else:
+            logger.warning('⚠️  Ultra Moon Spotter not available')
+            self.ultra_moon_spotter = None
+        
+        # Initialize Ultra Quantum Intelligence
+        if ULTRA_QUANTUM_AVAILABLE:
+            logger.info('🔬 Initializing Ultra Quantum Intelligence...')
+            self.ultra_quantum = UltraQuantumIntelligence()
+            self.advanced_orchestrators['ultra_quantum'] = self.ultra_quantum
+            logger.info('✅ Ultra Quantum Intelligence initialized')
+        else:
+            logger.warning('⚠️  Ultra Quantum Intelligence not available')
+            self.ultra_quantum = None
+        
+        # Initialize Ultra Swarm Consciousness
+        if ULTRA_SWARM_AVAILABLE:
+            logger.info('🐝 Initializing Ultra Swarm Consciousness...')
+            self.ultra_swarm = UltraSwarmConsciousness(MockUltraCore(), MockRiskEngine())
+            self.advanced_orchestrators['ultra_swarm'] = self.ultra_swarm
+            logger.info('✅ Ultra Swarm Consciousness initialized')
+        else:
+            logger.warning('⚠️  Ultra Swarm Consciousness not available')
+            self.ultra_swarm = None
+        
+        # Initialize Ultra Fluid Mechanics
+        if ULTRA_FLUID_AVAILABLE:
+            logger.info('🌊 Initializing Ultra Fluid Mechanics...')
+            self.ultra_fluid = UltraFluidMechanics()
+            self.advanced_orchestrators['ultra_fluid'] = self.ultra_fluid
+            logger.info('✅ Ultra Fluid Mechanics initialized')
+        else:
+            logger.warning('⚠️  Ultra Fluid Mechanics not available')
+            self.ultra_fluid = None
+        
+        # Initialize Ultra ML Pipeline
+        if ULTRA_ML_AVAILABLE:
+            logger.info('🤖 Initializing Ultra ML Pipeline...')
+            self.ultra_ml = UltraMLPipeline()
+            self.advanced_orchestrators['ultra_ml'] = self.ultra_ml
+            logger.info('✅ Ultra ML Pipeline initialized')
+        else:
+            logger.warning('⚠️  Ultra ML Pipeline not available')
+            self.ultra_ml = None
+        
+        # Initialize Trade Planner
+        if TRADE_PLANNER_AVAILABLE:
+            logger.info('📋 Initializing Trade Planner...')
+            self.trade_planner = attach_plan
+            self.advanced_orchestrators['trade_planner'] = self.trade_planner
+            logger.info('✅ Trade Planner initialized')
+        else:
+            logger.warning('⚠️  Trade Planner not available')
+            self.trade_planner = None
+        
+        # Initialize Ultimate Bot 450 Models
+        if ULTIMATE_BOT_AVAILABLE:
+            logger.info('🎯 Initializing Ultimate Bot 450 Models...')
+            self.ultimate_bot = UltimateBotWorking()
+            self.advanced_orchestrators['ultimate_bot'] = self.ultimate_bot
+            logger.info('✅ Ultimate Bot 450 Models initialized')
+        else:
+            logger.warning('⚠️  Ultimate Bot 450 Models not available')
+            self.ultimate_bot = None
+        
+        # Initialize Trader Core
+        if TRADER_CORE_AVAILABLE:
+            logger.info('⚙️  Initializing Trader Core...')
+            self.trader_core = TraderCore(
+                fx_symbols=['EURUSD', 'GBPUSD', 'USDJPY'],
+                fx_tfs=['5m', '15m', '1h'],
+                crypto_spot=['BTC/USDT', 'ETH/USDT', 'SOL/USDT'],
+                crypto_spot_tfs=['5m', '15m', '1h'],
+                crypto_fut=['BTC/USDT:USDT', 'ETH/USDT:USDT'],
+                crypto_fut_tfs=['5m', '15m', '1h']
+            )
+            self.advanced_orchestrators['trader_core'] = self.trader_core
+            logger.info('✅ Trader Core initialized')
+        else:
+            logger.warning('⚠️  Trader Core not available')
+            self.trader_core = None
+        
+        # Initialize Unified Trading System
+        if UNIFIED_TRADING_AVAILABLE:
+            logger.info('🌐 Initializing Unified Trading System...')
+            self.unified_trading = UnifiedTradingSystem()
+            self.advanced_orchestrators['unified_trading'] = self.unified_trading
+            logger.info('✅ Unified Trading System initialized')
+        else:
+            logger.warning('⚠️  Unified Trading System not available')
+            self.unified_trading = None
+        
+        logger.info(f'\n🎉 ULTRA SYSTEMS INITIALIZATION COMPLETE!')
+        logger.info(f'   Advanced Orchestrators: {len(self.advanced_orchestrators)} systems')
+        logger.info(f'   Available Systems: {list(self.advanced_orchestrators.keys())}')
+
+
+if __name__ == "__main__":
     asyncio.run(main())
