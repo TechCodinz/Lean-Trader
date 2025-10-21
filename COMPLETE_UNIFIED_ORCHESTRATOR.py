@@ -61,6 +61,9 @@ from november_growth_strategy import NovemberGrowthStrategy
 # Utilities
 from paper_broker import PaperBroker
 
+# Telegram signal monitoring
+from TELEGRAM_SIGNAL_MONITOR import monitor_signals_for_telegram
+
 
 class CentralDataHub:
     """Central hub for ALL data flow"""
@@ -361,7 +364,35 @@ class CompleteUnifiedOrchestrator:
         self.pattern_memory = PatternMemory()
         self.ledger = Ledger()
         
-        universe = ["BTC/USDT", "ETH/USDT", "BNB/USDT", "SOL/USDT", "DOGE/USDT"]
+        # EXPANDED UNIVERSE - ALL MARKETS (92 total)
+        universe = [
+            # Top Crypto (35 pairs)
+            'BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'SOL/USDT', 'ADA/USDT',
+            'XRP/USDT', 'DOGE/USDT', 'DOT/USDT', 'MATIC/USDT', 'SHIB/USDT',
+            'AVAX/USDT', 'LINK/USDT', 'UNI/USDT', 'ATOM/USDT', 'LTC/USDT',
+            'BCH/USDT', 'NEAR/USDT', 'APT/USDT', 'ARB/USDT', 'OP/USDT',
+            'FTM/USDT', 'ALGO/USDT', 'VET/USDT', 'SAND/USDT', 'MANA/USDT',
+            'AXS/USDT', 'THETA/USDT', 'FIL/USDT', 'PEPE/USDT', 'WLD/USDT',
+            'INJ/USDT', 'SUI/USDT', 'SEI/USDT', 'TIA/USDT', 'ORDI/USDT',
+            
+            # Forex (20 pairs)
+            'EUR/USD', 'GBP/USD', 'USD/JPY', 'AUD/USD', 'USD/CAD',
+            'USD/CHF', 'NZD/USD', 'EUR/GBP', 'EUR/JPY', 'GBP/JPY',
+            'AUD/JPY', 'EUR/CHF', 'GBP/CHF', 'EUR/AUD', 'GBP/AUD',
+            'AUD/CAD', 'NZD/JPY', 'CAD/JPY', 'EUR/NZD', 'GBP/NZD',
+            
+            # Top Stocks (24 pairs) 
+            'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'NVDA',
+            'META', 'JPM', 'V', 'WMT', 'JNJ', 'PG',
+            'MA', 'HD', 'BAC', 'DIS', 'NFLX', 'ADBE',
+            'CRM', 'PYPL', 'INTC', 'CSCO', 'PFE', 'KO',
+            
+            # Commodities (13 pairs)
+            'GOLD', 'SILVER', 'OIL', 'NATGAS', 'COPPER',
+            'PLATINUM', 'WHEAT', 'CORN', 'SOYBEAN', 'COFFEE',
+            'SUGAR', 'COTTON', 'COCOA',
+        ]
+        logger.info(f"🌌 Trading Universe: {len(universe)} pairs (35 crypto + 20 forex + 24 stocks + 13 commodities)")
         self.ultra_core = UltraCore(self.router, universe, logger)
         
         awareness_cfg = AwarenessConfig()
@@ -377,20 +408,20 @@ class CompleteUnifiedOrchestrator:
         # Phase 2: Trading Engines  
         logger.info("\n⚡ Phase 2: Trading Engines...")
         
-        self.trading_engines['arbitrage'] = UltraArbitrageEngine(self.ultra_core, self.risk_engine)
-        self.trading_engines['scalping'] = UltraScalpingEngine(self.ultra_core, self.risk_engine)
+        self.trading_engines['arbitrage'] = UltraArbitrageEngine(self.ultra_core, self.risk_engine, universe=universe)
+        self.trading_engines['scalping'] = UltraScalpingEngine(self.ultra_core, self.risk_engine, universe=universe)
         
         # SMART SCALPING - Multi-timeframe + Session aware!
         try:
             from SMART_SCALPING_ENGINE import SmartScalpingEngine
-            self.trading_engines['smart_scalping'] = SmartScalpingEngine(self.ultra_core, self.risk_engine)
-            logger.info("🎯 Smart Scalping Engine initialized (MTF + Session aware)")
+            self.trading_engines['smart_scalping'] = SmartScalpingEngine(self.ultra_core, self.risk_engine, universe=universe)
+            logger.info("🎯 Smart Scalping Engine initialized (MTF + Session aware + Full Universe)")
         except Exception as e:
             logger.warning(f"Smart scalping: {e}")
         
         self.trading_engines['moon_spotter'] = UltraMoonSpotter()
-        self.trading_engines['real_profit'] = RealProfitBot()
-        self.trading_engines['enhanced'] = EnhancedTradingBot()
+        self.trading_engines['real_profit'] = RealProfitBot(universe=universe)
+        self.trading_engines['enhanced'] = EnhancedTradingBot(universe=universe)
         
         engine_count = len([e for e in self.trading_engines.values() if e])
         logger.info(f"✅ Trading engines initialized ({engine_count}/6 - Including SMART SCALPING!)")
@@ -399,8 +430,8 @@ class CompleteUnifiedOrchestrator:
         logger.info("\n🤖 Phase 3: AI/ML Systems...")
         
         try:
-            self.ai_systems['evolution'] = ULTIMATE_EVOLUTION_ENGINE(data_hub=self.data_hub)
-            logger.info("✅ Evolution Engine initialized WITH DATA HUB - signals will publish!")
+            self.ai_systems['evolution'] = ULTIMATE_EVOLUTION_ENGINE(data_hub=self.data_hub, universe=universe)
+            logger.info(f"✅ Evolution Engine initialized WITH DATA HUB + {len(universe)} pairs!")
         except Exception as e:
             logger.warning(f"Evolution: {e}")
             self.ai_systems['evolution'] = None
@@ -517,8 +548,20 @@ class CompleteUnifiedOrchestrator:
         tasks.append(asyncio.create_task(self.main_trading_loop()))
         logger.info("✅ Main trading loop started")
         
+        # Start Telegram signal monitor
+        tasks.append(asyncio.create_task(monitor_signals_for_telegram(self)))
+        logger.info("✅ Telegram signal monitor started")
+        
+        # Start LIVE TRADING executor
+        try:
+            from ENABLE_LIVE_TRADING import enable_live_trading
+            tasks.append(asyncio.create_task(enable_live_trading(self)))
+            logger.info("💰 LIVE TRADING executor started")
+        except Exception as e:
+            logger.warning(f"⚠️ Live trading not enabled: {e}")
+        
         logger.info("\n" + "=" * 80)
-        logger.info("🎉 ALL ORCHESTRATORS RUNNING IN PARALLEL")
+        logger.info("🎉 ALL ORCHESTRATORS RUNNING + TELEGRAM + LIVE TRADING")
         logger.info("=" * 80)
         
         return tasks

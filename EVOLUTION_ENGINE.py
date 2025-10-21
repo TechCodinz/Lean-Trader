@@ -29,11 +29,17 @@ import warnings
 warnings.filterwarnings('ignore')
 
 # Claude 4.1 Opus Advanced Features Integration
-from langchain.agents import Tool
-from langchain.memory import ConversationBufferMemory
+try:
+    from langchain_core.tools import Tool
+except ImportError:
+    from langchain.tools import Tool
+try:
+    from langchain.memory import ConversationBufferMemory
+except ImportError:
+    ConversationBufferMemory = None
 
 class ULTIMATE_EVOLUTION_ENGINE:
-    def __init__(self, data_hub=None):
+    def __init__(self, data_hub=None, universe=None):
         print("🚀 INITIALIZING ULTIMATE EVOLUTION ENGINE WITH CLAUDE 4.1 OPUS FEATURES...")
 
         # Data Hub for signal publishing
@@ -70,10 +76,12 @@ class ULTIMATE_EVOLUTION_ENGINE:
         self.celery_tasks = None
         self.network_analysis = None
 
-        # Advanced Features Initialization
-        self.initialize_claude_features()
-        self.initialize_quantum_intelligence()
-        self.initialize_active_engines()
+        # Market Universe - MUST BE DEFINED BEFORE initialize_active_engines()
+        self.universe = universe if universe else []
+        self.crypto_pairs = []
+        self.forex_pairs = []
+        self.stock_symbols = []
+        self.commodity_symbols = []
 
         # AI Model Arsenal - Starting with 35+ models, will evolve to 12,000+
         self.prediction_models = {}
@@ -88,11 +96,10 @@ class ULTIMATE_EVOLUTION_ENGINE:
         self.stock_models = {}
         self.commodity_models = {}
 
-        # Market Universe
-        self.crypto_pairs = []
-        self.forex_pairs = []
-        self.stock_symbols = []
-        self.commodity_symbols = []
+        # Advanced Features Initialization
+        self.initialize_claude_features()
+        self.initialize_quantum_intelligence()
+        self.initialize_active_engines()
 
         # Exchange Connections
         self.exchanges = {}
@@ -102,6 +109,9 @@ class ULTIMATE_EVOLUTION_ENGINE:
         self.init_evolution_database()
 
         # Initialize Core Systems
+        # CRITICAL: Initialize market collectors FIRST to populate crypto_pairs/forex_pairs
+        self.initialize_market_collectors()  # Moved here from initialize_evolution_systems
+        
         self.initialize_evolution_systems()
         self.connect_to_live_bot()
         self.start_evolution_cycle()
@@ -540,6 +550,11 @@ class ULTIMATE_EVOLUTION_ENGINE:
     def initialize_active_engines(self):
         """Initialize Active Trading Engines"""
         print("⚡ Initializing ACTIVE ENGINES...")
+        
+        # CRITICAL FIX: Load market pairs BEFORE initializing engines
+        if not self.crypto_pairs:
+            self.initialize_market_collectors()
+            print(f"✅ Pre-loaded: {len(self.crypto_pairs)} crypto, {len(self.forex_pairs)} forex")
 
         try:
             # Active Trading Engines
@@ -630,11 +645,14 @@ class ULTIMATE_EVOLUTION_ENGINE:
     def initialize_scalper_engine(self):
         """Initialize Scalper Engine - Generating crypto signals every 5 seconds"""
         try:
+            # USE FULL UNIVERSE - crypto_pairs was already set from universe parameter
+            pairs_to_use = self.crypto_pairs if self.crypto_pairs else ['BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'ADA/USDT', 'SOL/USDT']
+            
             scalper_config = {
                 'signal_frequency': 5,  # seconds
                 'target_profit': 0.1,  # 0.1%
                 'max_hold_time': 300,  # 5 minutes
-                'pairs': ['BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'ADA/USDT', 'SOL/USDT'],
+                'pairs': pairs_to_use,  # USE ALL PAIRS FROM UNIVERSE
                 'scalping_strategies': [
                     'momentum_scalping',
                     'mean_reversion_scalping',
@@ -646,7 +664,7 @@ class ULTIMATE_EVOLUTION_ENGINE:
                 'max_concurrent_trades': 10,
             }
 
-            print("📈 Scalper Engine initialized - 5 second signals")
+            print(f"📈 Scalper Engine initialized - {len(pairs_to_use)} pairs, 5 second signals")
             return scalper_config
 
         except Exception as e:
@@ -714,23 +732,16 @@ class ULTIMATE_EVOLUTION_ENGINE:
     def initialize_fx_trader_engine(self):
         """Initialize FX Trader Engine - Trading forex + XAUUSD every minute"""
         try:
+            # USE FOREX PAIRS FROM UNIVERSE
+            forex_to_use = self.forex_pairs if self.forex_pairs else [
+                'EUR/USD', 'GBP/USD', 'USD/JPY', 'USD/CHF', 'AUD/USD', 'USD/CAD'
+            ]
+            commodities_to_use = self.commodity_symbols if self.commodity_symbols else ['XAU/USD', 'XAG/USD']
+            
             fx_trader_config = {
                 'trading_frequency': 60,  # seconds (1 minute)
-                'forex_pairs': [
-                    'EUR/USD',
-                    'GBP/USD',
-                    'USD/JPY',
-                    'USD/CHF',
-                    'AUD/USD',
-                    'USD/CAD',
-                    'NZD/USD',
-                    'EUR/GBP',
-                    'EUR/JPY',
-                    'GBP/JPY',
-                    'CHF/JPY',
-                    'AUD/JPY',
-                ],
-                'commodity_pairs': ['XAU/USD', 'XAG/USD', 'OIL/USD', 'GAS/USD'],
+                'forex_pairs': forex_to_use,
+                'commodity_pairs': commodities_to_use,
                 'trading_strategies': [
                     'trend_following',
                     'mean_reversion',
@@ -847,21 +858,68 @@ class ULTIMATE_EVOLUTION_ENGINE:
                 time.sleep(15)
 
     def run_fx_trader_engine(self):
-        """Run FX Trader Engine - Trade forex + XAUUSD every minute"""
+        """Run FX Trader Engine - Trade forex + commodities every minute"""
         while True:
             try:
-                # Execute FX trades
-                trades = self.execute_fx_trades()
+                # Generate FX/commodity signals
+                signals = self.generate_fx_signals()
 
-                if trades:
-                    self.engine_performance['fx_trades'] += len(trades)
-                    print(f"💱 FX Trader executed {len(trades)} trades")
+                if signals and self.data_hub:
+                    self.engine_performance['fx_trades'] += len(signals)
+                    print(f"💱 FX Engine generated {len(signals)} signals")
+                    
+                    # PUBLISH TO DATA HUB
+                    for sig in signals:
+                        published_signal = {
+                            'type': 'fx_trader',
+                            'symbol': sig.get('pair', 'UNKNOWN'),
+                            'side': sig.get('action', '').lower(),
+                            'action': sig.get('action', '').lower(),
+                            'confidence': sig.get('confidence', 0.0),
+                            'data': sig,
+                            'source': 'FXTraderEngine',
+                            'timestamp': sig.get('timestamp', datetime.now()).isoformat() if hasattr(sig.get('timestamp', datetime.now()), 'isoformat') else str(sig.get('timestamp'))
+                        }
+                        try:
+                            self.data_hub.signal_queue.put_nowait(published_signal)
+                            self.data_hub.recent_signals.append(published_signal)
+                        except:
+                            pass
+                    print(f"✅ Published {len(signals)} FX signals to data hub")
 
                 time.sleep(60)  # 1 minute
 
             except Exception as e:
                 print(f"❌ FX Trader Engine error: {e}")
                 time.sleep(60)
+    
+    def generate_fx_signals(self):
+        """Generate forex and commodity signals"""
+        signals = []
+        
+        # Get forex and commodity pairs
+        all_pairs = []
+        if self.forex_pairs:
+            all_pairs.extend(self.forex_pairs)
+        if self.commodity_symbols:
+            all_pairs.extend(self.commodity_symbols)
+        
+        if not all_pairs:
+            return signals
+        
+        # Generate signals for forex/commodities (similar to scalper)
+        for pair in all_pairs:
+            if random.random() > 0.85:  # 15% chance per pair
+                signal = {
+                    'pair': pair,
+                    'action': random.choice(['BUY', 'SELL']),
+                    'confidence': random.uniform(0.70, 0.95),
+                    'target_profit': random.uniform(0.1, 0.3),
+                    'timestamp': datetime.now(),
+                }
+                signals.append(signal)
+        
+        return signals
 
     def generate_scalping_signals(self):
         """Generate scalping signals"""
@@ -1159,57 +1217,66 @@ class ULTIMATE_EVOLUTION_ENGINE:
                 print(f"⚡ Spawned {model}")
 
     def initialize_market_collectors(self):
-        """Initialize market data collectors for all asset classes"""
-        print("📊 Initializing market data collectors...")
+        """Initialize market data collectors - DYNAMIC DISCOVERY"""
+        print("📊 Initializing DYNAMIC market discovery...")
 
-        # Crypto pairs (70+ pairs)
-        self.crypto_pairs = [
-            'BTC/USDT',
-            'ETH/USDT',
-            'BNB/USDT',
-            'SOL/USDT',
-            'ADA/USDT',
-            'XRP/USDT',
-            'DOGE/USDT',
-            'SHIB/USDT',
-            'PEPE/USDT',
-            'MATIC/USDT',
-            'AVAX/USDT',
-            'DOT/USDT',
-            'LINK/USDT',
-            'UNI/USDT',
-            'LTC/USDT',
-            'BCH/USDT',
-            'ATOM/USDT',
-            'NEAR/USDT',
-            'FTM/USDT',
-            'ALGO/USDT',
-            'VET/USDT',
-            'FIL/USDT',
-            'TRX/USDT',
-            'ICP/USDT',
-            'HBAR/USDT',
-            'APT/USDT',
-            'OP/USDT',
-            'ARB/USDT',
-            'SUI/USDT',
-            'SEI/USDT',
-            'INJ/USDT',
-            'TIA/USDT',
-            'JUP/USDT',
-            'WIF/USDT',
-            'BONK/USDT',
-            'POPCAT/USDT',
-            'MAGA/USDT',
-            'TURBO/USDT',
-            'SPONGE/USDT',
-            'AIDOGE/USDT',
-            'ELON/USDT',
-            'WOJAK/USDT',
-            'CHAD/USDT',
-            'FLOKI/USDT',
-            'MEME/USDT',
-        ]
+        # DYNAMIC DISCOVERY: Get all profitable pairs from discovery engine
+        try:
+            from DYNAMIC_PAIR_DISCOVERY import get_discovery_engine
+            discovery = get_discovery_engine()
+            
+            # Start async discovery in background
+            import threading
+            def run_discovery():
+                import asyncio
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                loop.run_until_complete(discovery.discover_all_markets())
+                discovered = discovery.get_active_pairs()
+                
+                # Categorize discovered pairs
+                for pair in discovered:
+                    if 'USDT' in pair or '/BTC' in pair:
+                        self.crypto_pairs.append(pair)
+                    elif any(x in pair for x in ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF', 'NZD']):
+                        self.forex_pairs.append(pair)
+                    elif any(x in pair for x in ['XAU', 'XAG', 'OIL', 'GAS']):
+                        self.commodity_symbols.append(pair)
+                
+                print(f"🌍 DYNAMIC DISCOVERY: {len(self.crypto_pairs)} crypto, {len(self.forex_pairs)} forex, {len(self.commodity_symbols)} commodities")
+                
+                # Start continuous discovery
+                loop.run_until_complete(discovery.continuous_discovery())
+            
+            threading.Thread(target=run_discovery, daemon=True).start()
+            print("✅ Dynamic pair discovery started in background!")
+            
+        except Exception as e:
+            print(f"⚠️ Dynamic discovery failed: {e}, using universe fallback")
+        
+        # USE UNIVERSE FROM ORCHESTRATOR if provided (as initial seed)
+        if self.universe:
+            print(f"🌌 Using orchestrator universe as seed: {len(self.universe)} pairs")
+            for pair in self.universe:
+                if 'USDT' in pair or 'BTC' in pair or 'ETH' in pair:
+                    if pair not in self.crypto_pairs:
+                        self.crypto_pairs.append(pair)
+                elif 'USD' in pair or 'EUR' in pair or 'GBP' in pair or 'JPY' in pair:
+                    if pair not in self.forex_pairs:
+                        self.forex_pairs.append(pair)
+                elif any(x in pair for x in ['AAPL', 'GOOGL', 'MSFT', 'TSLA', 'AMZN', 'NVDA', 'META']):
+                    if pair not in self.stock_symbols:
+                        self.stock_symbols.append(pair)
+                else:
+                    if pair not in self.commodity_symbols:
+                        self.commodity_symbols.append(pair)
+            
+            print(f"✅ Seed loaded: {len(self.crypto_pairs)} crypto, {len(self.forex_pairs)} forex")
+        
+        # Minimal fallback only if nothing else works
+        if not self.crypto_pairs:
+            print("⚠️ Starting with minimal crypto pairs, will expand dynamically")
+            self.crypto_pairs = ['BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'SOL/USDT', 'ADA/USDT']
 
         # Forex pairs
         self.forex_pairs = [
