@@ -6,6 +6,7 @@ NO MORE DELAYS - EVERYTHING CONNECTED NOW
 """
 
 import asyncio
+import os
 import logging
 import sys
 import time
@@ -625,9 +626,13 @@ class CompleteUnifiedOrchestrator:
         else:
             logger.error("❌ NO EXECUTION ORCHESTRATOR - TRADES WILL NOT EXECUTE!")
         
-        # Start Telegram signal monitor
-        tasks.append(asyncio.create_task(monitor_signals_for_telegram(self)))
-        logger.info("✅ Telegram signal monitor started")
+        # Start Telegram signal monitor (optional)
+        enable_telegram = os.getenv('ENABLE_TELEGRAM', '').lower() in ('1', 'true', 'yes', 'on')
+        if enable_telegram:
+            tasks.append(asyncio.create_task(monitor_signals_for_telegram(self)))
+            logger.info("✅ Telegram signal monitor started")
+        else:
+            logger.info("📵 Telegram disabled (set ENABLE_TELEGRAM=1 to enable)")
         
         # Start LIVE TRADING executor
         try:

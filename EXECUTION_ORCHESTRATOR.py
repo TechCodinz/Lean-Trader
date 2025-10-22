@@ -5,6 +5,7 @@ Smart trade execution with risk management, position sizing, and profit optimiza
 """
 
 import asyncio
+import os
 import logging
 from typing import Dict, List, Optional, Any
 from datetime import datetime
@@ -394,8 +395,9 @@ class ExecutionOrchestrator:
             # Choose execution engine based on signal source
             execution_result = None
             
-            # Try REAL_PROFIT_BOT first (Gate.io)
-            if 'real_profit' in self.engines and self.engines['real_profit']:
+            # Try REAL_PROFIT_BOT first (Gate.io) if explicitly enabled
+            use_real_profit = os.getenv('ENABLE_REAL_PROFIT_ENGINE', '').lower() in ('1', 'true', 'yes', 'on')
+            if use_real_profit and 'real_profit' in self.engines and self.engines['real_profit']:
                 try:
                     execution_result = self.engines['real_profit'].execute_trade(
                         symbol=symbol,
