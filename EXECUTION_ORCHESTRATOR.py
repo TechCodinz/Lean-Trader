@@ -256,6 +256,14 @@ class ExecutionOrchestrator:
         logger.info(f"   Min Confidence: {self.min_confidence}")
         logger.info(f"   Risk per trade: {self.position_sizer.max_risk_per_trade:.1%}")
     
+    @staticmethod
+    def _sanitize_symbol(symbol: str) -> str:
+        """Strip suffixes like BTC/USDT:USDT -> BTC/USDT for ccxt routing."""
+        try:
+            return symbol.split(':')[0] if symbol and ':' in symbol else symbol
+        except Exception:
+            return symbol
+
     async def run_execution_loop(self):
         """
         Main execution loop - monitors decisions and executes high-confidence trades
@@ -389,7 +397,7 @@ class ExecutionOrchestrator:
             price = signal.get('data', {}).get('price', 0)
             if not price:
                 # Try to fetch current price
-                price = await self.get_current_price(symbol)
+                price = await self.get_current_price(self._sanitize_symbol(symbol))
             
             if not price:
                 logger.error(f"Cannot get price for {symbol}")
@@ -424,7 +432,7 @@ class ExecutionOrchestrator:
             if use_real_profit and 'real_profit' in self.engines and self.engines['real_profit']:
                 try:
                     execution_result = self.engines['real_profit'].execute_trade(
-                        symbol=symbol,
+                        symbol=self._sanitize_symbol(symbol),
                         signal=side.upper(),
                         price=price
                     )
