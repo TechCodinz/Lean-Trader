@@ -424,6 +424,19 @@ class CompleteUnifiedOrchestrator:
             'PLATINUM', 'WHEAT', 'CORN', 'SOYBEAN', 'COFFEE',
             'SUGAR', 'COTTON', 'COCOA',
         ]
+        # Merge dynamic universe from file if available (auto-promotion feed)
+        try:
+            import json
+            dyn_path = Path('universe_dynamic.json')
+            if dyn_path.exists():
+                dyn = json.loads(dyn_path.read_text())
+                dyn_pairs = dyn.get('pairs', dyn) if isinstance(dyn, dict) else dyn
+                if isinstance(dyn_pairs, list):
+                    universe = list(dict.fromkeys(list(universe) + list(dyn_pairs)))
+                    logger.info(f"🌌 Dynamic Universe merged: {len(universe)} pairs")
+        except Exception as e:
+            logger.warning(f"Dynamic universe load failed: {e}")
+
         logger.info(f"🌌 Trading Universe: {len(universe)} pairs (35 crypto + 20 forex + 24 stocks + 13 commodities)")
         self.ultra_core = UltraCore(self.router, universe, logger)
         
@@ -453,6 +466,13 @@ class CompleteUnifiedOrchestrator:
         
         self.trading_engines['moon_spotter'] = UltraMoonSpotter()
         self.trading_engines['real_profit'] = RealProfitBot(universe=universe)
+        # Env gate for live RealProfit engine (safety)
+        try:
+            if os.getenv('ENABLE_REAL_PROFIT_ENGINE', '').lower() not in ('1','true','yes','on'):
+                self.trading_engines['real_profit'] = None
+                logger.info('🔒 Real Profit engine gated (ENABLE_REAL_PROFIT_ENGINE=0)')
+        except Exception:
+            pass
         self.trading_engines['enhanced'] = EnhancedTradingBot(universe=universe)
         
         engine_count = len([e for e in self.trading_engines.values() if e])

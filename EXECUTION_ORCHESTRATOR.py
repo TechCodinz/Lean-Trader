@@ -27,6 +27,16 @@ class SmartPositionSizer:
         # Dynamic sizing based on confidence
         self.use_dynamic_sizing = True
         self.aggressive_mode = True  # Grow account faster
+        # Environment overrides for adaptive config
+        try:
+            self.max_risk_per_trade = float(os.getenv('MAX_RISK_PER_TRADE', self.max_risk_per_trade))
+            self.max_position_pct = float(os.getenv('MAX_POSITION_PCT', self.max_position_pct))
+            self.min_position_usd = float(os.getenv('MIN_POSITION_USD', self.min_position_usd))
+            self.use_dynamic_sizing = os.getenv('USE_DYNAMIC_SIZING','1').lower() in ('1','true','yes','on')
+            self.aggressive_mode = os.getenv('AGGRESSIVE_MODE','1').lower() in ('1','true','yes','on')
+            self.balance = float(os.getenv('INITIAL_BALANCE', self.balance))
+        except Exception:
+            pass
         
     def calculate_position_size(self, 
                                confidence: float,
@@ -96,6 +106,12 @@ class SmartRiskManager:
         self.max_open_positions = 5
         self.max_daily_loss = 0.05  # 5% max daily loss
         self.max_correlated_positions = 2  # Max positions in correlated assets
+        # Environment overrides
+        try:
+            self.max_open_positions = int(os.getenv('MAX_OPEN_POSITIONS', self.max_open_positions))
+            self.max_daily_loss = float(os.getenv('MAX_DAILY_LOSS', self.max_daily_loss))
+        except Exception:
+            pass
         
         self.open_positions = {}
         self.daily_pnl = 0.0
@@ -227,6 +243,14 @@ class ExecutionOrchestrator:
         self.total_profit = 0.0
         self.execution_times = deque(maxlen=100)
         
+        # Environment override for min confidence (per-mode or global)
+        env_min = os.getenv(f'MIN_CONFIDENCE_{mode.upper()}') or os.getenv('MIN_CONFIDENCE')
+        try:
+            if env_min:
+                self.min_confidence = float(env_min)
+        except Exception:
+            pass
+
         logger.info("⚡ Execution Orchestrator initialized (SMART LOGIC)")
         logger.info(f"   Mode: {mode}")
         logger.info(f"   Min Confidence: {self.min_confidence}")

@@ -7,6 +7,13 @@ import os
 import sys
 import asyncio
 from pathlib import Path
+from typing import Optional
+
+# Prefer python-dotenv if available to load a central .env automatically
+try:
+    from dotenv import load_dotenv  # type: ignore
+except Exception:  # dotenv is optional
+    load_dotenv = None  # type: ignore
 
 # Load environment variables
 print("=" * 80)
@@ -14,21 +21,37 @@ print("🚀 TRADING BOT LAUNCHER")
 print("=" * 80)
 print()
 
-# Load .env file
-env_file = Path(__file__).parent / '.env'
-if env_file.exists():
-    print("📄 Loading environment variables...")
+def _safe_load_env(dotenv_path: Optional[Path]) -> int:
+    if not dotenv_path or not dotenv_path.exists():
+        return 0
     loaded = 0
-    with open(env_file, 'r') as f:
-        for line in f:
-            line = line.strip()
-            if line and not line.startswith('#') and '=' in line:
-                key, value = line.split('=', 1)
-                os.environ[key.strip()] = value.strip()
-                loaded += 1
-    print(f"✅ Loaded {loaded} environment variables\n")
+    try:
+        # Try python-dotenv first for robust parsing
+        if load_dotenv is not None:
+            # Do not override already-set environment variables
+            load_dotenv(dotenv_path=dotenv_path, override=False)
+            # We can't easily count how many keys were set via load_dotenv
+            # Fall through to manual count for visibility
+        with open(dotenv_path, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    key, _ = line.split('=', 1)
+                    if key.strip() in os.environ:
+                        loaded += 1
+        return loaded
+    except Exception:
+        return 0
+
+# Load .env from local directory and from central project path if present
+print("📄 Loading environment variables...")
+loaded_local = _safe_load_env(Path(__file__).parent / '.env')
+loaded_central = _safe_load_env(Path.home() / 'trading_bot' / '.env')
+total_loaded = loaded_local + loaded_central
+if total_loaded > 0:
+    print(f"✅ Loaded environment (local: {loaded_local}, central: {loaded_central})\n")
 else:
-    print("⚠️  No .env file found. Using system environment.\n")
+    print("⚠️  No .env file found (local or central). Using system environment.\n")
 
 # Verify critical keys
 print("🔍 Checking API Keys:")
