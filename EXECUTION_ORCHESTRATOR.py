@@ -242,6 +242,19 @@ class ExecutionOrchestrator:
         self.winning_trades = 0
         self.total_profit = 0.0
         self.execution_times = deque(maxlen=100)
+
+        # Autotune controls
+        self.pnl_window = deque(maxlen=50)
+        self._idle_ticks = 0
+        self.autotune_enabled = os.getenv('AUTOTUNE_EXECUTION', '1').lower() in ('1', 'true', 'yes', 'on')
+        try:
+            self.min_conf_floor = float(os.getenv('MIN_CONFIDENCE_FLOOR', '0.55'))
+        except Exception:
+            self.min_conf_floor = 0.55
+        try:
+            self.min_conf_ceiling = float(os.getenv('MIN_CONFIDENCE_CEIL', str(self.min_confidence)))
+        except Exception:
+            self.min_conf_ceiling = self.min_confidence
         
         # Environment override for min confidence (per-mode or global)
         env_min = os.getenv(f'MIN_CONFIDENCE_{mode.upper()}') or os.getenv('MIN_CONFIDENCE')
@@ -269,6 +282,15 @@ class ExecutionOrchestrator:
         Main execution loop - monitors decisions and executes high-confidence trades
         """
         logger.info("⚡ Starting SMART execution loop...")
+
+        # Start autotuner as a side task (adapts min_confidence automatically)
+        if self.autotune_enabled and not hasattr(self, '_autotune_started'):
+            try:
+                asyncio.create_task(self._autotune_loop())
+                self._autotune_started = True
+                logger.info("🛠️ Autotune enabled (min_confidence will adjust dynamically)")
+            except Exception:
+                pass
         
         while self.execution_enabled:
             try:
@@ -640,6 +662,10 @@ class ExecutionOrchestrator:
                 self.winning_trades += 1
             
             self.total_profit += pnl
+            try:
+                self.pnl_window.append(pnl)
+            except Exception:
+                pass
             
             # Record in ledger
             close_record = {
@@ -664,6 +690,57 @@ class ExecutionOrchestrator:
             
         except Exception as e:
             logger.error(f"Position close error: {e}")
+
+    async def _autotune_loop(self):
+        """Continuously adjust thresholds based on activity and recent outcomes."""
+        try:
+            idle_threshold = int(os.getenv('AUTOTUNE_IDLE_TICKS', '60'))  # ~60s idle lowers threshold
+            low_win = float(os.getenv('AUTOTUNE_WINRATE_LOW', '0.45'))
+            high_win = float(os.getenv('AUTOTUNE_WINRATE_HIGH', '0.70'))
+            window_needed = int(os.getenv('AUTOTUNE_WIN_WINDOW', '20'))
+        except Exception:
+            idle_threshold, low_win, high_win, window_needed = 60, 0.45, 0.70, 20
+
+        while self.execution_enabled:
+            try:
+                # Idle-based relaxation: if no decisions arriving, reduce min_confidence down to floor
+                qsize = 0
+                try:
+                    qsize = self.data_hub.alert_queue.qsize()
+                except Exception:
+                    pass
+                if qsize == 0:
+                    self._idle_ticks += 1
+                else:
+                    self._idle_ticks = 0
+
+                if self._idle_ticks >= idle_threshold:
+                    old = self.min_confidence
+                    self.min_confidence = max(self.min_conf_floor, self.min_confidence - 0.02)
+                    if self.min_confidence != old:
+                        logger.info(f"🛠️ Autotune: idle detected ({idle_threshold}s) → min_confidence {old:.2f} → {self.min_confidence:.2f}")
+                    self._idle_ticks = 0
+
+                # Outcome-based tightening: if recent winrate low, increase threshold up to ceiling
+                if len(self.pnl_window) >= window_needed:
+                    wins = sum(1 for x in self.pnl_window if x > 0)
+                    total = len(self.pnl_window)
+                    winrate = (wins / total) if total else 0.0
+                    if winrate < low_win:
+                        old = self.min_confidence
+                        self.min_confidence = min(self.min_conf_ceiling, self.min_confidence + 0.02)
+                        if self.min_confidence != old:
+                            logger.info(f"🛠️ Autotune: low winrate {winrate:.2f} < {low_win:.2f} → min_confidence {old:.2f} → {self.min_confidence:.2f}")
+                    # Optional easing on strong winrate (kept conservative)
+                    elif winrate > high_win and self.min_confidence > (self.min_conf_floor + 0.01):
+                        old = self.min_confidence
+                        self.min_confidence = max(self.min_conf_floor, self.min_confidence - 0.01)
+                        if self.min_confidence != old:
+                            logger.info(f"🛠️ Autotune: strong winrate {winrate:.2f} > {high_win:.2f} → min_confidence {old:.2f} → {self.min_confidence:.2f}")
+
+                await asyncio.sleep(1)
+            except Exception:
+                await asyncio.sleep(2)
     
     def get_win_rate(self) -> float:
         """Get current win rate"""
