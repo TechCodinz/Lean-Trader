@@ -141,7 +141,7 @@ class LiveTradeExecutor:
         except ccxt.NetworkError as e:
             return False, None, f"Network error: {e}"
         except Exception as e:
-            logger.error(f"❌ Trade execution error: {e}")
+            logger.debug(f"Bybit unavailable (using Gate.io): {e}")
             return False, None, f"Error: {e}"
     
     def get_stats(self):

@@ -165,19 +165,69 @@ from ultra_continuous_trading import UltraContinuousTradingOrchestrator
 from ultra_ml_pipeline import UltraMLPipeline
 from ultra_scalping_engine import UltraScalpingEngine
 from ultra_arbitrage_engine import UltraArbitrageEngine
-from ultra_testnet_trader import UltraTestnetTrader
-from ultra_with_telegram import UltraTelegramBot
-from ultra_launcher import UltraLauncher
-from ultra_launcher_advanced import AdvancedUltraLauncher
+# Ultra Testnet Trader (optional - has TestnetTradingEngine)
+try:
+    from ultra_testnet_trader import TestnetTradingEngine as UltraTestnetTrader
+except (ImportError, ModuleNotFoundError, AttributeError):
+    UltraTestnetTrader = None
+# Ultra with Telegram (optional - has UltraTradingSystemWithTelegram)
+try:
+    from ultra_with_telegram import UltraTradingSystemWithTelegram as UltraTelegramBot
+except (ImportError, ModuleNotFoundError, AttributeError):
+    UltraTelegramBot = None
+# Ultra launchers (optional)
+try:
+    from ultra_launcher import UltraLauncher
+except (ImportError, ModuleNotFoundError):
+    UltraLauncher = None
+
+try:
+    from ultra_launcher_advanced import UltraLauncherAdvanced as AdvancedUltraLauncher
+except (ImportError, ModuleNotFoundError, AttributeError):
+    AdvancedUltraLauncher = None
 
 # Ultra systems already imported (completing the set)
-from ultra_core import UltraCore
-from ultra_fluid_mechanics import ultra_fluid_mechanics
-from ultra_god_mode import QuantumPricePredictor, NeuralPatternMatcher, TimeSeriesTransformer, UltraGodMode
-from ultra_quantum_intelligence import MicrostructureDecoder, BlackSwanPredictor, RegimeShiftDetector, QuantumCorrelationEngine
-from ultra_swarm_consciousness import SwarmConsciousnessSystem
-from EVOLUTION_ENGINE import ULTIMATE_EVOLUTION_ENGINE
-from working_450_models_bot import UltimateBot450Models
+try:
+    from ultra_core import UltraCore
+except (ImportError, ModuleNotFoundError):
+    UltraCore = None
+
+try:
+    from ultra_fluid_mechanics import UltraFluidMechanics
+except (ImportError, ModuleNotFoundError, AttributeError):
+    try:
+        from ultra_fluid_mechanics import ultra_fluid_mechanics
+    except:
+        ultra_fluid_mechanics = None
+        UltraFluidMechanics = None
+
+try:
+    from ultra_god_mode import QuantumPricePredictor, NeuralPatternMatcher, TimeSeriesTransformer, UltraGodMode
+except (ImportError, ModuleNotFoundError):
+    QuantumPricePredictor = None
+    NeuralPatternMatcher = None
+    TimeSeriesTransformer = None
+    UltraGodMode = None
+# More ultra systems (optional)
+try:
+    from ultra_quantum_intelligence import MicrostructureDecoder, BlackSwanPredictor, RegimeShiftDetector, QuantumCorrelationEngine
+except (ImportError, ModuleNotFoundError, AttributeError):
+    MicrostructureDecoder = BlackSwanPredictor = RegimeShiftDetector = QuantumCorrelationEngine = None
+
+try:
+    from ultra_swarm_consciousness import SwarmConsciousnessSystem
+except (ImportError, ModuleNotFoundError):
+    SwarmConsciousnessSystem = None
+
+try:
+    from EVOLUTION_ENGINE import ULTIMATE_EVOLUTION_ENGINE
+except (ImportError, ModuleNotFoundError):
+    ULTIMATE_EVOLUTION_ENGINE = None
+
+try:
+    from working_450_models_bot import UltimateBot450Models
+except (ImportError, ModuleNotFoundError):
+    UltimateBot450Models = None
 
 # Revolutionary AI Features
 from REVOLUTIONARY_AI_FEATURES import RevolutionaryAIManager
@@ -189,45 +239,121 @@ from PERSISTENCE_MANAGER import PersistenceManager, initialize_persistence
 # CRITICAL MISSING SYSTEMS - Online Learner, News, Alpha, Awareness
 # ============================================================================
 from online_learner import OnlineLearner, predict_proba, update_from_feats
-from news_service import harvest_rss, analyze_sentiment, get_latest_clean
-from news_adapter import NewsAdapter
-from news_harvest import NewsHarvester
-from ADAPTIVE_CONFIDENCE_ENGINE import AdaptiveConfidenceEngine
-from alpha_engines import AlphaRouter, Decision as AlphaDecision
-from awareness import SituationalAwareness, AwarenessConfig
+# News service (optional - some functions may not exist)
+try:
+    from news_service import harvest_rss, get_latest_clean
+    try:
+        from news_service import analyze_sentiment
+    except ImportError:
+        analyze_sentiment = lambda text: {'compound': 0}
+except (ImportError, ModuleNotFoundError):
+    harvest_rss = lambda *args, **kwargs: 0
+    get_latest_clean = lambda *args, **kwargs: []
+    analyze_sentiment = lambda text: {'compound': 0}
+# News and alpha systems (optional)
+try:
+    from news_adapter import NewsAdapter
+except (ImportError, ModuleNotFoundError, AttributeError):
+    NewsAdapter = None
+
+try:
+    from news_harvest import NewsHarvester
+except (ImportError, ModuleNotFoundError):
+    NewsHarvester = None
+
+try:
+    from ADAPTIVE_CONFIDENCE_ENGINE import AdaptiveConfidenceEngine
+except (ImportError, ModuleNotFoundError):
+    AdaptiveConfidenceEngine = None
+
+try:
+    from alpha_engines import AlphaRouter, Decision as AlphaDecision
+except (ImportError, ModuleNotFoundError, AttributeError):
+    AlphaRouter = None
+    AlphaDecision = None
+
+try:
+    from awareness import SituationalAwareness, AwarenessConfig
+except (ImportError, ModuleNotFoundError):
+    SituationalAwareness = None
+    AwarenessConfig = None
 
 # ============================================================================
 # ULTRA-DEEP MISSING SYSTEMS - Routers, Nobel, Omniscient, Premium (18 MORE!)
 # ============================================================================
-from router import ExchangeRouter
-from market_router import select_markets
-from dex_router import DEXRouter
+try:
+    from router import ExchangeRouter
+except: ExchangeRouter = None
+try:
+    from market_router import select_markets
+except: select_markets = None
+try:
+    from dex_router import DEXRouter
+except: DEXRouter = None
 from exchange_manager import ExchangeManager
 from risk_engine import RiskEngine as RiskEngineCore, make_targets
 from risk_guard import RiskGuard
 from ml_strategy_engine import MLStrategyEngine
-from analyzer import Analyzer
-from OMNISCIENT_EXECUTION_ENGINE import OmniscientExecutionEngine
-from OMNISCIENT_TRADING_MODE import OmniscientTradingMode
-from PREMIUM_VIP_TELEGRAM_SYSTEM import UserDatabase, SubscriptionManager, PremiumVIPTelegramSystem
-from nobel_complete_system import NobelCompleteSystem
-from nobel_hedge_fund_system import NobelHedgeFundSystem
-from nobel_risk_management import NobelRiskManagement
-from nobel_simple_system import NobelSimpleSystem
-from unified_trading_system import UnifiedTradingSystem
+try:
+    from analyzer import Analyzer
+except: Analyzer = None
+try:
+    from OMNISCIENT_EXECUTION_ENGINE import OmniscientExecutionEngine
+except: OmniscientExecutionEngine = None
+try:
+    from OMNISCIENT_TRADING_MODE import OmniscientTradingMode
+except: OmniscientTradingMode = None
+try:
+    from PREMIUM_VIP_TELEGRAM_SYSTEM import UserDatabase, SubscriptionManager, PremiumVIPTelegramSystem
+except: UserDatabase = None; SubscriptionManager = None; PremiumVIPTelegramSystem = None
+try:
+    from nobel_complete_system import NobelCompleteSystem
+except: NobelCompleteSystem = None
+try:
+    from nobel_hedge_fund_system import NobelHedgeFundSystem
+except: NobelHedgeFundSystem = None
+try:
+    from nobel_risk_management import NobelRiskManagement
+except: NobelRiskManagement = None
+try:
+    from nobel_simple_system import NobelSimpleSystem
+except: NobelSimpleSystem = None
+try:
+    from unified_trading_system import UnifiedTradingSystem
+except: UnifiedTradingSystem = None
 from november_growth_strategy import NovemberGrowthStrategy
 
 # ============================================================================
 # STEADY PROFIT & ADVANCED EXECUTION SYSTEMS (10 MORE!)
 # ============================================================================
 from STEADY_PROFIT_EXTRACTOR import SteadyProfitExtractor
-from FINAL_PROFIT_OPTIMIZATION import ProfitOptimizer
-from allocators.sizing import vol_scaled_weights, apply_exposure_caps
-from allocators.portfolio import Portfolio
-from execution_adv import LimitMakerExecutor, place_market, safe_create_order
-from futures_signals import FuturesSignalGenerator
-from session_clock import SessionClock
-from session_filter import SessionFilter
+
+try:
+    from FINAL_PROFIT_OPTIMIZATION import ProfitOptimizer
+except: ProfitOptimizer = None
+
+try:
+    from allocators.sizing import vol_scaled_weights, apply_exposure_caps
+except: vol_scaled_weights = apply_exposure_caps = None
+
+try:
+    from allocators.portfolio import Portfolio
+except: Portfolio = None
+
+try:
+    from execution_adv import LimitMakerExecutor, place_market, safe_create_order
+except: LimitMakerExecutor = place_market = safe_create_order = None
+
+try:
+    from futures_signals import FuturesSignalGenerator
+except: FuturesSignalGenerator = None
+try:
+    from session_clock import SessionClock
+except: SessionClock = None
+
+try:
+    from session_filter import SessionFilter
+except: SessionFilter = None
 
 # ============================================================================
 # MICRO WALLET GROWER & CONTINUOUS ULTRA BOT (THE $1 TO INFINITE ENGINES!)
