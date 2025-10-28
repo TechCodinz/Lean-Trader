@@ -200,8 +200,8 @@ class UltraCore:
 
         return results
 
-    def get_market_data(self, symbol=None, timeframe='1h'):
-        """Get market data for Ultra engines - wrapper for compatibility"""
+    async def get_market_data(self, symbol=None, timeframe='1h'):
+        """Get market data for Ultra engines - wrapper for compatibility (async)"""
         try:
             if symbol:
                 # Fetch specific symbol data
