@@ -1601,7 +1601,7 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             logger.info("✅ 🌙 DEX ORCHESTRATOR STARTED - Moon spotting across 5 chains!")
         
         # START ARBITRAGE ENGINE - Risk-free profits!
-        if self.arbitrage_engine:
+        if getattr(self, 'arbitrage_engine', None):
             tasks.append(
                 asyncio.create_task(self.arbitrage_engine.run_arbitrage_scanner())
             )
@@ -1624,21 +1624,21 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             logger.info("✅ 💰 REAL PROFIT BOT STARTED - Trading 35 pairs!")
         
         # START DYNAMIC MARKET SCANNER - Auto-discover trending pairs!
-        if self.market_scanner:
+        if getattr(self, 'market_scanner', None):
             tasks.append(
                 asyncio.create_task(self.market_scanner.run_continuous_scanning())
             )
             logger.info("✅ 🔍 DYNAMIC MARKET SCANNER STARTED - Auto-discovering 50-100+ pairs!")
         
         # START NEWS TRADING ENGINE - Fundamental analysis!
-        if self.news_engine:
+        if getattr(self, 'news_engine', None):
             tasks.append(
                 asyncio.create_task(self.news_engine.run_news_monitor())
             )
             logger.info("✅ 📰 NEWS TRADING ENGINE STARTED - Monitoring trending & sentiment!")
         
         # START HEDGE FUND ARSENAL - Professional strategies!
-        if self.hedge_fund:
+        if getattr(self, 'hedge_fund', None):
             tasks.append(
                 asyncio.create_task(self.hedge_fund.run_hedge_fund_strategies())
             )
@@ -1661,7 +1661,7 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
         logger.info("\n🚀 AUTO-STARTING ALL 20 ULTRA SYSTEMS...")
         
         # ULTRA MOON SPOTTER - Continuously hunt for 1,000,000x gems
-        if self.ultra_moon_system:
+        if getattr(self, 'ultra_moon_system', None):
             async def run_moon_hunting():
                 while True:
                     try:
@@ -1675,7 +1675,7 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             logger.info("✅ 🌙 MOON SPOTTER HUNTING - Scanning for 1,000,000x gems!")
         
         # ULTRA FOREX MASTER - Trade forex continuously
-        if self.forex_master:
+        if getattr(self, 'forex_master', None):
             async def run_forex_master():
                 while True:
                     try:
@@ -1689,7 +1689,7 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             logger.info("✅ 💱 FOREX MASTER TRADING - Major + Exotic pairs!")
         
         # ULTRA CONTINUOUS TRADING - 24/7 execution
-        if self.continuous_trading:
+        if getattr(self, 'continuous_trading', None):
             async def run_continuous():
                 while True:
                     try:
@@ -1703,7 +1703,7 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             logger.info("✅ 🔄 CONTINUOUS TRADING ACTIVE - Never stops!")
         
         # ULTRA ML PIPELINE - Continuous model training
-        if self.ml_pipeline:
+        if getattr(self, 'ml_pipeline', None):
             async def run_ml_training():
                 while True:
                     try:
@@ -1717,7 +1717,7 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             logger.info("✅ 🤖 ML PIPELINE TRAINING - Continuous learning!")
         
         # ULTRA SCALPING ENGINE
-        if self.ultra_scalping:
+        if getattr(self, 'ultra_scalping', None):
             async def run_ultra_scalping():
                 while True:
                     try:
@@ -1731,7 +1731,7 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             logger.info("✅ ⚡ ULTRA SCALPING ACTIVE - Micro-profits!")
         
         # ULTRA ARBITRAGE ENGINE
-        if self.ultra_arbitrage:
+        if getattr(self, 'ultra_arbitrage', None):
             async def run_ultra_arb():
                 while True:
                     try:
@@ -1745,7 +1745,7 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             logger.info("✅ 💰 ULTRA ARBITRAGE SCANNING!")
         
         # ULTRA MULTI-PLATFORM SCANNER
-        if self.multi_platform:
+        if getattr(self, 'multi_platform', None):
             async def run_multi_scan():
                 while True:
                     try:
@@ -1759,7 +1759,7 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             logger.info("✅ 🔍 MULTI-PLATFORM SCANNING!")
         
         # REVOLUTIONARY AI - All 10 cutting-edge features
-        if self.revolutionary_ai:
+        if getattr(self, 'revolutionary_ai', None):
             async def run_revolutionary():
                 while True:
                     try:
@@ -1776,7 +1776,7 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             logger.info("✅ 🎯 REVOLUTIONARY AI ACTIVE - 10 cutting-edge features!")
         
         # EVOLUTION ENGINE - Spawn strategies every 5 min
-        if self.evolution_engine:
+        if getattr(self, 'evolution_engine', None):
             async def run_evolution():
                 while True:
                     try:
@@ -1790,7 +1790,7 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             logger.info("✅ 🧬 EVOLUTION ENGINE - Spawning strategies!")
         
         # SWARM CONSCIOUSNESS - 20 agents collaborating
-        if self.swarm_consciousness:
+        if getattr(self, 'swarm_consciousness', None):
             async def run_swarm():
                 while True:
                     try:
@@ -1847,28 +1847,28 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
         
         # ONLINE LEARNER - Updates from every trade
         # (This is passive - updates when trades close, no loop needed)
-        if self.online_learner:
+        if getattr(self, 'online_learner', None):
             logger.info("✅ 🧠 ONLINE LEARNER ACTIVE - Updates from every trade!")
         
         # ADAPTIVE CONFIDENCE - Adjusts thresholds dynamically
         # (This is passive - called during decision making, no loop needed)
-        if self.adaptive_confidence:
+        if getattr(self, 'adaptive_confidence', None):
             logger.info("✅ 🎯 ADAPTIVE CONFIDENCE ACTIVE - Dynamic 65-95% thresholds!")
         
         # ALPHA ROUTER - Multi-strategy alpha generation
         # (This is passive - called during signal generation, no loop needed)
-        if self.alpha_router:
+        if getattr(self, 'alpha_router', None):
             logger.info("✅ 🎲 ALPHA ROUTER ACTIVE - Multi-strategy signals!")
         
         # SITUATIONAL AWARENESS - Market regime monitoring
         # (This is passive - called during decision making, no loop needed)
-        if self.situational_awareness:
+        if getattr(self, 'situational_awareness', None):
             logger.info("✅ 👁️  SITUATIONAL AWARENESS ACTIVE - Regime detection!")
         
         # ====================================================================
         # STEADY PROFIT EXTRACTOR - THE MONEY PRINTER! 🎰
         # ====================================================================
-        if self.steady_profit:
+        if getattr(self, 'steady_profit', None):
             async def run_steady_profit():
                 """
                 STEADY PROFIT EXTRACTOR - Makes money in ALL conditions
@@ -1898,7 +1898,7 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                                     logger.info(f"   Size: ${extraction_signal['notional']:.2f}, SL: {extraction_signal['stop_loss']:.5f}, TP: {extraction_signal['take_profit']:.5f}")
                                     
                                     # Execute via execution engine
-                                    if self.execution:
+                                    if getattr(self, 'execution', None):
                                         await self.execution.execute_signal(extraction_signal)
                         
                         await asyncio.sleep(30)  # Check every 30 seconds
@@ -1915,13 +1915,13 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             logger.info("✅ 🕐 SESSION FILTER ACTIVE - Trades during best sessions!")
         
         # FUTURES SIGNALS - Leverage trading
-        if self.futures_signals:
+        if getattr(self, 'futures_signals', None):
             logger.info("✅ 📊 FUTURES SIGNALS ACTIVE - Margin & leverage trading!")
         
         # ====================================================================
         # MICRO WALLET GROWER - $1 TO INFINITE AUTO-GROWTH! 💎
         # ====================================================================
-        if self.micro_wallet_grower:
+        if getattr(self, 'micro_wallet_grower', None):
             async def run_micro_wallet_growth():
                 """
                 MICRO WALLET GROWER - Grows ANY balance
@@ -2020,7 +2020,7 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             logger.info("✅ 💎 MICRO WALLET GROWER ACTIVE - $1 to INFINITE growth!")
         
         # CONTINUOUS ULTRA BOT - Never stops scanning & trading!
-        if self.continuous_ultra:
+        if getattr(self, 'continuous_ultra', None):
             async def run_continuous_ultra():
                 """
                 CONTINUOUS ULTRA BOT - NEVER STOPS!
@@ -2052,7 +2052,7 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
         # ====================================================================
         # AUTO LIVE TRIGGER - TESTNET→REAL AUTO-SWITCHING! 🤖
         # ====================================================================
-        if self.auto_live_trigger:
+        if getattr(self, 'auto_live_trigger', None):
             async def run_auto_live_trigger():
                 """
                 AUTO LIVE TRIGGER - Smart testnet→real switching
@@ -2209,7 +2209,7 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                 # ============================================================
                 # CRITICAL: Check Emergency Stop FIRST
                 # ============================================================
-                if self.emergency_stop:
+                if getattr(self, 'emergency_stop', None):
                     try:
                         # Get current balance
                         balance = await self._get_account_balance()
@@ -2324,10 +2324,10 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                 logger.info(f"      • Signals: {len(self.data_hub.recent_signals)} recent")
                 logger.info(f"      • Trades: {len(self.data_hub.recent_trades)} recent")
                 
-                if self.learning_pipeline:
+                if getattr(self, 'learning_pipeline', None):
                     logger.info(f"      • Learning Buffer: {len(self.learning_pipeline.training_buffer)} samples")
                 
-                if self.scouting_pipeline:
+                if getattr(self, 'scouting_pipeline', None):
                     logger.info(f"      • Findings Buffer: {len(self.scouting_pipeline.findings_buffer)} findings")
                 
                 # Systems status
