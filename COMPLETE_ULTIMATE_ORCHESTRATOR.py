@@ -89,25 +89,27 @@ try:
 except Exception as e:
     logger.error(f"❌ ULTRA RARE ENGINES FAILED TO LOAD: {e}")
     ULTRA_RARE_AVAILABLE = False
-    MicrostructureExploiter = None
-    InformationEntropyTrader = None
-    CascadingLiquidityHunter = None
-    FlashCrashPredator = None
-    FundingRateArbitrage = None
-    HiddenOrderDetector = None
-    SmartMoneyShadow = None
-    RetailPanicExploiter = None
-    TimeWarpPatterns = None
-    WhalePsychologyPredictor = None
-    UltraRareEnginesOrchestrator = None
 
-    ULTRA_FEATURES_AVAILABLE = True
-    logger.info("✅ ULTRA GOLDMINE FEATURES LOADED - Ready for +200-500% boost!")
+# ============================================================================
+# BRAIN + HIVEMIND - Professional Trading Intelligence
+# ============================================================================
+try:
+    from brain import Memory, VolSizer, Brain, Advice
+    BRAIN_AVAILABLE = True
+    logger.info("✅ BRAIN SYSTEM LOADED - Memory, sizing, regime awareness!")
 except Exception as e:
-    logger.error(f"❌ ULTRA GOLDMINE FEATURES FAILED TO LOAD: {e}")
-    logger.error("   Install dependencies: pip3 install numpy pandas scipy scikit-learn")
-    logger.error("   Or run: bash INSTALL_ALL_DEPENDENCIES.sh")
-    ULTRA_FEATURES_AVAILABLE = False
+    logger.error(f"❌ BRAIN SYSTEM FAILED TO LOAD: {e}")
+    BRAIN_AVAILABLE = False
+    Memory = VolSizer = Brain = Advice = None
+
+try:
+    from hivemind import HiveCoordinator, FrameDecision
+    HIVEMIND_AVAILABLE = True
+    logger.info("✅ HIVEMIND LOADED - Multi-timeframe consensus!")
+except Exception as e:
+    logger.error(f"❌ HIVEMIND FAILED TO LOAD: {e}")
+    HIVEMIND_AVAILABLE = False
+    HiveCoordinator = FrameDecision = None
 
 # ============================================================================
 # DIVINE INTELLIGENCE FEATURES - CONSCIOUSNESS-LEVEL TRADING ENTITY
@@ -319,32 +321,6 @@ try:
 except (ImportError, ModuleNotFoundError):
     SituationalAwareness = None
     AwarenessConfig = None
-
-# ============================================================================
-# BRAIN + HIVEMIND - Professional Trading Intelligence
-# ============================================================================
-try:
-    from brain import Memory, VolSizer, Brain, Advice
-    BRAIN_AVAILABLE = True
-    logger.info("✅ BRAIN SYSTEM LOADED - Memory, sizing, regime awareness!")
-except Exception as e:
-    logger.error(f"❌ BRAIN SYSTEM FAILED TO LOAD: {e}")
-    BRAIN_AVAILABLE = False
-    Memory = None
-    VolSizer = None
-    Brain = None
-    Advice = None
-
-try:
-    from hivemind import HiveCoordinator, FrameDecision
-    HIVEMIND_AVAILABLE = True
-    logger.info("✅ HIVEMIND LOADED - Multi-timeframe consensus!")
-except Exception as e:
-    logger.error(f"❌ HIVEMIND FAILED TO LOAD: {e}")
-    HIVEMIND_AVAILABLE = False
-    HiveCoordinator = None
-    FrameDecision = None
-
 
 # ============================================================================
 # ULTRA-DEEP MISSING SYSTEMS - Routers, Nobel, Omniscient, Premium (18 MORE!)
@@ -924,6 +900,55 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             self.situational_awareness = None
         
         # ====================================================================
+        # ULTRA RARE ENGINES - 11 Market Inefficiency Exploiters!
+        # ====================================================================
+        if ULTRA_RARE_AVAILABLE:
+            logger.info("\n💎 Initializing ULTRA RARE ENGINES (11 exploiters)...")
+            try:
+                self.ultra_rare_orchestrator = UltraRareEnginesOrchestrator()
+                self.advanced_systems['ultra_rare'] = self.ultra_rare_orchestrator
+                logger.info("✅ 💎 ULTRA RARE ENGINES READY - 11 market inefficiency exploiters!")
+            except Exception as e:
+                logger.warning(f"⚠️  Ultra Rare Engines: {e}")
+                self.ultra_rare_orchestrator = None
+        else:
+            self.ultra_rare_orchestrator = None
+        
+        # ====================================================================
+        # BRAIN + HIVEMIND - Professional Trading Intelligence!
+        # ====================================================================
+        if BRAIN_AVAILABLE:
+            logger.info("\n🧠 Initializing BRAIN SYSTEM...")
+            try:
+                self.trading_memory = Memory()
+                current_balance = 100.0  # Will update from exchange
+                self.vol_sizer = VolSizer(balance_usd=current_balance)
+                self.brain_system = Brain()
+                self.advanced_systems['brain_system'] = self.brain_system
+                self.advanced_systems['trading_memory'] = self.trading_memory
+                self.advanced_systems['vol_sizer'] = self.vol_sizer
+                logger.info("✅ 🧠 BRAIN SYSTEM READY - Memory, VolSizer, regime-aware signals!")
+            except Exception as e:
+                logger.warning(f"⚠️  Brain System: {e}")
+                self.brain_system = None
+        else:
+            self.brain_system = None
+        
+        if HIVEMIND_AVAILABLE:
+            logger.info("\n🐝 Initializing HIVEMIND...")
+            try:
+                self.hivemind = HiveCoordinator(
+                    timeframes=['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h']
+                )
+                self.advanced_systems['hivemind'] = self.hivemind
+                logger.info("✅ 🐝 HIVEMIND READY - 8 timeframes coordinated!")
+            except Exception as e:
+                logger.warning(f"⚠️  Hivemind: {e}")
+                self.hivemind = None
+        else:
+            self.hivemind = None
+        
+        # ====================================================================
         # ULTRA-DEEP SYSTEMS - Routers, Nobel, Omniscient, Premium (18!)
         # ====================================================================
         logger.info("\n🚀 Initializing ULTRA-DEEP SYSTEMS (18 routers, nobel, omniscient)...")
@@ -1104,246 +1129,6 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             self.futures_signals = None
         
         logger.info("✅ STEADY PROFIT & EXECUTION SYSTEMS - ALL MONEY MAKERS READY!")
-        
-        
-        # ====================================================================
-        # ULTRA RARE ENGINES - Exploit Market Inefficiencies! 💎
-        # ====================================================================
-        if getattr(self, 'ultra_rare_orchestrator', None):
-            async def run_ultra_rare_exploiters():
-                """
-                Run all 11 ultra rare engines with REAL market data
-                Fetches: order books, price history, liquidation data, funding rates
-                """
-                while True:
-                    try:
-                        signals = []
-                        
-                        # Scan major pairs
-                        for symbol in ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'BNB/USDT']:
-                            try:
-                                # Fetch REAL market data
-                                # 1. Get order book
-                                order_book = await asyncio.to_thread(
-                                    self.trading_engines[self.mode].fetch_order_book, 
-                                    symbol, 
-                                    limit=20
-                                )
-                                
-                                # 2. Get ticker for current price
-                                ticker = await asyncio.to_thread(
-                                    self.trading_engines[self.mode].fetch_ticker,
-                                    symbol
-                                )
-                                current_price = ticker['last']
-                                
-                                # 3. Get recent OHLCV for price history
-                                ohlcv = await asyncio.to_thread(
-                                    self.trading_engines[self.mode].fetch_ohlcv,
-                                    symbol, '1m', None, 100
-                                )
-                                recent_prices = [candle[4] for candle in ohlcv]  # Closing prices
-                                
-                                # 4. Try to get open interest (for futures)
-                                open_interest = 0
-                                try:
-                                    if hasattr(self.trading_engines[self.mode], 'fetch_open_interest'):
-                                        oi_data = await asyncio.to_thread(
-                                            self.trading_engines[self.mode].fetch_open_interest,
-                                            symbol
-                                        )
-                                        open_interest = oi_data.get('openInterest', 0)
-                                except:
-                                    pass
-                                
-                                # 5. Try to get funding rate (for perpetuals)
-                                funding_rate = 0
-                                try:
-                                    if hasattr(self.trading_engines[self.mode], 'fetch_funding_rate'):
-                                        funding = await asyncio.to_thread(
-                                            self.trading_engines[self.mode].fetch_funding_rate,
-                                            symbol
-                                        )
-                                        funding_rate = funding.get('fundingRate', 0)
-                                except:
-                                    pass
-                                
-                                # Prepare complete market data
-                                market_data = {
-                                    'symbol': symbol,
-                                    'price': current_price,
-                                    'order_book': order_book,
-                                    'recent_prices': recent_prices,
-                                    'open_interest': open_interest,
-                                    'funding_rate': funding_rate,
-                                    'bids': order_book.get('bids', []),
-                                    'asks': order_book.get('asks', [])
-                                }
-                                
-                                # Run all 11 engines via orchestrator with REAL data
-                                rare_signals = await self.ultra_rare_orchestrator.scan_all_engines(market_data)
-                                
-                                if rare_signals:
-                                    for signal in rare_signals:
-                                        # Enrich signal before publishing
-                                        signal['source'] = 'UltraRareEngines'
-                                        signal['timestamp'] = datetime.now().isoformat()
-                                        
-                                        # Publish to Data Hub
-                                        await self.data_hub.publish_signal(signal)
-                                        logger.info(f"💎 ULTRA RARE: {signal.get('pattern')} on {symbol} - {signal.get('signal')}")
-                                    
-                                    signals.extend(rare_signals)
-                            
-                            except Exception as e:
-                                logger.debug(f"Ultra rare analysis error for {symbol}: {e}")
-                        
-                        if signals:
-                            logger.info(f"💎 ULTRA RARE ENGINES: {len(signals)} inefficiency signals detected!")
-                        
-                        await asyncio.sleep(30)  # Every 30 seconds
-                        
-                    except Exception as e:
-                        logger.error(f"❌ Ultra Rare Exploiters error: {e}")
-                        import traceback
-                        logger.error(traceback.format_exc())
-                        await asyncio.sleep(30)
-            
-            tasks.append(asyncio.create_task(run_ultra_rare_exploiters()))
-            logger.info("✅ 💎 ULTRA RARE ENGINES ACTIVE - Fetching REAL data & hunting inefficiencies!")
-        
-        
-        # ====================================================================
-        # BRAIN ADVISOR - Professional Risk-Managed Signals! 🧠
-        # ====================================================================
-        if getattr(self, 'brain_system', None):
-            async def run_brain_advisor():
-                """
-                Brain system generates professional signals with proper SL/TP
-                Uses REAL OHLCV data from exchange
-                """
-                while True:
-                    try:
-                        # Scan major pairs
-                        for symbol in ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'BNB/USDT']:
-                            try:
-                                # Fetch REAL OHLCV data
-                                ohlcv = await asyncio.to_thread(
-                                    self.trading_engines[self.mode].fetch_ohlcv,
-                                    symbol, '1m', None, 100
-                                )
-                                
-                                if not ohlcv or len(ohlcv) < 50:
-                                    continue
-                                
-                                # Convert to DataFrame
-                                import pandas as pd
-                                df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
-                                
-                                # Get Brain's advice
-                                advice = self.brain_system.decide(symbol, df)
-                                
-                                if advice.side:  # buy or sell
-                                    # Calculate position size using VolSizer
-                                    notional = self.vol_sizer.usd(df)
-                                    
-                                    signal = {
-                                        'type': 'brain_advisor',
-                                        'source': 'BrainSystem',
-                                        'symbol': symbol,
-                                        'side': advice.side,
-                                        'stop_loss': advice.sl,
-                                        'take_profit': advice.tp,
-                                        'notional': notional,
-                                        'reason': advice.reason,
-                                        'confidence': 0.75,
-                                        'timestamp': datetime.now().isoformat()
-                                    }
-                                    
-                                    await self.data_hub.publish_signal(signal)
-                                    logger.info(f"🧠 BRAIN: {symbol} {advice.side.upper()} (SL: {advice.sl:.5f}, TP: {advice.tp:.5f}, ${notional:.2f})")
-                            
-                            except Exception as e:
-                                logger.debug(f"Brain advisor error for {symbol}: {e}")
-                        
-                        await asyncio.sleep(60)  # Every minute
-                        
-                    except Exception as e:
-                        logger.error(f"❌ Brain Advisor error: {e}")
-                        import traceback
-                        logger.error(traceback.format_exc())
-                        await asyncio.sleep(60)
-            
-            tasks.append(asyncio.create_task(run_brain_advisor()))
-            logger.info("✅ 🧠 BRAIN ADVISOR ACTIVE - Professional risk-managed signals with REAL data!")
-        
-        # ====================================================================
-        # HIVEMIND COORDINATOR - Multi-Timeframe Consensus! 🐝
-        # ====================================================================
-        if getattr(self, 'hivemind', None):
-            async def run_hivemind_coordinator():
-                """
-                Hivemind coordinates 8 timeframes into consensus signals
-                Fetches REAL data for all timeframes: 1m, 3m, 5m, 15m, 30m, 1h, 2h, 4h
-                """
-                while True:
-                    try:
-                        # Scan major pairs
-                        for symbol in ['BTC/USDT', 'ETH/USDT', 'SOL/USDT']:
-                            try:
-                                # Define fetch function for hivemind
-                                def fetch_ohlcv_sync(timeframe, limit):
-                                    """Synchronous fetch for hivemind"""
-                                    import pandas as pd
-                                    ohlcv = self.trading_engines[self.mode].fetch_ohlcv(
-                                        symbol, timeframe, None, limit
-                                    )
-                                    if not ohlcv:
-                                        return pd.DataFrame()
-                                    return pd.DataFrame(
-                                        ohlcv, 
-                                        columns=['timestamp', 'open', 'high', 'low', 'close', 'volume']
-                                    )
-                                
-                                # Let hivemind coordinate across all timeframes
-                                # It will call fetch_ohlcv for each of its 8 timeframes
-                                consensus_decision, insights = await asyncio.to_thread(
-                                    self.hivemind.decide,
-                                    symbol,
-                                    fetch_ohlcv_sync,
-                                    is_fx=False
-                                )
-                                
-                                if consensus_decision and consensus_decision.side:
-                                    signal = {
-                                        'type': 'hivemind_consensus',
-                                        'source': 'HiveCoordinator',
-                                        'symbol': symbol,
-                                        'side': consensus_decision.side,
-                                        'confidence': consensus_decision.prob,
-                                        'size_mult': consensus_decision.size_mult,
-                                        'reasons': consensus_decision.reasons,
-                                        'notes': consensus_decision.notes,
-                                        'timestamp': datetime.now().isoformat()
-                                    }
-                                    
-                                    await self.data_hub.publish_signal(signal)
-                                    logger.info(f"🐝 HIVEMIND: {symbol} {consensus_decision.side.upper()} "
-                                              f"({consensus_decision.prob:.0%} conf, {len(insights)} TF insights)")
-                            
-                            except Exception as e:
-                                logger.debug(f"Hivemind error for {symbol}: {e}")
-                        
-                        await asyncio.sleep(120)  # Every 2 minutes
-                        
-                    except Exception as e:
-                        logger.error(f"❌ Hivemind Coordinator error: {e}")
-                        import traceback
-                        logger.error(traceback.format_exc())
-                        await asyncio.sleep(120)
-            
-            tasks.append(asyncio.create_task(run_hivemind_coordinator()))
-            logger.info("✅ 🐝 HIVEMIND ACTIVE - 8 timeframes coordinated with REAL data!")
         
         # ====================================================================
         # MICRO WALLET GROWER & CONTINUOUS ULTRA - THE $1 TO INFINITE ENGINES!
@@ -2378,6 +2163,101 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             
             tasks.append(asyncio.create_task(run_session_publisher()))
             logger.info("✅ 🕐 SESSION TRADER publishing to Data Hub!")
+        
+        # ====================================================================
+        # ULTRA RARE ENGINES - Hunt Market Inefficiencies with REAL Data! 💎
+        # ====================================================================
+        if getattr(self, 'ultra_rare_orchestrator', None):
+            async def run_ultra_rare_exploiters():
+                """Run all 11 ultra rare engines with REAL market data"""
+                while True:
+                    try:
+                        signals = []
+                        for symbol in ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'BNB/USDT']:
+                            try:
+                                order_book = await asyncio.to_thread(self.trading_engines[self.mode].fetch_order_book, symbol, limit=20)
+                                ticker = await asyncio.to_thread(self.trading_engines[self.mode].fetch_ticker, symbol)
+                                ohlcv = await asyncio.to_thread(self.trading_engines[self.mode].fetch_ohlcv, symbol, '1m', None, 100)
+                                recent_prices = [candle[4] for candle in ohlcv]
+                                market_data = {'symbol': symbol, 'price': ticker['last'], 'order_book': order_book, 'recent_prices': recent_prices, 'open_interest': 0, 'funding_rate': 0, 'bids': order_book.get('bids', []), 'asks': order_book.get('asks', [])}
+                                rare_signals = await self.ultra_rare_orchestrator.scan_all_engines(market_data)
+                                if rare_signals:
+                                    for signal in rare_signals:
+                                        signal['source'] = 'UltraRareEngines'
+                                        signal['timestamp'] = datetime.now().isoformat()
+                                        await self.data_hub.publish_signal(signal)
+                                        logger.info(f"💎 ULTRA RARE: {signal.get('pattern')} on {symbol}")
+                                    signals.extend(rare_signals)
+                            except Exception as e:
+                                logger.debug(f"Ultra rare error: {e}")
+                        if signals:
+                            logger.info(f"💎 ULTRA RARE: {len(signals)} inefficiency signals!")
+                        await asyncio.sleep(30)
+                    except Exception as e:
+                        logger.error(f"❌ Ultra Rare error: {e}")
+                        await asyncio.sleep(30)
+            tasks.append(asyncio.create_task(run_ultra_rare_exploiters()))
+            logger.info("✅ 💎 ULTRA RARE ENGINES ACTIVE - Fetching REAL data!")
+        
+        # ====================================================================
+        # BRAIN ADVISOR - Professional Signals with REAL Data! 🧠
+        # ====================================================================
+        if getattr(self, 'brain_system', None):
+            async def run_brain_advisor():
+                """Brain system with REAL OHLCV data"""
+                while True:
+                    try:
+                        for symbol in ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'BNB/USDT']:
+                            try:
+                                ohlcv = await asyncio.to_thread(self.trading_engines[self.mode].fetch_ohlcv, symbol, '1m', None, 100)
+                                if not ohlcv or len(ohlcv) < 50:
+                                    continue
+                                import pandas as pd
+                                df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+                                advice = self.brain_system.decide(symbol, df)
+                                if advice.side:
+                                    notional = self.vol_sizer.usd(df)
+                                    signal = {'type': 'brain_advisor', 'source': 'BrainSystem', 'symbol': symbol, 'side': advice.side, 'stop_loss': advice.sl, 'take_profit': advice.tp, 'notional': notional, 'reason': advice.reason, 'confidence': 0.75, 'timestamp': datetime.now().isoformat()}
+                                    await self.data_hub.publish_signal(signal)
+                                    logger.info(f"🧠 BRAIN: {symbol} {advice.side.upper()} (SL: {advice.sl:.5f}, TP: {advice.tp:.5f})")
+                            except Exception as e:
+                                logger.debug(f"Brain error: {e}")
+                        await asyncio.sleep(60)
+                    except Exception as e:
+                        logger.error(f"❌ Brain error: {e}")
+                        await asyncio.sleep(60)
+            tasks.append(asyncio.create_task(run_brain_advisor()))
+            logger.info("✅ 🧠 BRAIN ADVISOR ACTIVE - REAL OHLCV data!")
+        
+        # ====================================================================
+        # HIVEMIND - 8 Timeframe Consensus with REAL Data! 🐝
+        # ====================================================================
+        if getattr(self, 'hivemind', None):
+            async def run_hivemind_coordinator():
+                """Hivemind with REAL data for 8 timeframes"""
+                while True:
+                    try:
+                        for symbol in ['BTC/USDT', 'ETH/USDT', 'SOL/USDT']:
+                            try:
+                                def fetch_ohlcv_sync(timeframe, limit):
+                                    import pandas as pd
+                                    ohlcv = self.trading_engines[self.mode].fetch_ohlcv(symbol, timeframe, None, limit)
+                                    if not ohlcv:
+                                        return pd.DataFrame()
+                                    return pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+                                consensus_decision, insights = await asyncio.to_thread(self.hivemind.decide, symbol, fetch_ohlcv_sync, is_fx=False)
+                                if consensus_decision and consensus_decision.side:
+                                    signal = {'type': 'hivemind_consensus', 'source': 'HiveCoordinator', 'symbol': symbol, 'side': consensus_decision.side, 'confidence': consensus_decision.prob, 'reasons': consensus_decision.reasons, 'timestamp': datetime.now().isoformat()}
+                                    await self.data_hub.publish_signal(signal)
+                                    logger.info(f"🐝 HIVEMIND: {symbol} {consensus_decision.side.upper()} ({consensus_decision.prob:.0%})")
+                            except Exception as e:
+                                logger.debug(f"Hivemind error: {e}")
+                        await asyncio.sleep(120)
+                    except Exception as e:
+                        logger.error(f"❌ Hivemind error: {e}")
+                        await asyncio.sleep(120)
+            tasks.append(asyncio.create_task(run_hivemind_coordinator()))
+            logger.info("✅ 🐝 HIVEMIND ACTIVE - 8 timeframes with REAL data!")
         
 # MICRO WALLET GROWER - $1 TO INFINITE AUTO-GROWTH! 💎
         # ====================================================================
