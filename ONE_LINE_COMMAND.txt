@@ -1,0 +1,33 @@
+═══════════════════════════════════════════════════════════════
+COPY THIS - IT CREATES A NEW UNIQUE BRANCH AUTOMATICALLY
+═══════════════════════════════════════════════════════════════
+
+REPO_PATH="$HOME/workspace" && \
+VPS_PATH="/root/trading_bot" && \
+NEW_BRANCH="vps-pull-$(date +%Y%m%d-%H%M%S)" && \
+cd "$REPO_PATH" && \
+git fetch origin && \
+git checkout main && \
+git pull origin main && \
+git checkout -b "$NEW_BRANCH" && \
+echo "✅ Created NEW branch: $NEW_BRANCH" && \
+rsync -avz --delete \
+  --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' \
+  --exclude='*.log' --exclude='venv' --exclude='node_modules' \
+  root@75.119.149.117:"$VPS_PATH/" ./ && \
+git add -A && \
+git commit -m "VPS bot snapshot - $(date)" && \
+git push -u origin "$NEW_BRANCH" && \
+echo "" && \
+echo "✅ DONE! NEW BRANCH: $NEW_BRANCH" && \
+echo "" && \
+echo "Tell Cursor: git fetch && git checkout $NEW_BRANCH"
+
+═══════════════════════════════════════════════════════════════
+THIS WILL:
+  ✅ Create new branch: vps-pull-20251028-HHMMSS
+  ✅ Pull VPS files
+  ✅ Commit everything
+  ✅ Push to GitHub
+  ✅ Show you the branch name to tell me
+═══════════════════════════════════════════════════════════════
