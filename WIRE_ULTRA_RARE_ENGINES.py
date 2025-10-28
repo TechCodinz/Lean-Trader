@@ -155,19 +155,8 @@ def add_ultra_rare_initialization():
                 self.time_warp_patterns = TimeWarpPatterns()
                 self.whale_psychology = WhalePsychologyPredictor()
                 
-                # Master orchestrator coordinates all 11
-                self.ultra_rare_orchestrator = UltraRareEnginesOrchestrator(
-                    microstructure=self.microstructure_exploiter,
-                    entropy=self.entropy_trader,
-                    cascade=self.cascade_hunter,
-                    flash_crash=self.flash_crash_predator,
-                    funding_arb=self.funding_arbitrage,
-                    hidden_orders=self.hidden_order_detector,
-                    smart_money=self.smart_money_shadow,
-                    retail_panic=self.retail_panic_exploiter,
-                    time_warp=self.time_warp_patterns,
-                    whale_psych=self.whale_psychology
-                )
+                # Master orchestrator coordinates all 11 (self-initializes)
+                self.ultra_rare_orchestrator = UltraRareEnginesOrchestrator()
                 
                 self.advanced_systems['ultra_rare_orchestrator'] = self.ultra_rare_orchestrator
                 
