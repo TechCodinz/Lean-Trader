@@ -1883,10 +1883,14 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                         # Get current balance for dynamic sizing
                         balance = 42.0  # Will update from exchange
                         
-                        # Check all timeframes
+                        # Get signals from data hub (filtered by timeframe)
+                        all_signals = self.data_hub.get_signals(limit=100)
+                        
                         for tf in ['1m', '5m', '15m', '1h', '4h']:
-                            # Get signals from data hub
-                            signals = []  # self.data_hub would provide these
+                            # Filter signals for this timeframe
+                            signals = [s for s in all_signals if s.get('timeframe') == tf or not s.get('timeframe')]
+                            
+                            logger.debug(f"💰 STEADY checking {len(signals)} signals on {tf}")
                             
                             for signal in signals:
                                 # Analyze if good for extraction
@@ -1899,12 +1903,21 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                                     
                                     # Execute via execution engine
                                     if getattr(self, 'execution', None):
-                                        await self.execution.execute_signal(extraction_signal)
+                                        logger.info(f"⚡ STEADY executing via Execution Orchestrator")
+                                        result = await self.execution.execute_signal(extraction_signal)
+                                        if result:
+                                            logger.info(f"✅ STEADY trade executed: {extraction_signal.get('symbol')}")
+                                        else:
+                                            logger.warning(f"⚠️  STEADY trade failed")
+                                    else:
+                                        logger.warning("⚠️  STEADY: Execution Orchestrator not available!")
                         
                         await asyncio.sleep(30)  # Check every 30 seconds
                         
                     except Exception as e:
-                        logger.debug(f"Steady profit: {e}")
+                        logger.error(f"❌ STEADY PROFIT ERROR: {e}")
+                        import traceback
+                        logger.error(traceback.format_exc())
                         await asyncio.sleep(30)
             
             tasks.append(asyncio.create_task(run_steady_profit()))
