@@ -1999,19 +1999,62 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                                 self.micro_wallet_grower.crypto_pairs = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'BNB/USDT', 'DOGE/USDT']
                                 logger.warning(f"⚠️  MICRO using 5 fallback pairs (discovery engines not ready)")
                         
-                        # Analyze and trade all configured pairs
-                        for symbol in self.micro_wallet_grower.crypto_pairs:
-                            # analyze_market returns: action, confidence, price, change, volume
-                            action, confidence, price, change, volume = self.micro_wallet_grower.analyze_market(symbol)
+                        # Get ACTUAL signals from data hub (with direction & confidence!)
+                        hub_signals = self.data_hub.get_signals(limit=50)
+                        trades_attempted = 0
+                        
+                        if not hub_signals:
+                            logger.info("💤 MICRO: No signals in hub yet")
+                        else:
+                            logger.info(f"🔍 MICRO checking {len(hub_signals)} hub signals...")
+                        
+                        for signal in hub_signals:
+                            symbol = signal.get('symbol')
+                            side = signal.get('side', 'buy')
+                            confidence = signal.get('confidence', 0) * 100 if signal.get('confidence', 0) <= 1 else signal.get('confidence', 0)
                             
-                            if action in ['BUY', 'SELL'] and confidence >= 70:
-                                # Execute micro trade (execute_trade expects: symbol, signal, price, quantity)
-                                result = self.micro_wallet_grower.execute_trade(symbol, action, price)
+                            # Filter 1: Need valid symbol and high confidence
+                            if not symbol or confidence < 85:
+                                continue
+                            
+                            # Filter 2: Only BUY/SELL signals (skip HOLD, CLOSE, HEDGE, etc.)
+                            if side.upper() not in ['BUY', 'SELL']:
+                                logger.debug(f"Skipping {symbol} - not a BUY/SELL signal ({side})")
+                                continue
+                            
+                            # Filter 3: CHEAP coins only (< $5 per trade for micro wallet)
+                            try:
+                                ticker = self.micro_wallet_grower.get_gate_ticker(symbol)
+                                if not ticker:
+                                    continue
+                                    
+                                price = ticker['price']
+                                position_size = self.micro_wallet_grower.position_sizes.get(symbol, 0.001)
+                                position_cost = price * position_size
+                                
+                                if position_cost > 5.0:
+                                    logger.debug(f"Skipping {symbol} - too expensive (${position_cost:.2f} > $5)")
+                                    continue
+                                
+                                # Execute using signal data (not re-analysis!)
+                                trades_attempted += 1
+                                logger.info(f"💎 MICRO TRADE #{trades_attempted}: {side.upper()} {symbol}")
+                                logger.info(f"   Price: ${price:.6f}, Cost: ${position_cost:.2f}")
+                                logger.info(f"   Confidence: {confidence:.1f}%, Balance: ${balance:.2f}")
+                                
+                                result = self.micro_wallet_grower.execute_trade(symbol, side.upper(), price)
                                 
                                 if result:
-                                    logger.info(f"💎 MICRO TRADE: {symbol} {action} @ ${price:.6f}")
-                                    logger.info(f"   Change: {change:+.2f}%, Volume: ${volume:.0f}")
-                                    logger.info(f"   Balance: ${balance:.2f}, Conf: {confidence:.0f}%")
+                                    logger.info(f"✅ MICRO executed: {symbol} {side.upper()}")
+                                else:
+                                    logger.warning(f"⚠️  MICRO trade failed for {symbol}")
+                                    
+                            except Exception as e:
+                                logger.debug(f"Error checking {symbol}: {e}")
+                                continue
+                        
+                        if trades_attempted == 0 and hub_signals:
+                            logger.info(f"💤 MICRO: No qualifying signals (checked {len(hub_signals)} signals)")
                         
                         await asyncio.sleep(60)  # Check every minute
                         
