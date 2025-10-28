@@ -200,6 +200,26 @@ class UltraCore:
 
         return results
 
+    def get_market_data(self, symbol=None, timeframe='1h'):
+        """Get market data for Ultra engines - wrapper for compatibility"""
+        try:
+            if symbol:
+                # Fetch specific symbol data
+                ohlcv = self.router.safe_fetch_ohlcv(symbol, timeframe=timeframe)
+                if ohlcv:
+                    return {
+                        'symbol': symbol,
+                        'timeframe': timeframe,
+                        'ohlcv': ohlcv,
+                        'analysis': self.analyze_market(ohlcv)
+                    }
+            # Return general market scan if no symbol specified
+            return self.scan_markets()
+        except Exception as e:
+            if self.logger:
+                self.logger.debug(f"get_market_data error: {e}")
+            return {}
+    
     def analyze_market(self, ohlcv):
         """Advanced reasoning: pattern recognition, anomaly detection, regime analysis."""
         # Enhanced: LSTM-based regime prediction

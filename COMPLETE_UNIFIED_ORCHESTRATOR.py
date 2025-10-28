@@ -380,6 +380,23 @@ class CompleteUnifiedOrchestrator:
         
         logger.info(f"🚀 Complete Unified Orchestrator - {mode.upper()} mode")
     
+    
+    def update_universe(self, new_universe: list):
+        """Update trading universe dynamically"""
+        if new_universe and len(new_universe) > len(getattr(self, 'trading_universe', [])):
+            old_count = len(getattr(self, 'trading_universe', []))
+            self.trading_universe = new_universe
+            
+            # Update ultra_core
+            if hasattr(self, 'ultra_core') and hasattr(self.ultra_core, 'pairs'):
+                self.ultra_core.pairs = new_universe
+            
+            logger.info(f"🔄 UNIVERSE EXPANDED: {old_count} → {len(new_universe)} pairs!")
+            logger.info(f"   🎯 Trading engines now scanning {len(new_universe)} pairs!")
+            
+            return True
+        return False
+
     async def initialize_all_systems(self):
         """Initialize ALL systems with full wiring"""
         logger.info("=" * 80)
@@ -395,35 +412,41 @@ class CompleteUnifiedOrchestrator:
         self.pattern_memory = PatternMemory()
         self.ledger = Ledger()
         
-        # EXPANDED UNIVERSE - ALL MARKETS (92 total)
-        universe = [
-            # Top Crypto (35 pairs)
-            'BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'SOL/USDT', 'ADA/USDT',
-            'XRP/USDT', 'DOGE/USDT', 'DOT/USDT', 'MATIC/USDT', 'SHIB/USDT',
-            'AVAX/USDT', 'LINK/USDT', 'UNI/USDT', 'ATOM/USDT', 'LTC/USDT',
-            'BCH/USDT', 'NEAR/USDT', 'APT/USDT', 'ARB/USDT', 'OP/USDT',
-            'FTM/USDT', 'ALGO/USDT', 'VET/USDT', 'SAND/USDT', 'MANA/USDT',
-            'AXS/USDT', 'THETA/USDT', 'FIL/USDT', 'PEPE/USDT', 'WLD/USDT',
-            'INJ/USDT', 'SUI/USDT', 'SEI/USDT', 'TIA/USDT', 'ORDI/USDT',
-            
-            # Forex (20 pairs)
-            'EUR/USD', 'GBP/USD', 'USD/JPY', 'AUD/USD', 'USD/CAD',
-            'USD/CHF', 'NZD/USD', 'EUR/GBP', 'EUR/JPY', 'GBP/JPY',
-            'AUD/JPY', 'EUR/CHF', 'GBP/CHF', 'EUR/AUD', 'GBP/AUD',
-            'AUD/CAD', 'NZD/JPY', 'CAD/JPY', 'EUR/NZD', 'GBP/NZD',
-            
-            # Top Stocks (24 pairs) 
-            'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'NVDA',
-            'META', 'JPM', 'V', 'WMT', 'JNJ', 'PG',
-            'MA', 'HD', 'BAC', 'DIS', 'NFLX', 'ADBE',
-            'CRM', 'PYPL', 'INTC', 'CSCO', 'PFE', 'KO',
-            
-            # Commodities (13 pairs)
-            'GOLD', 'SILVER', 'OIL', 'NATGAS', 'COPPER',
-            'PLATINUM', 'WHEAT', 'CORN', 'SOYBEAN', 'COFFEE',
-            'SUGAR', 'COTTON', 'COCOA',
-        ]
-        logger.info(f"🌌 Trading Universe: {len(universe)} pairs (35 crypto + 20 forex + 24 stocks + 13 commodities)")
+        # DYNAMIC UNIVERSE - Use discovered pairs if available!
+        if hasattr(self, 'dynamic_pairs') and self.dynamic_pairs and len(self.dynamic_pairs) > 100:
+            # Use discovered pairs (5,587+ pairs!)
+            universe = self.dynamic_pairs
+            logger.info(f"🌍 DYNAMIC UNIVERSE: {len(universe)} discovered pairs!")
+        else:
+            # Fallback universe (will expand after discovery)
+            universe = [
+                # Top Crypto (35 pairs)
+                'BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'SOL/USDT', 'ADA/USDT',
+                'XRP/USDT', 'DOGE/USDT', 'DOT/USDT', 'MATIC/USDT', 'SHIB/USDT',
+                'AVAX/USDT', 'LINK/USDT', 'UNI/USDT', 'ATOM/USDT', 'LTC/USDT',
+                'BCH/USDT', 'NEAR/USDT', 'APT/USDT', 'ARB/USDT', 'OP/USDT',
+                'FTM/USDT', 'ALGO/USDT', 'VET/USDT', 'SAND/USDT', 'MANA/USDT',
+                'AXS/USDT', 'THETA/USDT', 'FIL/USDT', 'PEPE/USDT', 'WLD/USDT',
+                'INJ/USDT', 'SUI/USDT', 'SEI/USDT', 'TIA/USDT', 'ORDI/USDT',
+                
+                # Forex (20 pairs)
+                'EUR/USD', 'GBP/USD', 'USD/JPY', 'AUD/USD', 'USD/CAD',
+                'USD/CHF', 'NZD/USD', 'EUR/GBP', 'EUR/JPY', 'GBP/JPY',
+                'AUD/JPY', 'EUR/CHF', 'GBP/CHF', 'EUR/AUD', 'GBP/AUD',
+                'AUD/CAD', 'NZD/JPY', 'CAD/JPY', 'EUR/NZD', 'GBP/NZD',
+                
+                # Top Stocks (24 pairs) 
+                'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'NVDA',
+                'META', 'JPM', 'V', 'WMT', 'JNJ', 'PG',
+                'MA', 'HD', 'BAC', 'DIS', 'NFLX', 'ADBE',
+                'CRM', 'PYPL', 'INTC', 'CSCO', 'PFE', 'KO',
+                
+                # Commodities (13 pairs)
+                'GOLD', 'SILVER', 'OIL', 'NATGAS', 'COPPER',
+                'PLATINUM', 'WHEAT', 'CORN', 'SOYBEAN', 'COFFEE',
+                'SUGAR', 'COTTON', 'COCOA',
+            ]
+            logger.info(f"🌌 Base Universe: {len(universe)} pairs (expanding to 5000+ after discovery)")
         self.ultra_core = UltraCore(self.router, universe, logger)
         
         awareness_cfg = AwarenessConfig()
