@@ -1,0 +1,49 @@
+═══════════════════════════════════════════════════════════════
+COPY THESE COMMANDS - CHECK WHAT'S RUNNING ON VPS
+═══════════════════════════════════════════════════════════════
+
+# 1. What Python processes are running?
+ssh root@75.119.149.117 "ps aux | grep python | grep -v grep"
+
+# 2. Is MICRO WALLET running?
+ssh root@75.119.149.117 "ps aux | grep -i micro | grep -v grep"
+
+# 3. Which orchestrator is running?
+ssh root@75.119.149.117 "ps aux | grep -i orchestrator | grep -v grep"
+
+# 4. Find bot directory
+ssh root@75.119.149.117 "find /root /home -name 'MICRO_WALLET_GROWER.py' 2>/dev/null"
+
+# 5. Check screen sessions
+ssh root@75.119.149.117 "screen -ls"
+
+# 6. Check what's in bot directory
+ssh root@75.119.149.117 "ls -la /root/trading_bot/ | head -20"
+
+# 7. Check recent logs for MICRO
+ssh root@75.119.149.117 "tail -100 /root/trading_bot/*.log | grep -i micro"
+
+# 8. See what command started the bot
+ssh root@75.119.149.117 "ps aux | grep python | grep -v grep | awk '{for(i=11;i<=NF;i++) printf \$i\" \"; print \"\"}'"
+
+═══════════════════════════════════════════════════════════════
+ONCE YOU KNOW WHAT'S RUNNING, USE THIS TO PULL IT:
+═══════════════════════════════════════════════════════════════
+
+# After you find the bot path (e.g., /root/trading_bot), run:
+REPO_PATH="$HOME/workspace" && \
+VPS_PATH="/root/trading_bot" && \
+NEW_BRANCH="vps-micro-wallet-$(date +%Y%m%d-%H%M%S)" && \
+cd "$REPO_PATH" && \
+git checkout main && \
+git pull && \
+git checkout -b "$NEW_BRANCH" && \
+rsync -avz --delete \
+  --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' --exclude='*.log' \
+  root@75.119.149.117:"$VPS_PATH/" ./ && \
+git add -A && \
+git commit -m "VPS MICRO WALLET bot - $(date)" && \
+git push -u origin "$NEW_BRANCH" && \
+echo "✅ DONE! Branch: $NEW_BRANCH"
+
+═══════════════════════════════════════════════════════════════
