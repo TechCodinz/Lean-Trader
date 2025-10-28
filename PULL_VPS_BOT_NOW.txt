@@ -1,0 +1,61 @@
+═══════════════════════════════════════════════════════════════
+COPY THIS COMMAND - PULL VPS BOT WITH PIG/USDT ISSUE
+═══════════════════════════════════════════════════════════════
+
+Based on your VPS output, the bot is at: ~/bot
+Running: COMPLETE_ULTIMATE_ORCHESTRATOR.py
+
+ISSUES DETECTED:
+✅ Trades executing successfully (ETH, SOL, SHIB, etc.)
+❌ PIG/USDT stuck - trying to close every ~1 minute
+❌ MICRO WALLET not executing
+
+RUN THIS:
+
+REPO_PATH="$HOME/workspace" && \
+NEW_BRANCH="vps-pig-stuck-$(date +%Y%m%d-%H%M%S)" && \
+cd "$REPO_PATH" && \
+git checkout main && \
+git pull origin main && \
+git checkout -b "$NEW_BRANCH" && \
+rsync -avz --delete \
+  --exclude='.git' --exclude='.gitignore' \
+  --exclude='__pycache__' --exclude='*.pyc' \
+  --exclude='*.log' --exclude='*.log.*' \
+  --exclude='venv' --exclude='node_modules' \
+  root@75.119.149.117:~/bot/ ./ && \
+git add -A && \
+git commit -m "VPS bot - PIG/USDT stuck closing, MICRO not executing
+
+Issues:
+- PIG/USDT tries to close every minute but fails
+- MICRO WALLET not executing trades
+- Other trades working (ETH, SOL, SHIB, AVAX, etc.)
+
+From VPS: ~/bot
+Date: $(date)
+" && \
+git push -u origin "$NEW_BRANCH" && \
+echo "" && \
+echo "✅ DONE! NEW BRANCH: $NEW_BRANCH" && \
+echo "" && \
+echo "Tell Cursor: Branch is $NEW_BRANCH"
+
+═══════════════════════════════════════════════════════════════
+WHAT I SAW IN YOUR LOGS:
+═══════════════════════════════════════════════════════════════
+
+✅ Bot executing trades successfully:
+   - ETH, SOL, SHIB, AVAX, SAND, MANA, AXS, SEI, BNB, APT, XRP, 
+     BCH, NEAR, OP, ALGO, WLD, DOT, FTM
+
+❌ PROBLEM: PIG/USDT stuck in loop:
+   - "CLOSING FULL POSITION: PIG/USDT" every ~1 minute
+   - Never actually closes or keeps reopening
+   - This is blocking the position manager
+
+❌ MICRO WALLET: Not executing (need to see code to diagnose)
+
+═══════════════════════════════════════════════════════════════
+AFTER YOU PUSH, TELL ME THE BRANCH NAME
+═══════════════════════════════════════════════════════════════
