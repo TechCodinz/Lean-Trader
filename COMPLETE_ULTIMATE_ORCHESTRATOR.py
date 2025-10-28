@@ -1932,7 +1932,146 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             logger.info("✅ 📊 FUTURES SIGNALS ACTIVE - Margin & leverage trading!")
         
         # ====================================================================
-        # MICRO WALLET GROWER - $1 TO INFINITE AUTO-GROWTH! 💎
+        
+        # ====================================================================
+        # MICRO MOON SPOTTER - Publish micro-cap gem signals! 🌙
+        # ====================================================================
+        if getattr(self, 'micro_moon_spotter', None):
+            async def run_micro_moon_publisher():
+                """Hunt and publish micro-cap moonshot opportunities"""
+                while True:
+                    try:
+                        # Scan for gems
+                        gems = await self.micro_moon_spotter.scan_for_new_gems()
+                        
+                        if gems:
+                            logger.info(f"🌙 MOON SPOTTER found {len(gems)} gems!")
+                            
+                            for gem in gems:
+                                # Create signal
+                                signal = {
+                                    'type': 'moon',
+                                    'source': 'MicroMoonSpotter',
+                                    'symbol': gem.get('symbol'),
+                                    'side': 'buy',  # Moons are always buys
+                                    'confidence': gem.get('potential', 0.7),
+                                    'liquidity': gem.get('liquidity', 0),
+                                    'social_score': gem.get('social_score', 0),
+                                    'contract': gem.get('contract'),
+                                    'chain': gem.get('chain'),
+                                    'priority': 'moon',
+                                    'timestamp': datetime.now().isoformat()
+                                }
+                                
+                                await self.data_hub.publish_signal(signal)
+                                logger.info(f"📤 Published moon signal: {gem.get('symbol')}")
+                        
+                        await asyncio.sleep(300)  # Every 5 minutes
+                        
+                    except Exception as e:
+                        logger.error(f"❌ Micro Moon Publisher error: {e}")
+                        await asyncio.sleep(300)
+            
+            tasks.append(asyncio.create_task(run_micro_moon_publisher()))
+            logger.info("✅ 🌙 MICRO MOON SPOTTER publishing to Data Hub!")
+        
+        # ====================================================================
+        # ML STRATEGY ENGINE - Publish ML predictions! 🤖
+        # ====================================================================
+        if getattr(self, 'ml_strategy', None):
+            async def run_ml_strategy_publisher():
+                """Generate and publish ML-based trading strategies"""
+                while True:
+                    try:
+                        # Get recent market data from Data Hub
+                        market_data = self.data_hub.get_market_data(limit=100)
+                        
+                        if market_data:
+                            # Generate predictions for major pairs
+                            for symbol in ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'BNB/USDT']:
+                                # ML prediction
+                                prediction = self.ml_strategy.predict_price(market_data)
+                                
+                                if abs(prediction) > 0.005:  # >0.5% predicted move
+                                    signal = {
+                                        'type': 'ml_strategy',
+                                        'source': 'MLStrategyEngine',
+                                        'symbol': symbol,
+                                        'side': 'buy' if prediction > 0 else 'sell',
+                                        'confidence': min(abs(prediction) * 10, 0.95),
+                                        'predicted_move': prediction,
+                                        'model': 'LSTM',
+                                        'timestamp': datetime.now().isoformat()
+                                    }
+                                    
+                                    await self.data_hub.publish_signal(signal)
+                                    logger.info(f"📤 ML Strategy: {symbol} {signal['side']} ({signal['confidence']:.0%})")
+                        
+                        await asyncio.sleep(30)  # Every 30 seconds
+                        
+                    except Exception as e:
+                        logger.error(f"❌ ML Strategy Publisher error: {e}")
+                        await asyncio.sleep(30)
+            
+            tasks.append(asyncio.create_task(run_ml_strategy_publisher()))
+            logger.info("✅ 🤖 ML STRATEGY publishing to Data Hub!")
+        
+        # ====================================================================
+        # NEWS TRADING ENGINE - Publish news-based signals! 📰
+        # ====================================================================
+        if getattr(self, 'news_engine', None):
+            async def run_news_publisher():
+                """Analyze news and publish trading signals"""
+                while True:
+                    try:
+                        # Analyze recent news
+                        news_signals = await self.news_engine.analyze_latest_news()
+                        
+                        for signal in news_signals:
+                            await self.data_hub.publish_signal(signal)
+                            logger.info(f"📰 News signal: {signal.get('symbol')} - {signal.get('headline', '')[:50]}")
+                        
+                        await asyncio.sleep(120)  # Every 2 minutes
+                        
+                    except Exception as e:
+                        logger.error(f"❌ News Publisher error: {e}")
+                        await asyncio.sleep(120)
+            
+            tasks.append(asyncio.create_task(run_news_publisher()))
+            logger.info("✅ 📰 NEWS ENGINE publishing to Data Hub!")
+        
+        # ====================================================================
+        # SESSION TRADER - Publish session-optimal signals! 🕐
+        # ====================================================================
+        if getattr(self, 'session_trader', None):
+            async def run_session_publisher():
+                """Find and publish session-optimal trading opportunities"""
+                while True:
+                    try:
+                        # Get current session
+                        current_session = await self.session_trader.get_current_session()
+                        
+                        # Find optimal pairs for this session
+                        session_signals = await self.session_trader.find_session_opportunities(current_session)
+                        
+                        for signal in session_signals:
+                            # Enrich with session info
+                            signal['session'] = current_session
+                            signal['session_optimal'] = True
+                            
+                            await self.data_hub.publish_signal(signal)
+                            logger.info(f"🕐 Session signal: {signal.get('symbol')} ({current_session})")
+                        
+                        await asyncio.sleep(60)  # Every minute
+                        
+                    except Exception as e:
+                        logger.error(f"❌ Session Publisher error: {e}")
+                        await asyncio.sleep(60)
+            
+            tasks.append(asyncio.create_task(run_session_publisher()))
+            logger.info("✅ 🕐 SESSION TRADER publishing to Data Hub!")
+        
+# MICRO WALLET GROWER - $1 TO INFINITE AUTO-GROWTH! 💎
         # ====================================================================
         if getattr(self, 'micro_wallet_grower', None):
             async def run_micro_wallet_growth():
