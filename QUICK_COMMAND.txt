@@ -1,0 +1,26 @@
+═══════════════════════════════════════════════════════════════
+COPY THIS ENTIRE BLOCK - RUN ON YOUR LOCAL MACHINE
+═══════════════════════════════════════════════════════════════
+
+#!/bin/bash
+VPS_IP="75.119.149.117"
+VPS_USER="root"
+VPS_PATH="/root/trading_bot"
+REPO_PATH="$HOME/workspace"  # ← CHANGE THIS to your workspace path
+BRANCH="vps-working-$(date +%Y%m%d-%H%M)"
+
+cd "$REPO_PATH" && \
+git checkout main && \
+git pull && \
+git checkout -b "$BRANCH" && \
+rsync -avz --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' --exclude='*.log' "$VPS_USER@$VPS_IP:$VPS_PATH/" ./ && \
+git add -A && \
+git commit -m "Pull VPS working bot - $(date)" && \
+git push -u origin "$BRANCH" && \
+echo "" && \
+echo "✅ DONE! Branch: $BRANCH" && \
+echo "Tell Cursor agent to: git fetch && git checkout $BRANCH"
+
+═══════════════════════════════════════════════════════════════
+AFTER RUNNING, TELL ME THE BRANCH NAME
+═══════════════════════════════════════════════════════════════
