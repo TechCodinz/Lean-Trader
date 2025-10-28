@@ -1,0 +1,30 @@
+# VPS DEPLOYMENT COMMANDS - Copy/Paste These
+
+# Step 1: Create local branch tracking remote
+cd ~/bot
+git fetch origin
+git checkout -b micro-fix-local origin/micro-fix-local
+
+# Step 2: Verify files are there
+ls -lh DEPLOY_COMPLETE_SENTIENT_BEAST.sh
+
+# Step 3: Check for syntax errors BEFORE starting
+python3 -m py_compile COMPLETE_ULTIMATE_ORCHESTRATOR.py
+
+# Step 4: If syntax OK, deploy
+pkill -9 -f COMPLETE_ULTIMATE_ORCHESTRATOR
+sleep 3
+nohup python3 COMPLETE_ULTIMATE_ORCHESTRATOR.py > bot.log 2>&1 &
+
+# Step 5: Monitor
+tail -f bot.log | grep -E "✅|❌|ACTIVE|ERROR"
+
+# ====================================================================
+# IF SYNTAX ERROR, RUN THIS TO FIX:
+# ====================================================================
+
+# Check which line has error
+python3 COMPLETE_ULTIMATE_ORCHESTRATOR.py 2>&1 | head -20
+
+# If it says "expected 'except' or 'finally' block", there's an unclosed try
+# I'll create a fix script for you
