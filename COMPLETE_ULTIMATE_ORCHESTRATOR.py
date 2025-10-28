@@ -1943,7 +1943,7 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                             
                             for coin, amt in positions['total'].items():
                                 # Skip USDT and GT (GT is for fee rebates, not trading)
-                                if coin not in ['USDT', 'GT'] and amt > 0:
+                                if coin not in ['USDT', 'GT', 'PIG'] and amt > 0:
                                     # Get available (not locked) amount
                                     available_amt = positions['free'].get(coin, 0)
                                     
@@ -1956,7 +1956,7 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                                             position_value = available_amt * current_price
                                             
                                             # Close ANY position > $1
-                                            if position_value >= 1.0:
+                                            if position_value >= 3.0:  # Gate.io minimum
                                                 logger.info(f"🔄 CLOSING FULL POSITION: {symbol}")
                                                 logger.info(f"   Amount: {available_amt:.8f} {coin}")
                                                 logger.info(f"   Value: ${position_value:.2f}")
