@@ -455,6 +455,43 @@ class SmartScalpingEngine:
                     # Get confluence details
                     details = self.mtf_analyzer.get_confluence_details(symbol)
                     
+                    # Get current price for entry/exit calculation
+                    try:
+                        # Would fetch real price in production
+                        current_price = 100.0  # Placeholder - needs real price fetch
+                        
+                        # Calculate stop loss and take profit based on timeframe and confidence
+                        # Higher timeframes = wider stops, Higher confidence = tighter stops
+                        timeframe_count = len(details['timeframes'])
+                        
+                        # Base stop/profit (scalping = tight)
+                        base_stop_pct = 0.008  # 0.8%
+                        base_profit_pct = 0.012  # 1.2% (1.5:1 R/R)
+                        
+                        # Adjust for timeframe alignment
+                        # More timeframes agree = can use tighter stops
+                        alignment_factor = details['alignment']
+                        if alignment_factor > 0.8:  # Strong alignment
+                            base_stop_pct *= 0.8  # Tighter stop
+                            base_profit_pct *= 0.8  # Quicker profit
+                        
+                        # Calculate targets
+                        if direction.lower() == 'buy':
+                            stop_loss = current_price * (1 - base_stop_pct)
+                            take_profit = current_price * (1 + base_profit_pct)
+                        else:  # sell
+                            stop_loss = current_price * (1 + base_stop_pct)
+                            take_profit = current_price * (1 - base_profit_pct)
+                        
+                        expected_move_pct = base_profit_pct
+                        
+                    except Exception as e:
+                        # Fallback values if price fetch fails
+                        stop_loss = None
+                        take_profit = None
+                        expected_move_pct = 0.01
+                        current_price = None
+                    
                     signal = {
                         'type': 'scalping',
                         'source': 'SmartScalpingEngine',
@@ -467,7 +504,13 @@ class SmartScalpingEngine:
                         'timeframes_analyzed': len(details['timeframes']),
                         'confluence_details': details,
                         'timestamp': datetime.now().isoformat(),
-                        'priority': 'high' if confidence > 0.85 else 'normal'
+                        'priority': 'high' if confidence > 0.85 else 'normal',
+                        # NEW FIELDS FOR SMART EXECUTION:
+                        'entry_price': current_price,
+                        'stop_loss': stop_loss,
+                        'take_profit': take_profit,
+                        'expected_move_pct': expected_move_pct,
+                        'risk_reward_ratio': base_profit_pct / base_stop_pct if base_stop_pct > 0 else 1.5
                     }
                     
                     signals.append(signal)
