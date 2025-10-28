@@ -1975,7 +1975,7 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                                 logger.info(f"💰 TOTAL FREED: ${total_freed:.2f}")
                                 
                         except Exception as e:
-                            logger.debug(f"Position close: {e}")
+                            logger.error(f"❌ Position close failed: {e}")
                         
                         # INJECT DYNAMIC PAIRS from discovery engines
                         if not self.micro_wallet_grower.crypto_pairs or len(self.micro_wallet_grower.crypto_pairs) == 0:
@@ -2014,7 +2014,9 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                         await asyncio.sleep(60)  # Check every minute
                         
                     except Exception as e:
-                        logger.debug(f"Micro wallet growth: {e}")
+                        logger.error(f"❌ MICRO WALLET ERROR: {e}")
+                        import traceback
+                        logger.error(traceback.format_exc())
                         await asyncio.sleep(60)
             
             tasks.append(asyncio.create_task(run_micro_wallet_growth()))
