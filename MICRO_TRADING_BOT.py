@@ -37,7 +37,23 @@ class MICRO_GATE_BOT:
             'PEPE/USDT': 200000.0,  # ~$2.40 (well below 1000000 PEPE minimum)
         }
 
-        # Profit tracking
+        
+    def calculate_position_size(self, symbol, price, balance):
+        """Calculate position size dynamically for cheap coins"""
+        # Use predefined size if available
+        if symbol in self.position_sizes:
+            return self.position_sizes[symbol]
+        
+        # For unknown coins, calculate based on price
+        # Target: $3-5 per trade
+        target_cost = min(balance * 0.3, 4.0)  # Max 30% of balance or $4
+        
+        if price > 0:
+            size = target_cost / price
+            return size
+        return 0.001  # fallback
+
+    # Profit tracking
         self.total_profit = 0.0
         self.total_trades = 0
         self.winning_trades = 0
@@ -134,7 +150,7 @@ class MICRO_GATE_BOT:
 
             # Use passed quantity or calculate from balance
             if quantity is None:
-                position_size = self.position_sizes.get(symbol, 0.001)
+                position_size = self.calculate_position_size(symbol, price, balance)
             else:
                 position_size = quantity
             
@@ -200,7 +216,7 @@ class MICRO_GATE_BOT:
                         trade_result = self.execute_trade(symbol, signal, price)
 
                         if trade_result:
-                            position_size = self.position_sizes.get(symbol, 0.001)
+                            position_size = self.calculate_position_size(symbol, price, balance)
                             profit = abs(price * position_size * 0.01)  # 1% profit factor
                             self.total_profit += profit
                             self.total_trades += 1
