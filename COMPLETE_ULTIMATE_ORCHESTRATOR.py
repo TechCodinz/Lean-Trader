@@ -2001,15 +2001,17 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                         
                         # Analyze and trade all configured pairs
                         for symbol in self.micro_wallet_grower.crypto_pairs:
-                            action, confidence, price, sl, tp = self.micro_wallet_grower.analyze_market(symbol)
+                            # analyze_market returns: action, confidence, price, change, volume
+                            action, confidence, price, change, volume = self.micro_wallet_grower.analyze_market(symbol)
                             
-                            if action in ['BUY', 'SELL'] and confidence >= 0.70:
-                                # Execute micro trade
-                                result = self.micro_wallet_grower.execute_trade(symbol, action, price, sl, tp)
+                            if action in ['BUY', 'SELL'] and confidence >= 70:
+                                # Execute micro trade (execute_trade expects: symbol, signal, price, quantity)
+                                result = self.micro_wallet_grower.execute_trade(symbol, action, price)
                                 
                                 if result:
-                                    logger.info(f"💎 MICRO GROWTH: {symbol} {action} @ ${price:.6f}")
-                                    logger.info(f"   Balance: ${balance:.2f}, Conf: {confidence*100:.0f}%")
+                                    logger.info(f"💎 MICRO TRADE: {symbol} {action} @ ${price:.6f}")
+                                    logger.info(f"   Change: {change:+.2f}%, Volume: ${volume:.0f}")
+                                    logger.info(f"   Balance: ${balance:.2f}, Conf: {confidence:.0f}%")
                         
                         await asyncio.sleep(60)  # Check every minute
                         
