@@ -36,6 +36,9 @@ class MICRO_GATE_BOT:
             'SHIB/USDT': 100000.0,  # ~$2.40 (well below 100000 SHIB minimum)
             'PEPE/USDT': 200000.0,  # ~$2.40 (well below 1000000 PEPE minimum)
         }
+        
+        # Dynamic crypto pairs (can be updated by orchestrator)
+        self.crypto_pairs = []
 
         
     def calculate_position_size(self, symbol, price, balance):
