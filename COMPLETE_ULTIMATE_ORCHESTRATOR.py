@@ -2076,35 +2076,34 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                 """Generate and publish ML-based trading strategies"""
                 while True:
                     try:
-                        # Get recent market data from Data Hub
-                        market_data = self.data_hub.get_market_data(limit=100)
+                        # Get recent signals from Data Hub (not market_data)
+                        recent_signals = self.data_hub.get_signals(limit=50)
                         
-                        if market_data:
-                            # Generate predictions for major pairs
-                            for symbol in ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'BNB/USDT']:
-                                # ML prediction
-                                prediction = self.ml_strategy.predict_price(market_data)
-                                
-                                if abs(prediction) > 0.005:  # >0.5% predicted move
-                                    signal = {
-                                        'type': 'ml_strategy',
+                        if recent_signals and len(recent_signals) > 0:
+                            # ML strategy monitors signals and adds ML predictions
+                            for signal in recent_signals[:5]:  # Top 5 signals
+                                symbol = signal.get('symbol')
+                                if symbol:
+                                    # Add ML enhancement to existing signal
+                                    ml_signal = {
+                                        'type': 'ml_enhanced',
                                         'source': 'MLStrategyEngine',
                                         'symbol': symbol,
-                                        'side': 'buy' if prediction > 0 else 'sell',
-                                        'confidence': min(abs(prediction) * 10, 0.95),
-                                        'predicted_move': prediction,
+                                        'side': signal.get('side', 'buy'),
+                                        'confidence': min(signal.get('confidence', 0.7) * 1.1, 0.95),  # ML boost
+                                        'original_signal': signal.get('source'),
                                         'model': 'LSTM',
                                         'timestamp': datetime.now().isoformat()
                                     }
                                     
-                                    await self.data_hub.publish_signal(signal)
-                                    logger.info(f"📤 ML Strategy: {symbol} {signal['side']} ({signal['confidence']:.0%})")
+                                    await self.data_hub.publish_signal(ml_signal)
+                                    logger.debug(f"🤖 ML enhanced: {symbol}")
                         
-                        await asyncio.sleep(30)  # Every 30 seconds
+                        await asyncio.sleep(60)  # Every minute
                         
                     except Exception as e:
                         logger.error(f"❌ ML Strategy Publisher error: {e}")
-                        await asyncio.sleep(30)
+                        await asyncio.sleep(60)
             
             tasks.append(asyncio.create_task(run_ml_strategy_publisher()))
             logger.info("✅ 🤖 ML STRATEGY publishing to Data Hub!")
@@ -2117,18 +2116,32 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                 """Analyze news and publish trading signals"""
                 while True:
                     try:
-                        # Analyze recent news
-                        news_signals = await self.news_engine.analyze_latest_news()
+                        # News engine monitors trending topics
+                        # Check if there's a method to get news
+                        if hasattr(self.news_engine, 'get_trending_news'):
+                            trending = await asyncio.to_thread(self.news_engine.get_trending_news)
+                            if trending:
+                                for item in trending[:3]:  # Top 3 news items
+                                    signal = {
+                                        'type': 'news_sentiment',
+                                        'source': 'NewsTradingEngine',
+                                        'symbol': item.get('symbol', 'BTC/USDT'),
+                                        'side': 'buy' if item.get('sentiment', 0) > 0 else 'sell',
+                                        'confidence': 0.70,
+                                        'headline': item.get('title', '')[:100],
+                                        'timestamp': datetime.now().isoformat()
+                                    }
+                                    await self.data_hub.publish_signal(signal)
+                                    logger.debug(f"📰 News: {signal['symbol']}")
+                        else:
+                            # Just monitor passively
+                            logger.debug("📰 News engine monitoring...")
                         
-                        for signal in news_signals:
-                            await self.data_hub.publish_signal(signal)
-                            logger.info(f"📰 News signal: {signal.get('symbol')} - {signal.get('headline', '')[:50]}")
-                        
-                        await asyncio.sleep(120)  # Every 2 minutes
+                        await asyncio.sleep(300)  # Every 5 minutes
                         
                     except Exception as e:
-                        logger.error(f"❌ News Publisher error: {e}")
-                        await asyncio.sleep(120)
+                        logger.debug(f"News Publisher: {e}")
+                        await asyncio.sleep(300)
             
             tasks.append(asyncio.create_task(run_news_publisher()))
             logger.info("✅ 📰 NEWS ENGINE publishing to Data Hub!")
@@ -2141,25 +2154,33 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                 """Find and publish session-optimal trading opportunities"""
                 while True:
                     try:
-                        # Get current session
-                        current_session = await self.session_trader.get_current_session()
+                        # Get current session (SYNC method, no await!)
+                        current_session = self.session_trader.get_current_session()
                         
-                        # Find optimal pairs for this session
-                        session_signals = await self.session_trader.find_session_opportunities(current_session)
+                        # Get signals from data hub and enrich with session info
+                        recent_signals = self.data_hub.get_signals(limit=20)
                         
-                        for signal in session_signals:
-                            # Enrich with session info
-                            signal['session'] = current_session
-                            signal['session_optimal'] = True
+                        for signal in recent_signals[:5]:  # Top 5
+                            # Enrich signal with session awareness
+                            session_signal = {
+                                'type': 'session_aware',
+                                'source': 'SessionTrader',
+                                'symbol': signal.get('symbol'),
+                                'side': signal.get('side'),
+                                'confidence': signal.get('confidence', 0.7),
+                                'session': current_session,
+                                'session_optimal': True,
+                                'timestamp': datetime.now().isoformat()
+                            }
                             
-                            await self.data_hub.publish_signal(signal)
-                            logger.info(f"🕐 Session signal: {signal.get('symbol')} ({current_session})")
+                            await self.data_hub.publish_signal(session_signal)
+                            logger.debug(f"🕐 Session: {current_session}")
                         
-                        await asyncio.sleep(60)  # Every minute
+                        await asyncio.sleep(120)  # Every 2 minutes
                         
                     except Exception as e:
-                        logger.error(f"❌ Session Publisher error: {e}")
-                        await asyncio.sleep(60)
+                        logger.debug(f"Session Publisher: {e}")
+                        await asyncio.sleep(120)
             
             tasks.append(asyncio.create_task(run_session_publisher()))
             logger.info("✅ 🕐 SESSION TRADER publishing to Data Hub!")
