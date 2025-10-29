@@ -832,6 +832,13 @@ class UltraScout:
     # -------------------------
     # Scout/aggregate
     # -------------------------
+    def scan_all_sources(self) -> Dict[str, Any]:
+        """
+        Main scanning method called by orchestrator
+        Scans all sources and returns aggregated intelligence
+        """
+        return self.scout_all()
+    
     def scout_all(self) -> Dict[str, Any]:
         headlines = self.fetch_news()
         sentiment = self.analyze_sentiment(headlines)
