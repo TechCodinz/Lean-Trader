@@ -2295,8 +2295,12 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                                             current_price = ticker['last']
                                             position_value = available_amt * current_price
                                             
-                                            # Close ANY position > $1
-                                            if position_value >= 3.0:  # Gate.io minimum
+                                            # Get exchange minimum for this symbol
+                                            market_info = self.micro_wallet_grower.gate.markets.get(symbol, {})
+                                            min_amount = market_info.get('limits', {}).get('amount', {}).get('min', 0)
+                                            
+                                            # Check if position meets both value AND amount minimums
+                                            if position_value >= 3.0 and available_amt >= min_amount:
                                                 logger.info(f"🔄 CLOSING FULL POSITION: {symbol}")
                                                 logger.info(f"   Amount: {available_amt:.8f} {coin}")
                                                 logger.info(f"   Value: ${position_value:.2f}")
@@ -2310,6 +2314,8 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                                                 logger.info(f"   ✅ CLOSED! Order: {order['id']}")
                                                 logger.info(f"   💰 Freed ${position_value:.2f}")
                                                 total_freed += position_value
+                                            elif position_value >= 1.0:
+                                                logger.warning(f"💤 Dust position: {symbol} = {available_amt:.8f} {coin} (${position_value:.2f}) - below minimum {min_amount}")
                             
                             if total_freed > 0:
                                 logger.info(f"💰 TOTAL FREED: ${total_freed:.2f}")
