@@ -164,6 +164,7 @@ from EXECUTION_ORCHESTRATOR import ExecutionOrchestrator
 
 # Import SMART SCALPING ENGINE - Multi-timeframe + Session aware
 from SMART_SCALPING_ENGINE import SmartScalpingEngine
+from AGGRESSIVE_SCALPING_ENGINE import AggressiveScalpingEngine, ScalpingCoordinator
 
 # Import TELEGRAM ORCHESTRATOR - Complete Telegram integration
 from TELEGRAM_ORCHESTRATOR import TelegramOrchestrator
@@ -1601,6 +1602,22 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             )
             self.advanced_orchestrators['smart_scalping'] = self.smart_scalping
             logger.info("✅ ⚡ SMART SCALPING ENGINE WIRED!")
+            
+            # AGGRESSIVE SCALPING - Fast wallet growth!
+            try:
+                self.aggressive_scalper = AggressiveScalpingEngine(
+                    exchange=self.micro_wallet_grower.gate if hasattr(self, 'micro_wallet_grower') else None
+                )
+                self.scalping_coordinator = ScalpingCoordinator(max_concurrent=5)
+                self.advanced_orchestrators['aggressive_scalper'] = self.aggressive_scalper
+                logger.info("✅ 🔥 AGGRESSIVE SCALPING ENGINE WIRED!")
+                logger.info("   → Scans every 10 seconds")
+                logger.info("   → 0.2-0.5% quick profits")
+                logger.info("   → 10-30 trades per hour possible!")
+            except Exception as e:
+                logger.warning(f"⚠️  Aggressive scalper: {e}")
+                self.aggressive_scalper = None
+                self.scalping_coordinator = None
             logger.info("   Multi-timeframe confluence + Session awareness")
             logger.info("   Targets: $0.50-2.00 per scalp")
             logger.info("   Frequency: 10-50 scalps per hour")
@@ -1772,6 +1789,89 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                 asyncio.create_task(self.run_smart_scalping_loop())
             )
             logger.info("✅ ⚡ SMART SCALPING LOOP STARTED - Micro-profits accumulating!")
+        
+        # 🔥 START AGGRESSIVE SCALPING - RAPID FIRE WALLET GROWTH! 🔥
+        if hasattr(self, 'aggressive_scalper') and self.aggressive_scalper:
+            async def run_aggressive_scalping_loop():
+                """
+                🔥 AGGRESSIVE SCALPING LOOP - RAPID FIRE! 🔥
+                - Scans every 10 seconds
+                - Takes quick 0.2-0.5% profits
+                - 10-30 trades per hour
+                - Fast wallet growth!
+                """
+                logger.info("\n🔥 AGGRESSIVE SCALPING LOOP ACTIVE - Rapid fire mode!")
+                
+                # Register with swarm
+                self.collective_swarm.register_engine('AGGRESSIVE_SCALPER')
+                
+                cycle = 0
+                while self.is_running:
+                    try:
+                        cycle += 1
+                        
+                        # Get active pairs from market scanner
+                        symbols = []
+                        if self.market_scanner and hasattr(self.market_scanner, 'active_pairs'):
+                            symbols = list(self.market_scanner.active_pairs)[:15]  # Top 15
+                        
+                        if not symbols:
+                            # Fallback to popular pairs
+                            symbols = ['BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'SOL/USDT', 'AVAX/USDT',
+                                      'MATIC/USDT', 'DOT/USDT', 'LINK/USDT', 'UNI/USDT', 'ATOM/USDT']
+                        
+                        # SCAN FOR SCALPS
+                        scalp_signals = await self.aggressive_scalper.scan_for_scalps(symbols)
+                        
+                        if scalp_signals:
+                            logger.info(f"🔥 AGGRESSIVE SCALPER: Found {len(scalp_signals)} fast opportunities!")
+                            
+                            # Filter through coordinator (max 5 concurrent)
+                            for signal in scalp_signals:
+                                if self.scalping_coordinator.can_take_scalp():
+                                    # Publish to data hub
+                                    signal['timestamp'] = datetime.now().isoformat()
+                                    self.data_hub.publish_signal(signal)
+                                    
+                                    # Share with swarm for voting
+                                    signal_with_votes = await self.collective_swarm.share_signal('AGGRESSIVE_SCALPER', signal)
+                                    
+                                    # Track scalp
+                                    self.scalping_coordinator.add_scalp(signal)
+                                    
+                                    # Log signal (first 3 only)
+                                    if scalp_signals.index(signal) < 3:
+                                        strategy = signal.get('strategy', '')
+                                        symbol = signal.get('symbol', '')
+                                        side = signal.get('side', '').upper()
+                                        profit = signal.get('profit_target_pct', 0)
+                                        urgency = signal.get('urgency', 'NORMAL')
+                                        logger.info(f"   ⚡ [{urgency}] {strategy}: {symbol} {side} - {profit:.2f}% target")
+                            
+                            logger.info(f"✅ Published {len(scalp_signals)} aggressive scalp signals!")
+                            
+                            # Show stats every 10 cycles (every 100 seconds)
+                            if cycle % 10 == 0:
+                                stats = self.aggressive_scalper.get_stats()
+                                perf = self.scalping_coordinator.get_performance()
+                                logger.info(f"📊 SCALPING STATS (Cycle {cycle}):")
+                                logger.info(f"   Total scans: {stats['total_scans']}")
+                                logger.info(f"   Signals: {stats['signals_generated']}")
+                                logger.info(f"   Active scalps: {perf['active_scalps']}")
+                                logger.info(f"   Completed: {perf['total_scalps']}")
+                                if perf['total_scalps'] > 0:
+                                    logger.info(f"   Win rate: {perf['win_rate']*100:.1f}%")
+                                    logger.info(f"   Avg profit: {perf['avg_profit']:.2f}%")
+                        
+                        # FAST SCAN - Every 10 seconds!
+                        await asyncio.sleep(10)
+                        
+                    except Exception as e:
+                        logger.error(f"❌ Aggressive scalping error: {e}")
+                        await asyncio.sleep(10)
+            
+            tasks.append(asyncio.create_task(run_aggressive_scalping_loop()))
+            logger.info("✅ 🔥 AGGRESSIVE SCALPING LOOP STARTED - Rapid fire every 10 seconds!")
         
         # Start enhanced main loop
         tasks.append(asyncio.create_task(self.enhanced_trading_loop()))
