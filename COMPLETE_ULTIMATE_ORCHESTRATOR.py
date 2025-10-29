@@ -664,6 +664,13 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
         self.advanced_systems = {}
         self.advanced_orchestrators = {}
         
+        # 🧠 COLLECTIVE SWARM INTELLIGENCE - Self-aware auto-adjusting coordination
+        self.collective_swarm = CollectiveSwarmIntelligence(self.data_hub)
+        logger.info("🐝 Collective Swarm Intelligence initialized - All engines will share resources!")
+        
+        # Track starting balance for auto-adjustment
+        self.starting_balance = 0.0
+        
         # ========================================================================
         # LOAD LEARNED MEMORY - Don't start from scratch!
         # ========================================================================
@@ -2267,11 +2274,28 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                 - MICRO positions (0.0001 BTC, 50 DOGE)
                 - Aggressive compound growth
                 - Goal: $1 → $100 → $10,000 → $1,000,000
+                
+                🧠 SWARM INTEGRATION:
+                - Shares balance with all engines
+                - Auto-adjusts based on performance
+                - Prevents liquidation collectively
+                - Catches all opportunities from swarm
                 """
+                # Register with swarm
+                self.collective_swarm.register_engine('MICRO_WALLET_GROWER')
+                
                 while True:
                     try:
                         # Check current balance
                         balance = self.micro_wallet_grower.check_gate_balance()
+                        
+                        # Set starting balance if first run
+                        if self.starting_balance == 0.0:
+                            self.starting_balance = balance
+                            logger.info(f"💎 Starting balance: ${balance:.2f}")
+                        
+                        # 🧠 AUTO-ADJUST ENTIRE SWARM BASED ON PERFORMANCE
+                        await self.collective_swarm.auto_adjust_strategy(balance, self.starting_balance)
                         
                         # AUTO-CLOSE ALL positions to compound profit
                         try:
@@ -2352,12 +2376,23 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                             logger.info(f"🔍 MICRO checking {len(hub_signals)} hub signals...")
                         
                         for signal in hub_signals:
-                            symbol = signal.get('symbol')
-                            side = signal.get('side', 'buy')
-                            confidence = signal.get('confidence', 0) * 100 if signal.get('confidence', 0) <= 1 else signal.get('confidence', 0)
+                            # 🧠 SWARM VOTING - Let all engines vote on this signal
+                            signal_with_votes = await self.collective_swarm.share_signal('MICRO_WALLET_GROWER', signal)
                             
-                            # Filter 1: Need valid symbol and high confidence
-                            if not symbol or confidence < 85:
+                            symbol = signal_with_votes.get('symbol')
+                            side = signal_with_votes.get('side', 'buy')
+                            confidence = signal_with_votes.get('confidence', 0) * 100 if signal_with_votes.get('confidence', 0) <= 1 else signal_with_votes.get('confidence', 0)
+                            swarm_confidence = signal_with_votes.get('swarm_confidence', confidence / 100) * 100
+                            
+                            # 🐝 SWARM DECISION - Check if collective approves
+                            if not self.collective_swarm.should_take_trade(signal_with_votes):
+                                continue
+                            
+                            # Use SWARM confidence (collective intelligence)
+                            confidence = swarm_confidence
+                            
+                            # Filter 1: Need valid symbol and high confidence (SWARM-ADJUSTED)
+                            if not symbol or confidence < self.collective_swarm.min_confidence_threshold * 100:
                                 continue
                             
                             # Filter 2: Only BUY/SELL signals (skip HOLD, CLOSE, HEDGE, etc.)
