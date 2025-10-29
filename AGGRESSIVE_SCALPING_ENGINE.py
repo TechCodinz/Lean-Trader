@@ -317,8 +317,8 @@ class ScalpingCoordinator:
     
     def __init__(self, max_concurrent=5):
         self.max_concurrent = max_concurrent
-        self.active_scalps = []
-        self.completed_scalps = []
+        self.active_scalps = []  # List of active scalp positions
+        self.completed_scalps = []  # List of completed scalps
         
         logger.info(f"📊 Scalping Coordinator initialized")
         logger.info(f"   Max concurrent scalps: {max_concurrent}")
