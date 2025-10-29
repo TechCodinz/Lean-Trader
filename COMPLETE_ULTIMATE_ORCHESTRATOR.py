@@ -1651,7 +1651,8 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             
             self.smart_scalping = SmartScalpingEngine(
                 ultra_core=ultra_core_instance,
-                risk_engine=self.risk_engine
+                risk_engine=self.risk_engine,
+                data_hub=self.data_hub  # Give it hub access for dynamic pairs!
             )
             self.advanced_orchestrators['smart_scalping'] = self.smart_scalping
             logger.info("✅ ⚡ SMART SCALPING ENGINE WIRED!")

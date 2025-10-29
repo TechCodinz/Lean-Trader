@@ -377,12 +377,13 @@ class SmartScalpingEngine:
     - Adaptive strategy (adjusts based on session volatility)
     """
     
-    def __init__(self, ultra_core, risk_engine, universe=None):
+    def __init__(self, ultra_core, risk_engine, universe=None, data_hub=None):
         self.ultra_core = ultra_core
         self.risk_engine = risk_engine
+        self.data_hub = data_hub  # To get pairs from hub!
         
         # Trading universe - use all 92 pairs instead of session-based hardcoded pairs
-        self.universe = universe if universe else ['BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'ADA/USDT', 'SOL/USDT']
+        self.universe = universe if universe else []  # Empty - will fetch from hub!
         
         # Smart components
         self.mtf_analyzer = MultiTimeframeAnalyzer()
@@ -421,13 +422,25 @@ class SmartScalpingEngine:
         
         logger.info(f"🕐 Current Session: {current_session} ({session_volatility} volatility)")
         
-        # Use FULL UNIVERSE instead of session-based hardcoded pairs
-        optimal_pairs = self.universe
+        # GET PAIRS FROM DATA HUB (not hardcoded!)
+        optimal_pairs = []
+        if self.data_hub:
+            # Get recent signals from hub
+            hub_signals = self.data_hub.get_signals(limit=100)
+            # Extract unique symbols
+            optimal_pairs = list(set([s.get('symbol') for s in hub_signals if s.get('symbol')]))
+            logger.info(f"📡 Got {len(optimal_pairs)} pairs from data hub signals")
         
-        # Also get learned optimal pairs (if available)
-        learned_pairs = self.session_tracker.get_optimal_markets(current_session)
+        # If no hub data yet, use universe (which could be from discovery)
+        if not optimal_pairs and self.universe:
+            optimal_pairs = self.universe
+            logger.info(f"📊 Using universe: {len(optimal_pairs)} pairs")
         
-        # Use full universe + learned pairs (no duplication needed since we're using all pairs)
+        # Last resort: Use session-appropriate pairs
+        if not optimal_pairs:
+            optimal_pairs = MarketSession.get_optimal_pairs(current_session)
+            logger.info(f"⚠️ Using session pairs: {len(optimal_pairs)} pairs")
+        
         all_pairs = list(set(optimal_pairs))
         
         logger.info(f"📊 Scanning {len(all_pairs)} optimal pairs for {current_session}")
