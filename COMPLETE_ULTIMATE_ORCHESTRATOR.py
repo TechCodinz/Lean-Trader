@@ -179,6 +179,7 @@ from NEWS_TRADING_ENGINE import NewsTradingEngine
 from SESSION_AWARE_TRADING import SessionAwareTrading
 from HEDGE_FUND_ARSENAL import HedgeFundArsenal
 from SENTIENT_TRADING_BRAIN import SentientTradingBrain
+from COLLECTIVE_SWARM_INTELLIGENCE import CollectiveSwarmIntelligence
 
 # Import REAL PROFIT BOT - 35 pairs smart trading
 from REAL_PROFIT_BOT import REAL_PROFIT_BOT
