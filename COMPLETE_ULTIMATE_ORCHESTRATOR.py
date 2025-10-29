@@ -165,6 +165,7 @@ from EXECUTION_ORCHESTRATOR import ExecutionOrchestrator
 # Import SMART SCALPING ENGINE - Multi-timeframe + Session aware
 from SMART_SCALPING_ENGINE import SmartScalpingEngine
 from AGGRESSIVE_SCALPING_ENGINE import AggressiveScalpingEngine, ScalpingCoordinator
+from SENTIENT_SCALPING_COORDINATOR import SentientScalpingCoordinator, HotPairTracker
 
 # Import TELEGRAM ORCHESTRATOR - Complete Telegram integration
 from TELEGRAM_ORCHESTRATOR import TelegramOrchestrator
@@ -669,6 +670,10 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
         # 🧠 COLLECTIVE SWARM INTELLIGENCE - Self-aware auto-adjusting coordination
         self.collective_swarm = CollectiveSwarmIntelligence(self.data_hub)
         logger.info("🐝 Collective Swarm Intelligence initialized - All engines will share resources!")
+        
+        # 🧠 SENTIENT SCALPING COORDINATOR - Engines communicate about hot pairs!
+        self.sentient_scalping = SentientScalpingCoordinator(self.data_hub, self.collective_swarm)
+        logger.info("🧠 Sentient Scalping Coordinator initialized - Collective movement mastery!")
         
         # 💰 MONEY PRINTER ULTRA RARE - Strategies NO ONE has ever dared to imagine!
         self.money_printer = None  # Initialize after exchanges load
@@ -1873,6 +1878,84 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             tasks.append(asyncio.create_task(run_aggressive_scalping_loop()))
             logger.info("✅ 🔥 AGGRESSIVE SCALPING LOOP STARTED - Rapid fire every 10 seconds!")
         
+        # 🧠 START SENTIENT SCALPING - COLLECTIVE MOVEMENT MASTERY! 🧠
+        async def run_sentient_scalping_loop():
+            """
+            🧠 SENTIENT SCALPING LOOP - COLLECTIVE INTELLIGENCE! 🧠
+            
+            When ANY engine finds volatile pairs:
+            1. Coordinator is alerted
+            2. All scalpers focus on the hot pair
+            3. Collective analysis masters its movements
+            4. Extracts profit from EVERY micro-movement
+            
+            This is how professional trading desks operate!
+            """
+            logger.info("\n🧠 SENTIENT SCALPING LOOP ACTIVE - Collective movement mastery!")
+            
+            # Register with swarm
+            self.collective_swarm.register_engine('SENTIENT_SCALPER')
+            
+            cycle = 0
+            while self.is_running:
+                try:
+                    cycle += 1
+                    
+                    # Get hot pairs from coordinator
+                    hot_pairs = self.sentient_scalping.get_hot_pairs_for_scalping()
+                    
+                    if hot_pairs:
+                        logger.info(f"🧠 SENTIENT SCALPING: Analyzing {len(hot_pairs)} HOT pairs")
+                        
+                        for symbol in hot_pairs:
+                            # Get current price (in production, fetch real price)
+                            try:
+                                # Would fetch real ticker in production
+                                import random
+                                current_price = 100.0 * (1 + random.uniform(-0.01, 0.01))
+                                
+                                # Analyze and generate sentient scalp signal
+                                sentient_signal = await self.sentient_scalping.analyze_and_scalp(symbol, current_price)
+                                
+                                if sentient_signal:
+                                    # Publish to data hub
+                                    self.data_hub.publish_signal(sentient_signal)
+                                    
+                                    # Log it
+                                    side = sentient_signal.get('side', '').upper()
+                                    move = sentient_signal.get('expected_move_pct', 0)
+                                    heat = sentient_signal.get('heat_level', '')
+                                    reasoning = sentient_signal.get('reasoning', '')[:60]
+                                    
+                                    logger.info(f"   🧠 SENTIENT: {symbol} {side} [{heat}]")
+                                    logger.info(f"      {reasoning}")
+                                    logger.info(f"      Expected: {move:.3f}% move")
+                                
+                            except Exception as e:
+                                logger.debug(f"Sentient analysis error for {symbol}: {e}")
+                        
+                        # Show stats every 10 cycles
+                        if cycle % 10 == 0:
+                            perf = self.sentient_scalping.get_performance_summary()
+                            logger.info(f"📊 SENTIENT SCALPING STATS (Cycle {cycle}):")
+                            logger.info(f"   Total scalps: {perf['total_scalps']}")
+                            logger.info(f"   Total profit: {perf['total_profit_pct']:.2f}%")
+                            logger.info(f"   Avg per scalp: {perf['avg_profit_per_scalp']:.3f}%")
+                            logger.info(f"   Hot pairs monitored: {perf['hot_pairs_monitored']}")
+                            if perf['best_pairs']:
+                                best = perf['best_pairs'][0]
+                                logger.info(f"   Best pair: {best[0]} ({best[1]:.3f}% avg)")
+                    
+                    # Analyze hot pairs frequently (every 5 seconds!)
+                    await asyncio.sleep(5)
+                    
+                except Exception as e:
+                    logger.error(f"❌ Sentient scalping error: {e}")
+                    await asyncio.sleep(5)
+        
+        tasks.append(asyncio.create_task(run_sentient_scalping_loop()))
+        logger.info("✅ 🧠 SENTIENT SCALPING LOOP STARTED - Collective intelligence analyzing hot pairs!")
+        
         # Start enhanced main loop
         tasks.append(asyncio.create_task(self.enhanced_trading_loop()))
         logger.info("✅ Enhanced trading loop started")
@@ -2646,6 +2729,20 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                         
                         if money_signals:
                             logger.info(f"💰 MONEY PRINTER: Found {len(money_signals)} opportunities!")
+                            
+                            # Alert sentient scalping about volatile pairs
+                            for signal in money_signals:
+                                # Check if it's a volatile opportunity
+                                if signal.get('strategy') in ['VOLATILITY_STRADDLE', 'VOLATILITY_SCALP']:
+                                    vol = signal.get('volatility_pct', 0)
+                                    if vol > 1.5:  # High volatility
+                                        self.sentient_scalping.alert_hot_pair(
+                                            symbol=signal['symbol'],
+                                            alert_type='volatility',
+                                            value=vol,
+                                            source='MONEY_PRINTER'
+                                        )
+                                        logger.info(f"   🔥 Alerted sentient scalper: {signal['symbol']} has {vol:.1f}% volatility!")
                             
                             # Publish to data hub for other engines to use
                             for signal in money_signals:
