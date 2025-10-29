@@ -144,18 +144,18 @@ class MICRO_GATE_BOT:
                 print(f"🛑 SAFETY: Daily loss limit reached (${self.daily_loss:.2f}). Stopping trading.")
                 return None
             
-            # SAFETY CHECK: Limit trades per day
-            # Infinite trading - no daily limit
-
+            # Check balance FIRST (before using it!)
+            balance = self.check_gate_balance()
+            print(f"   Current balance: ${balance:.2f}")
+            
             # Use passed quantity or calculate from balance
             if quantity is None:
                 position_size = self.calculate_position_size(symbol, price, balance)
             else:
                 position_size = quantity
             
-            # Check if we have enough balance first
-            balance = self.check_gate_balance()
-            required_balance = price * position_size * 1.1  # Add 10% buffer
+            # Calculate required balance
+            required_balance = price * position_size * 1.1  # Add 10% buffer for fees
 
             print(f"   Balance check: have ${balance:.2f}, need ${required_balance:.2f}")
             if balance < required_balance:
@@ -167,19 +167,26 @@ class MICRO_GATE_BOT:
                 print(f"   Creating BUY order...")
                 # Gate.io market buy needs COST (total $ to spend), not quantity
                 cost_to_spend = price * position_size
+                print(f"   Buying ${cost_to_spend:.2f} worth of {symbol}")
                 params = {'createMarketBuyOrderRequiresPrice': False}
                 order = self.gate.create_market_buy_order(symbol, cost_to_spend, params)
-                print(f"✅ MICRO BUY: {symbol} - Spent ${cost_to_spend:.2f}")
+                print(f"✅ MICRO BUY EXECUTED: {symbol} - Spent ${cost_to_spend:.2f}")
+                print(f"   Order ID: {order.get('id', 'unknown')}")
+                return order
             elif signal.upper() == "SELL":
+                print(f"   Selling {position_size} {symbol}")
                 order = self.gate.create_market_sell_order(symbol, position_size)
-                print(f"✅ MICRO SELL: {symbol} @ ${price:.4f} | Size: {position_size}")
+                print(f"✅ MICRO SELL EXECUTED: {symbol} @ ${price:.4f} | Size: {position_size}")
+                print(f"   Order ID: {order.get('id', 'unknown')}")
+                return order
             else:
+                print(f"⚠️ Unknown signal type: {signal}")
                 return None
-
-            return order
 
         except Exception as e:
             print(f"❌ Trade execution failed: {e}")
+            import traceback
+            print(traceback.format_exc())
             return None
 
     def run_micro_trading(self):
