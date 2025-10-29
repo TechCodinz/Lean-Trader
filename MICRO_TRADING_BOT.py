@@ -39,8 +39,25 @@ class MICRO_GATE_BOT:
         
         # Dynamic crypto pairs (can be updated by orchestrator)
         self.crypto_pairs = []
+        
+        # Profit tracking
+        self.total_profit = 0.0
+        self.total_trades = 0
+        self.winning_trades = 0
+        self.running = True
+        
+        # SAFETY FEATURES - Initialize BEFORE using them!
+        self.starting_balance = self.check_gate_balance()
+        self.max_daily_loss = self.starting_balance * 0.20  # Max 20% loss per day
+        self.daily_loss = 0.0  # Track daily losses
+        self.max_trades_per_day = 50  # Limit trades
 
         
+        print("🚀 MICRO GATE.IO BOT INITIALIZED!")
+        print("💰 TRADING EXCHANGE: Gate.io (MICRO POSITIONS)")
+        print(f"📊 {len(self.crypto_pairs)} Crypto Pairs")
+        print("🎯 READY FOR MICRO PROFITS!")
+
     def calculate_position_size(self, symbol, price, balance):
         """Calculate position size dynamically for cheap coins"""
         # Use predefined size if available
@@ -55,27 +72,6 @@ class MICRO_GATE_BOT:
             size = target_cost / price
             return size
         return 0.001  # fallback
-
-    # Profit tracking
-        self.total_profit = 0.0
-        self.total_trades = 0
-        self.winning_trades = 0
-        self.running = True
-
-        # Only trade pairs that definitely meet minimums
-        # self.crypto_pairs = ['DOGE/USDT', 'SHIB/USDT', 'PEPE/USDT', 'FLOKI/USDT', 'BONK/USDT']  # DISABLED - Using dynamic discovery
-        self.crypto_pairs = []  # Will be populated by scanner
-        
-        # SAFETY FEATURES
-        self.starting_balance = self.check_gate_balance()
-        self.max_daily_loss = self.starting_balance * 0.20  # Max 20% loss per day
-        self.daily_loss = 0.0
-        self.max_trades_per_day = 50  # Limit trades  # Multiple micro pairs
-
-        print("🚀 MICRO GATE.IO BOT INITIALIZED!")
-        print("💰 TRADING EXCHANGE: Gate.io (MICRO POSITIONS)")
-        print(f"📊 {len(self.crypto_pairs)} Crypto Pairs")
-        print("🎯 READY FOR MICRO PROFITS!")
 
     def send_telegram(self, message, chat_id=None):
         if chat_id is None:
