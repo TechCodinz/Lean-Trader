@@ -21,7 +21,12 @@ class SmartPositionSizer:
         self.balance = initial_balance
         self.max_risk_per_trade = 0.02  # 2% max risk
         self.max_position_pct = 0.10  # 10% max position size
-        self.min_position_usd = 10.0  # $10 minimum
+        
+        # Adaptive minimum based on balance
+        if initial_balance < 100:
+            self.min_position_usd = 3.5  # $3.50 minimum for small accounts (Gate.io minimum)
+        else:
+            self.min_position_usd = 10.0  # $10 minimum for larger accounts
         
         # Dynamic sizing based on confidence
         self.use_dynamic_sizing = True
