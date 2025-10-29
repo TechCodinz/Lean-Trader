@@ -177,6 +177,7 @@ from IBM_QUANTUM_ENGINE import IBMQuantumEngine
 # Import CROSS-EXCHANGE ARBITRAGE - Risk-free profits
 from CROSS_EXCHANGE_ARBITRAGE import CrossExchangeArbitrage, P2PArbitrageScanner
 from SINGLE_EXCHANGE_ARBITRAGE import SingleExchangeArbitrage
+from AUTO_PROFIT_TAKER import AutoProfitTaker
 from DYNAMIC_MARKET_SCANNER import DynamicMarketScanner
 from NEWS_TRADING_ENGINE import NewsTradingEngine
 from SESSION_AWARE_TRADING import SessionAwareTrading
@@ -1190,6 +1191,19 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             except Exception as e:
                 logger.warning(f"⚠️  Single-Exchange Arbitrage: {e}")
                 self.single_arb = None
+            
+            # Initialize AUTO PROFIT TAKER (CRITICAL - closes positions with profit!)
+            try:
+                self.auto_profit_taker = AutoProfitTaker(self.micro_wallet_grower.gate, self.data_hub)
+                logger.info("✅ 💰 AUTO PROFIT TAKER - Closes positions automatically!")
+                logger.info("   → Monitors all open positions")
+                logger.info("   → Closes at profit targets (0.3-3%)")
+                logger.info("   → Stop loss protection (1.5%)")
+                logger.info("   → Time stops (1 hour max)")
+                logger.info("   → THIS IS WHY TRADES CLOSE WITH PROFIT!")
+            except Exception as e:
+                logger.warning(f"⚠️  Auto Profit Taker: {e}")
+                self.auto_profit_taker = None
         except Exception as e:
             logger.warning(f"⚠️  Micro Wallet Grower: {e}")
             self.micro_wallet_grower = None
@@ -2610,15 +2624,16 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                             confidence = signal_with_votes.get('confidence', 0) * 100 if signal_with_votes.get('confidence', 0) <= 1 else signal_with_votes.get('confidence', 0)
                             swarm_confidence = signal_with_votes.get('swarm_confidence', confidence / 100) * 100
                             
-                            # 🐝 SWARM DECISION - Check if collective approves
-                            if not self.collective_swarm.should_take_trade(signal_with_votes):
+                            # 🐝 SWARM DECISION - For MICRO, be more aggressive (tiny positions!)
+                            # Lower threshold for MICRO wallet since positions are small
+                            if swarm_confidence < 50:  # MICRO can take 50%+ signals
                                 continue
                             
                             # Use SWARM confidence (collective intelligence)
                             confidence = swarm_confidence
                             
-                            # Filter 1: Need valid symbol and high confidence (SWARM-ADJUSTED)
-                            if not symbol or confidence < self.collective_swarm.min_confidence_threshold * 100:
+                            # Filter 1: Need valid symbol
+                            if not symbol:
                                 continue
                             
                             # Filter 2: Only BUY/SELL signals (skip HOLD, CLOSE, HEDGE, etc.)
@@ -2636,8 +2651,9 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                                 position_size = self.micro_wallet_grower.position_sizes.get(symbol, 0.001)
                                 position_cost = price * position_size
                                 
-                                if position_cost > 5.0:
-                                    logger.debug(f"Skipping {symbol} - too expensive (${position_cost:.2f} > $5)")
+                                # MICRO can trade up to $10 per position (small enough to scalp many times)
+                                if position_cost > 10.0:
+                                    logger.debug(f"Skipping {symbol} - too expensive (${position_cost:.2f} > $10)")
                                     continue
                                 
                                 # Execute using signal data (not re-analysis!)
@@ -2650,6 +2666,17 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                                 
                                 if result:
                                     logger.info(f"✅ MICRO executed: {symbol} {side.upper()}")
+                                    
+                                    # Register position with profit taker
+                                    if hasattr(self, 'auto_profit_taker') and self.auto_profit_taker:
+                                        self.auto_profit_taker.register_position(
+                                            symbol=symbol,
+                                            side=side,
+                                            entry_price=price,
+                                            size=position_size,
+                                            strategy='quick_scalp'  # Micro = quick scalps
+                                        )
+                                        logger.info(f"   📝 Position registered with profit taker")
                                 else:
                                     logger.warning(f"⚠️  MICRO trade failed for {symbol}")
                                     
@@ -2847,6 +2874,64 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             
             tasks.append(asyncio.create_task(run_single_exchange_arbitrage()))
             logger.info("✅ 💰 ARBITRAGE ENGINE ACTIVE - Scanning for risk-free profits every 30s!")
+        
+        # AUTO PROFIT TAKER - Closes positions with profit!
+        if getattr(self, 'auto_profit_taker', None):
+            async def run_auto_profit_taker():
+                """
+                💰 AUTO PROFIT TAKER LOOP
+                
+                Checks ALL open positions every 10 seconds:
+                - Profit target hit? CLOSE and take profit!
+                - Stop loss hit? CLOSE and protect capital!
+                - Time limit hit? CLOSE and free up capital!
+                
+                THIS IS WHY TRADES CLOSE WITH PROFIT!
+                """
+                logger.info("\n💰 AUTO PROFIT TAKER ACTIVE - Will close positions at profit targets!")
+                
+                while True:
+                    try:
+                        # Check and close profitable positions
+                        closed = await self.auto_profit_taker.check_and_close_positions()
+                        
+                        if closed:
+                            logger.info(f"💰 CLOSED {len(closed)} POSITIONS:")
+                            for pos in closed:
+                                logger.info(f"   {pos['symbol']}: ${pos['profit_usd']:.2f} ({pos['pnl_pct']:.2%})")
+                                logger.info(f"   Reason: {pos['reason']}")
+                                
+                                # Record in data hub for learning
+                                self.data_hub.record_trade({
+                                    'symbol': pos['symbol'],
+                                    'side': pos['side'],
+                                    'entry': pos['entry_price'],
+                                    'exit': pos['exit_price'],
+                                    'profit': pos['profit_usd'],
+                                    'pnl_pct': pos['pnl_pct'],
+                                    'duration': pos['duration'],
+                                    'closed_at': datetime.now().isoformat()
+                                })
+                        
+                        # Show stats every 50 closes
+                        stats = self.auto_profit_taker.get_stats()
+                        if stats['total_closed'] > 0 and stats['total_closed'] % 10 == 0:
+                            logger.info(f"📊 PROFIT TAKER STATS:")
+                            logger.info(f"   Closed: {stats['total_closed']}")
+                            logger.info(f"   Win rate: {stats['win_rate']:.1f}%")
+                            logger.info(f"   Total profit: ${stats['total_profit']:.2f}")
+                            logger.info(f"   Avg profit: ${stats['avg_profit']:.2f}")
+                            logger.info(f"   Open positions: {stats['open_positions']}")
+                        
+                        # Check frequently (positions can hit targets fast!)
+                        await asyncio.sleep(10)
+                        
+                    except Exception as e:
+                        logger.error(f"❌ Auto profit taker error: {e}")
+                        await asyncio.sleep(10)
+            
+            tasks.append(asyncio.create_task(run_auto_profit_taker()))
+            logger.info("✅ 💰 AUTO PROFIT TAKER ACTIVE - Checking positions every 10 seconds!")
         
         # CONTINUOUS ULTRA BOT - Never stops scanning & trading!
         if getattr(self, 'continuous_ultra', None):

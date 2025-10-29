@@ -27,15 +27,23 @@ class PersistenceManager:
     """
     
     def __init__(self):
-        self.workspace = Path('/workspace')
+        # Use current directory instead of hardcoded /workspace
+        # This works on VPS, local, anywhere!
+        current_dir = Path(__file__).parent.absolute()
+        self.workspace = current_dir
         self.data_dir = self.workspace / 'data'
         self.models_dir = self.workspace / 'models'
         self.runtime_dir = self.workspace / 'runtime'
         
         # Ensure directories exist
-        self.data_dir.mkdir(exist_ok=True)
-        self.models_dir.mkdir(exist_ok=True)
-        self.runtime_dir.mkdir(exist_ok=True)
+        self.data_dir.mkdir(exist_ok=True, parents=True)
+        self.models_dir.mkdir(exist_ok=True, parents=True)
+        self.runtime_dir.mkdir(exist_ok=True, parents=True)
+        
+        logger.info(f"📁 Persistence directories:")
+        logger.info(f"   Data: {self.data_dir}")
+        logger.info(f"   Models: {self.models_dir}")
+        logger.info(f"   Runtime: {self.runtime_dir}")
         
         self.loaded_databases = {}
         self.loaded_memories = {}
