@@ -21,20 +21,41 @@ except Exception:  # pragma: no cover
             return x
 
 try:
-    from tensorflow.keras.layers import LSTM, Dense, Dropout  # type: ignore
-    from tensorflow.keras.models import Sequential  # type: ignore
+    # Try new Keras 3.x import first
+    from keras.layers import LSTM, Dense, Dropout  # type: ignore
+    from keras.models import Sequential  # type: ignore
+    KERAS_AVAILABLE = True
 except Exception:  # pragma: no cover
-    LSTM = Dense = Dropout = object  # type: ignore
+    try:
+        # Fallback to TensorFlow 2.x Keras
+        from tensorflow.keras.layers import LSTM, Dense, Dropout  # type: ignore
+        from tensorflow.keras.models import Sequential  # type: ignore
+        KERAS_AVAILABLE = True
+    except Exception:  # pragma: no cover
+        # No Keras available - use dummy classes
+        KERAS_AVAILABLE = False
+        
+        class LSTM:  # type: ignore
+            def __init__(self, *_a, **_k):
+                pass
+        
+        class Dense:  # type: ignore
+            def __init__(self, *_a, **_k):
+                pass
+        
+        class Dropout:  # type: ignore
+            def __init__(self, *_a, **_k):
+                pass
 
-    class Sequential:  # type: ignore
-        def __init__(self, *_a, **_k):
-            pass
+        class Sequential:  # type: ignore
+            def __init__(self, *_a, **_k):
+                pass
 
-        def compile(self, **_k):
-            pass
+            def compile(self, **_k):
+                pass
 
-        def predict(self, x):
-            return x
+            def predict(self, x):
+                return x
 
 try:
     from stable_baselines3 import PPO  # type: ignore
@@ -56,17 +77,27 @@ class MLStrategyEngine:
 
     def build_lstm(self):
         """Build LSTM model for time-series prediction."""
-        self.lstm_model = Sequential(
-            [
-                LSTM(100, return_sequences=True, input_shape=(60, 1)),
-                Dropout(0.2),
-                LSTM(100, return_sequences=False),
-                Dropout(0.2),
-                Dense(25),
-                Dense(1),
-            ]
-        )
-        self.lstm_model.compile(optimizer="adam", loss="mean_squared_error")
+        if not KERAS_AVAILABLE:
+            # Keras not available - use dummy model
+            self.lstm_model = Sequential()
+            return
+        
+        try:
+            self.lstm_model = Sequential(
+                [
+                    LSTM(100, return_sequences=True, input_shape=(60, 1)),
+                    Dropout(0.2),
+                    LSTM(100, return_sequences=False),
+                    Dropout(0.2),
+                    Dense(25),
+                    Dense(1),
+                ]
+            )
+            self.lstm_model.compile(optimizer="adam", loss="mean_squared_error")
+        except Exception as e:
+            # If model building fails, use dummy
+            print(f"⚠️ LSTM model build failed: {e}")
+            self.lstm_model = Sequential()
 
     def build_rl_env(self):
         """Custom RL environment for trading."""
