@@ -234,9 +234,17 @@ class ExecutionOrchestrator:
     
     async def run_execution_loop(self):
         """
-        Main execution loop - monitors decisions and executes high-confidence trades
+        Main execution loop - monitors data hub and executes high-confidence trades
+        
+        ACTIVELY TRADES:
+        - Smart Scalping signals (75%+ confluence)
+        - Aggressive Scalping signals (momentum/breakouts)
+        - Sentient Scalping signals (hot pairs)
+        - Money Printer signals (arbitrage/market making)
+        - All other engine signals
         """
         logger.info("⚡ Starting SMART execution loop...")
+        logger.info("   → Will execute ALL scalper signals with profit targets!")
         
         while self.execution_enabled:
             try:
@@ -250,10 +258,40 @@ class ExecutionOrchestrator:
                     # Validate and execute
                     await self.process_decision(decision)
                 
-                # Monitor open positions
+                # ACTIVELY CHECK HUB FOR NEW SIGNALS (don't just wait for alert queue!)
+                signals = self.data_hub.get_signals(limit=20)
+                
+                for signal in signals:
+                    # Only execute high-confidence scalper signals
+                    source = signal.get('source', '')
+                    strategy = signal.get('strategy', '')
+                    confidence = signal.get('confidence', 0)
+                    
+                    # Convert confidence to 0-1 range if needed
+                    if confidence > 1:
+                        confidence = confidence / 100
+                    
+                    # Execute if:
+                    # - From scalpers (Smart, Aggressive, Sentient)
+                    # - Or high confidence (>70%)
+                    # - Has profit targets
+                    is_scalper = any(x in source or x in strategy for x in [
+                        'Scalp', 'SCALP', 'Aggressive', 'Sentient', 'MOMENTUM', 'BREAKOUT', 'VOLATILITY'
+                    ])
+                    
+                    has_targets = signal.get('take_profit') or signal.get('profit_target_pct')
+                    
+                    if (is_scalper or confidence >= 0.70) and has_targets:
+                        # Execute this signal!
+                        await self.execute_signal(signal)
+                        
+                        # Rate limit
+                        await asyncio.sleep(1)
+                
+                # Monitor open positions (close at profit targets!)
                 await self.monitor_positions()
                 
-                await asyncio.sleep(1)  # Check every second
+                await asyncio.sleep(5)  # Check every 5 seconds
                 
             except Exception as e:
                 logger.error(f"Execution loop error: {e}")
