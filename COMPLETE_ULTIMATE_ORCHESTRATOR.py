@@ -2709,8 +2709,10 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                         logger.error(traceback.format_exc())
                         await asyncio.sleep(60)
             
-            tasks.append(asyncio.create_task(run_micro_wallet_growth()))
-            logger.info("✅ 💎 MICRO WALLET GROWER ACTIVE - $1 to INFINITE growth!")
+            # DISABLED - MICRO just churns without profit strategy, loses on fees!
+            # Using SCALPERS instead - they have REAL profit targets!
+            # tasks.append(asyncio.create_task(run_micro_wallet_growth()))
+            logger.info("⚠️  MICRO WALLET GROWER DISABLED - Using scalpers with profit strategies instead!")
         
         # ====================================================================
         # SWARM OPPORTUNITY SCANNER - Catches ALL missed opportunities! 🐝
