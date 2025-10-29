@@ -2174,6 +2174,9 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
         if getattr(self, 'ultra_rare_orchestrator', None):
             async def run_ultra_rare_exploiters():
                 """Run all 11 ultra rare engines with REAL market data"""
+                # Register with swarm
+                self.collective_swarm.register_engine('ULTRA_RARE_ENGINES')
+                
                 while True:
                     try:
                         signals = []
@@ -2209,6 +2212,9 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
         if getattr(self, 'brain_system', None):
             async def run_brain_advisor():
                 """Brain system with REAL OHLCV data"""
+                # Register with swarm
+                self.collective_swarm.register_engine('BRAIN_SYSTEM')
+                
                 while True:
                     try:
                         for symbol in ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'BNB/USDT']:
@@ -2239,6 +2245,9 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
         if getattr(self, 'hivemind', None):
             async def run_hivemind_coordinator():
                 """Hivemind with REAL data for 8 timeframes"""
+                # Register with swarm
+                self.collective_swarm.register_engine('HIVEMIND')
+                
                 while True:
                     try:
                         for symbol in ['BTC/USDT', 'ETH/USDT', 'SOL/USDT']:
@@ -2444,6 +2453,40 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             
             tasks.append(asyncio.create_task(run_micro_wallet_growth()))
             logger.info("✅ 💎 MICRO WALLET GROWER ACTIVE - $1 to INFINITE growth!")
+        
+        # ====================================================================
+        # SWARM OPPORTUNITY SCANNER - Catches ALL missed opportunities! 🐝
+        # ====================================================================
+        async def run_swarm_opportunity_scanner():
+            """
+            Continuously scans for missed opportunities
+            Ensures NO opportunity is left behind by ANY engine
+            """
+            self.collective_swarm.register_engine('OPPORTUNITY_SCANNER')
+            
+            while True:
+                try:
+                    # Scan for missed high-confidence opportunities
+                    await self.collective_swarm.optimize_opportunities()
+                    
+                    # Get collective state
+                    swarm_state = self.collective_swarm.get_collective_state()
+                    
+                    # Log swarm health every 5 minutes
+                    logger.info(f"🐝 SWARM STATUS:")
+                    logger.info(f"   Active Engines: {swarm_state['active_engines']}")
+                    logger.info(f"   Mode: {swarm_state['mode'].upper()}")
+                    logger.info(f"   Win Rate: {swarm_state['performance']['win_rate']*100:.1f}%")
+                    logger.info(f"   Total Profit: ${swarm_state['performance']['total_profit']:.2f}")
+                    
+                    await asyncio.sleep(300)  # Every 5 minutes
+                    
+                except Exception as e:
+                    logger.error(f"❌ Swarm scanner error: {e}")
+                    await asyncio.sleep(300)
+        
+        tasks.append(asyncio.create_task(run_swarm_opportunity_scanner()))
+        logger.info("✅ 🐝 SWARM OPPORTUNITY SCANNER ACTIVE - No opportunity left behind!")
         
         # CONTINUOUS ULTRA BOT - Never stops scanning & trading!
         if getattr(self, 'continuous_ultra', None):
