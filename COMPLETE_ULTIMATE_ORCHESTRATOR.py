@@ -2609,13 +2609,21 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                         # Get ACTUAL signals from data hub (with direction & confidence!)
                         hub_signals = self.data_hub.get_signals(limit=50)
                         trades_attempted = 0
+                        trades_executed = 0
+                        max_trades_per_cycle = 3  # Limit to 3 trades per minute to avoid balance conflicts
                         
                         if not hub_signals:
                             logger.info("💤 MICRO: No signals in hub yet")
                         else:
                             logger.info(f"🔍 MICRO checking {len(hub_signals)} hub signals...")
+                            logger.info(f"   Max trades this cycle: {max_trades_per_cycle}")
                         
                         for signal in hub_signals:
+                            # Stop if we hit trade limit for this cycle
+                            if trades_executed >= max_trades_per_cycle:
+                                logger.info(f"   ⏸️  Trade limit reached ({max_trades_per_cycle}) - will continue next cycle")
+                                break
+                            
                             # 🧠 SWARM VOTING - Let all engines vote on this signal
                             signal_with_votes = await self.collective_swarm.share_signal('MICRO_WALLET_GROWER', signal)
                             
@@ -2665,7 +2673,8 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                                 result = self.micro_wallet_grower.execute_trade(symbol, side.upper(), price)
                                 
                                 if result:
-                                    logger.info(f"✅ MICRO executed: {symbol} {side.upper()}")
+                                    trades_executed += 1
+                                    logger.info(f"✅ MICRO executed: {symbol} {side.upper()} (Trade {trades_executed}/{max_trades_per_cycle})")
                                     
                                     # Register position with profit taker
                                     if hasattr(self, 'auto_profit_taker') and self.auto_profit_taker:
@@ -2677,6 +2686,9 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                                             strategy='quick_scalp'  # Micro = quick scalps
                                         )
                                         logger.info(f"   📝 Position registered with profit taker")
+                                    
+                                    # Wait a bit before next trade (avoid rate limits)
+                                    await asyncio.sleep(2)
                                 else:
                                     logger.warning(f"⚠️  MICRO trade failed for {symbol}")
                                     
@@ -2686,6 +2698,8 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                         
                         if trades_attempted == 0 and hub_signals:
                             logger.info(f"💤 MICRO: No qualifying signals (checked {len(hub_signals)} signals)")
+                        elif trades_executed > 0:
+                            logger.info(f"✅ MICRO CYCLE COMPLETE: {trades_executed}/{trades_attempted} trades executed")
                         
                         await asyncio.sleep(60)  # Check every minute
                         
