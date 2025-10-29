@@ -158,6 +158,44 @@ class NewsTradingEngine:
         
         return signal
     
+    async def analyze_latest_news(self) -> List[Dict]:
+        """
+        Analyze latest news and return trading signals
+        This is the main method called by the orchestrator
+        """
+        signals = []
+        
+        try:
+            # Fetch trending coins (represents market interest/news)
+            trending = await self.fetch_trending_coins()
+            
+            if trending:
+                logger.info(f"📰 Analyzing {len(trending)} trending items...")
+                
+                for coin_data in trending:
+                    signal = await self.generate_news_signal(coin_data)
+                    if signal:
+                        signals.append(signal)
+                        logger.info(f"📰 Generated signal: {signal.get('symbol')} ({signal.get('confidence', 0)*100:.0f}%)")
+                
+                # Cache for later
+                self.trending_cache.extend(trending)
+                
+            else:
+                logger.debug("📰 No trending news found")
+                
+        except Exception as e:
+            logger.error(f"📰 News analysis error: {e}")
+        
+        return signals
+    
+    def get_trending_news(self) -> List[Dict]:
+        """
+        Synchronous method to get cached trending news
+        Used by passive monitoring loops
+        """
+        return list(self.trending_cache)
+    
     def get_stats(self) -> Dict:
         """Get news engine statistics"""
         return {

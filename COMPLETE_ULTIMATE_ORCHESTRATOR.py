@@ -2116,31 +2116,18 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                 """Analyze news and publish trading signals"""
                 while True:
                     try:
-                        # News engine monitors trending topics
-                        # Check if there's a method to get news
-                        if hasattr(self.news_engine, 'get_trending_news'):
-                            trending = await asyncio.to_thread(self.news_engine.get_trending_news)
-                            if trending:
-                                for item in trending[:3]:  # Top 3 news items
-                                    signal = {
-                                        'type': 'news_sentiment',
-                                        'source': 'NewsTradingEngine',
-                                        'symbol': item.get('symbol', 'BTC/USDT'),
-                                        'side': 'buy' if item.get('sentiment', 0) > 0 else 'sell',
-                                        'confidence': 0.70,
-                                        'headline': item.get('title', '')[:100],
-                                        'timestamp': datetime.now().isoformat()
-                                    }
-                                    await self.data_hub.publish_signal(signal)
-                                    logger.debug(f"📰 News: {signal['symbol']}")
-                        else:
-                            # Just monitor passively
-                            logger.debug("📰 News engine monitoring...")
+                        # Call the proper analyze_latest_news() method
+                        news_signals = await self.news_engine.analyze_latest_news()
+                        
+                        if news_signals:
+                            for signal in news_signals:
+                                await self.data_hub.publish_signal(signal)
+                                logger.info(f"📰 News signal: {signal.get('symbol')} - {signal.get('reasoning', '')[:80]}")
                         
                         await asyncio.sleep(300)  # Every 5 minutes
                         
                     except Exception as e:
-                        logger.debug(f"News Publisher: {e}")
+                        logger.error(f"❌ News Publisher error: {e}")
                         await asyncio.sleep(300)
             
             tasks.append(asyncio.create_task(run_news_publisher()))
@@ -2154,32 +2141,20 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                 """Find and publish session-optimal trading opportunities"""
                 while True:
                     try:
-                        # Get current session (SYNC method, no await!)
+                        # Get current session (sync method)
                         current_session = self.session_trader.get_current_session()
                         
-                        # Get signals from data hub and enrich with session info
-                        recent_signals = self.data_hub.get_signals(limit=20)
+                        # Find optimal opportunities for this session (async method)
+                        session_signals = await self.session_trader.find_session_opportunities(current_session)
                         
-                        for signal in recent_signals[:5]:  # Top 5
-                            # Enrich signal with session awareness
-                            session_signal = {
-                                'type': 'session_aware',
-                                'source': 'SessionTrader',
-                                'symbol': signal.get('symbol'),
-                                'side': signal.get('side'),
-                                'confidence': signal.get('confidence', 0.7),
-                                'session': current_session,
-                                'session_optimal': True,
-                                'timestamp': datetime.now().isoformat()
-                            }
-                            
-                            await self.data_hub.publish_signal(session_signal)
-                            logger.debug(f"🕐 Session: {current_session}")
+                        for signal in session_signals:
+                            await self.data_hub.publish_signal(signal)
+                            logger.info(f"🕐 Session signal: {signal.get('symbol')} ({current_session} - {signal.get('confidence', 0)*100:.0f}%)")
                         
                         await asyncio.sleep(120)  # Every 2 minutes
                         
                     except Exception as e:
-                        logger.debug(f"Session Publisher: {e}")
+                        logger.error(f"❌ Session Publisher error: {e}")
                         await asyncio.sleep(120)
             
             tasks.append(asyncio.create_task(run_session_publisher()))
