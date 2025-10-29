@@ -176,6 +176,7 @@ from IBM_QUANTUM_ENGINE import IBMQuantumEngine
 
 # Import CROSS-EXCHANGE ARBITRAGE - Risk-free profits
 from CROSS_EXCHANGE_ARBITRAGE import CrossExchangeArbitrage, P2PArbitrageScanner
+from SINGLE_EXCHANGE_ARBITRAGE import SingleExchangeArbitrage
 from DYNAMIC_MARKET_SCANNER import DynamicMarketScanner
 from NEWS_TRADING_ENGINE import NewsTradingEngine
 from SESSION_AWARE_TRADING import SessionAwareTrading
@@ -1177,6 +1178,18 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             except Exception as e:
                 logger.warning(f"⚠️  Money Printer: {e}")
                 self.money_printer = None
+            
+            # Initialize SINGLE-EXCHANGE ARBITRAGE (works with just Gate.io!)
+            try:
+                self.single_arb = SingleExchangeArbitrage(self.micro_wallet_grower.gate, self.data_hub)
+                logger.info("✅ 💰 SINGLE-EXCHANGE ARBITRAGE - Works on ONE exchange!")
+                logger.info("   → Triangular Arbitrage (3-pair cycles)")
+                logger.info("   → Flash Arbitrage (order book mismatches)")
+                logger.info("   → Funding Arbitrage (perp-spot on same exchange)")
+                logger.info("   → NO multi-exchange needed!")
+            except Exception as e:
+                logger.warning(f"⚠️  Single-Exchange Arbitrage: {e}")
+                self.single_arb = None
         except Exception as e:
             logger.warning(f"⚠️  Micro Wallet Grower: {e}")
             self.micro_wallet_grower = None
@@ -2769,6 +2782,71 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             
             tasks.append(asyncio.create_task(run_money_printer_ultra_rare()))
             logger.info("✅ 💰 MONEY PRINTER ULTRA RARE ACTIVE - Printing money from untapped markets!")
+        
+        # SINGLE-EXCHANGE ARBITRAGE - Works with just Gate.io!
+        if getattr(self, 'single_arb', None):
+            async def run_single_exchange_arbitrage():
+                """
+                💰 SINGLE-EXCHANGE ARBITRAGE
+                
+                Works on ONE exchange (Gate.io):
+                - Triangular arbitrage (3-pair cycles)
+                - Flash arbitrage (order book mismatches)
+                - Funding arbitrage (perp-spot premium)
+                
+                NO multi-exchange needed - RISK-FREE profits!
+                """
+                self.collective_swarm.register_engine('ARBITRAGE_ENGINE')
+                
+                while True:
+                    try:
+                        # Get active pairs from market scanner
+                        symbols = []
+                        if self.market_scanner and hasattr(self.market_scanner, 'active_pairs'):
+                            symbols = list(self.market_scanner.active_pairs)[:20]
+                        
+                        if not symbols:
+                            symbols = ['BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'SOL/USDT', 'AVAX/USDT']
+                        
+                        # Scan ALL arbitrage strategies
+                        arb_opportunities = await self.single_arb.scan_all_arbitrage(symbols)
+                        
+                        if arb_opportunities:
+                            logger.info(f"💰 ARBITRAGE ENGINE: Found {len(arb_opportunities)} risk-free opportunities!")
+                            
+                            # Publish to data hub
+                            for opp in arb_opportunities:
+                                opp['timestamp'] = datetime.now().isoformat()
+                                self.data_hub.publish_signal(opp)
+                                
+                                # Share with swarm
+                                opp_with_votes = await self.collective_swarm.share_signal('ARBITRAGE_ENGINE', opp)
+                                
+                                # Log top 3
+                                if arb_opportunities.index(opp) < 3:
+                                    strategy = opp.get('strategy', '')
+                                    profit = opp.get('profit_pct', 0)
+                                    logger.info(f"   💎 {strategy}: {profit:.2f}% risk-free profit")
+                            
+                            logger.info(f"✅ Published {len(arb_opportunities)} ARBITRAGE signals!")
+                            
+                            # Show stats every 10 cycles
+                            stats = self.single_arb.get_stats()
+                            if stats['total_opportunities'] % 10 == 0 and stats['total_opportunities'] > 0:
+                                logger.info(f"📊 ARBITRAGE STATS:")
+                                logger.info(f"   Total opportunities: {stats['total_opportunities']}")
+                                logger.info(f"   Executed: {stats['executed']}")
+                                logger.info(f"   Execution rate: {stats['execution_rate']:.1f}%")
+                        
+                        # Scan frequently (arbitrage opportunities disappear fast!)
+                        await asyncio.sleep(30)
+                        
+                    except Exception as e:
+                        logger.error(f"❌ Single-exchange arbitrage error: {e}")
+                        await asyncio.sleep(30)
+            
+            tasks.append(asyncio.create_task(run_single_exchange_arbitrage()))
+            logger.info("✅ 💰 ARBITRAGE ENGINE ACTIVE - Scanning for risk-free profits every 30s!")
         
         # CONTINUOUS ULTRA BOT - Never stops scanning & trading!
         if getattr(self, 'continuous_ultra', None):
