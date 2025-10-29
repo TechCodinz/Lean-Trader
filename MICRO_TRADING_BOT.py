@@ -59,14 +59,34 @@ class MICRO_GATE_BOT:
         print("🎯 READY FOR MICRO PROFITS!")
 
     def calculate_position_size(self, symbol, price, balance):
-        """Calculate position size dynamically for cheap coins"""
+        """
+        Calculate position size dynamically
+        
+        Gate.io MINIMUM: $3 USDT per order
+        With $25 balance: Need FIXED $3-4 per trade (not percentage!)
+        This allows 6-8 trades before running out
+        """
         # Use predefined size if available
         if symbol in self.position_sizes:
-            return self.position_sizes[symbol]
+            base_size = self.position_sizes[symbol]
+            # But ensure it meets $3 minimum
+            cost = price * base_size
+            if cost < 3.0:
+                # Adjust size to meet $3 minimum
+                base_size = 3.5 / price  # Target $3.50 to be safe
+            return base_size
         
-        # For unknown coins, calculate based on price
-        # Target: $3-5 per trade
-        target_cost = min(balance * 0.3, 4.0)  # Max 30% of balance or $4
+        # For unknown coins: FIXED $3.50 per trade (meets Gate.io $3 minimum)
+        # This is better than percentage because:
+        # - Consistent trade sizes
+        # - Always meets minimums
+        # - Allows multiple trades
+        # - Balance lasts longer
+        target_cost = 3.5  # FIXED $3.50 per trade
+        
+        # Only reduce if balance is VERY low
+        if balance < 10:
+            target_cost = max(3.0, balance * 0.9)  # Use 90% of remaining balance
         
         if price > 0:
             size = target_cost / price
