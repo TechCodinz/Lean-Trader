@@ -1320,8 +1320,16 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
         # 4. EXECUTION ORCHESTRATOR - THE CRITICAL PIECE!
         # Give it Gate.io for REAL trading!
         execution_exchanges = {}
+        actual_balance = 1000.0  # Default
+        
         if hasattr(self, 'micro_wallet_grower') and self.micro_wallet_grower:
             execution_exchanges['gateio'] = self.micro_wallet_grower.gate
+            # Get ACTUAL balance from Gate.io
+            try:
+                actual_balance = self.micro_wallet_grower.check_gate_balance()
+                logger.info(f"   💰 Gate.io balance: ${actual_balance:.2f}")
+            except:
+                actual_balance = 25.0  # Fallback
             logger.info("   🔗 Wiring Gate.io to Execution Orchestrator...")
         
         self.advanced_orchestrators['execution'] = ExecutionOrchestrator(
@@ -1331,6 +1339,12 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             self.ledger,
             mode=self.mode
         )
+        
+        # Update balance to ACTUAL Gate.io balance
+        if hasattr(self.advanced_orchestrators['execution'], 'position_sizer'):
+            self.advanced_orchestrators['execution'].position_sizer.balance = actual_balance
+            logger.info(f"   📊 Position sizer balance set to: ${actual_balance:.2f}")
+        
         logger.info("✅ ⚡ EXECUTION ORCHESTRATOR WIRED - TRADES WILL NOW EXECUTE!")
         logger.info(f"   Connected to: {list(execution_exchanges.keys()) if execution_exchanges else 'default engines'}")
         
