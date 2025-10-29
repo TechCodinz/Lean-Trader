@@ -186,3 +186,80 @@ class SessionAwareTrading:
         else:  # OFF_HOURS
             # Only major liquid pairs
             return ['BTC/USDT', 'ETH/USDT']
+    
+    async def find_session_opportunities(self, session: str) -> List[Dict]:
+        """
+        Find optimal trading opportunities for the current session
+        Returns list of trading signals optimized for session timing
+        
+        This provides:
+        - Session-optimal pairs (EUR/GBP during London, USD during NY, etc.)
+        - Adjusted confidence based on session liquidity
+        - Reasoning explaining why pair is good for this session
+        """
+        opportunities = []
+        
+        try:
+            # Get optimal pairs for this session
+            optimal_pairs = self.get_optimal_pairs_for_session()
+            
+            # Session multipliers
+            multipliers = {
+                'LONDON-NY_OVERLAP': 1.25,  # BEST
+                'LONDON': 1.15,
+                'NEW_YORK': 1.10,
+                'ASIA': 0.95,
+                'OFF_HOURS': 0.80
+            }
+            
+            multiplier = multipliers.get(session, 1.0)
+            
+            for symbol in optimal_pairs:
+                # Create session-optimized signal
+                signal = {
+                    'type': 'session_optimal',
+                    'symbol': symbol,
+                    'side': 'buy',  # Neutral signal, indicates good time to trade
+                    'confidence': 0.72 * multiplier,  # Base confidence adjusted by session
+                    'session': session,
+                    'session_multiplier': multiplier,
+                    'reasoning': self._get_session_reasoning(symbol, session, multiplier),
+                    'source': 'SessionAwareTrading',
+                    'timestamp': datetime.now().isoformat()
+                }
+                opportunities.append(signal)
+            
+            if opportunities:
+                logger.info(f"🕐 Generated {len(opportunities)} opportunities for {session} session")
+            
+        except Exception as e:
+            logger.error(f"🕐 Session opportunities error: {e}")
+        
+        return opportunities
+    
+    def _get_session_reasoning(self, symbol: str, session: str, multiplier: float) -> str:
+        """Generate reasoning for why this symbol is good in this session"""
+        
+        if session == 'LONDON-NY_OVERLAP':
+            return (f"{symbol} optimal during London-NY overlap. "
+                   f"Highest liquidity (25% confidence boost). "
+                   f"Best execution and tightest spreads.")
+        
+        elif session == 'LONDON':
+            if 'EUR' in symbol or 'GBP' in symbol:
+                return f"{symbol} peaks during London session. European markets most active."
+            return f"{symbol} tradable during London hours with good liquidity."
+        
+        elif session == 'NEW_YORK':
+            if 'USD' in symbol or 'USDT' in symbol:
+                return f"{symbol} optimal during NY session. US markets drive volume."
+            return f"{symbol} benefits from US trading hours."
+        
+        elif session == 'ASIA':
+            if 'JPY' in symbol or 'AUD' in symbol or 'BNB' in symbol:
+                return f"{symbol} strong during Asia session. Asian markets leading."
+            return f"{symbol} moderate liquidity during Asia hours."
+        
+        else:  # OFF_HOURS
+            return (f"{symbol} tradable during off-hours but with reduced liquidity. "
+                   f"Risk adjusted down 20%.")
