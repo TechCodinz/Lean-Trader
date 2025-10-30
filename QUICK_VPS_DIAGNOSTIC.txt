@@ -1,0 +1,44 @@
+===============================================================================
+🔍 QUICK VPS DIAGNOSTIC - Copy/Paste These Commands
+===============================================================================
+
+SSH INTO YOUR VPS FIRST:
+ssh root@YOUR_VPS_IP
+
+THEN RUN THESE 7 COMMANDS:
+===============================================================================
+
+1️⃣ CHECK RUNNING PROCESSES:
+ps aux | grep python | grep -v grep
+
+2️⃣ CHECK SCREEN SESSIONS:
+screen -ls
+
+3️⃣ CHECK RECENT BOT ACTIVITY:
+tail -50 ~/trading_bot/bot.log
+
+4️⃣ CHECK BOT FILES:
+ls -lh ~/trading_bot/*.py | head -20
+
+5️⃣ CHECK GIT BRANCH:
+cd ~/trading_bot && git branch
+
+6️⃣ CHECK RECENT COMMITS:
+git log --oneline -5
+
+7️⃣ CHECK CONFIGURATION:
+grep -E "GATE_API|ENABLE_LIVE|TRADING_MODE" ~/trading_bot/.env
+
+===============================================================================
+📋 COPY ALL OUTPUT ABOVE AND SEND TO AGENT
+===============================================================================
+
+Then the agent will:
+✅ See your REAL working bot
+✅ Create enhancements that fit YOUR setup
+✅ Give you ONE command to deploy everything
+✅ Include automatic backup and rollback
+✅ Guarantee everything works!
+
+NO GUESSWORK. NO BROKEN SETUPS. JUST WORKS! 🚀
+===============================================================================
