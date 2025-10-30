@@ -28,9 +28,10 @@ class SteadyProfitExtractor:
     Extracts steady profits through high-frequency, low-risk trading
     """
     
-    def __init__(self, data_hub, execution_engine):
+    def __init__(self, data_hub, gate_exchange, auto_profit_taker):
         self.data_hub = data_hub
-        self.execution = execution_engine
+        self.gate = gate_exchange  # Direct Gate.io access!
+        self.profit_taker = auto_profit_taker  # For closing positions
         
         # Profit targets (scales with balance)
         self.min_profit_per_trade = 0.50  # $0.50 minimum
@@ -48,12 +49,8 @@ class SteadyProfitExtractor:
         self.last_reset = datetime.now()
         self.trade_history = deque(maxlen=100)
         
-        # Fast-moving pairs (updated dynamically)
-        self.fast_pairs = [
-            'BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'BNB/USDT',
-            'PEPE/USDT', 'DOGE/USDT', 'SHIB/USDT',  # Volatile meme coins
-            'WIF/USDT', 'BONK/USDT',  # High volatility
-        ]
+        # Fast-moving pairs (GET FROM HUB, not hardcoded!)
+        self.fast_pairs = []  # Will populate from hub signals
         
         logger.info("💰 Steady Profit Extractor initialized")
         logger.info(f"   Target: {self.target_profit_pct*100:.1f}% per trade")
@@ -88,7 +85,13 @@ class SteadyProfitExtractor:
         confidence = signal.get('confidence', 0)
         side = signal.get('side', 'BUY')
         
-        # Must be fast-moving pair
+        # Update fast pairs from hub (dynamic!)
+        if not self.fast_pairs:
+            hub_signals = self.data_hub.get_signals(limit=100)
+            self.fast_pairs = list(set([s.get('symbol') for s in hub_signals if s.get('symbol')]))
+            logger.info(f"📡 STEADY got {len(self.fast_pairs)} pairs from hub")
+        
+        # Allow any pair from hub (all are opportunities!)
         if symbol not in self.fast_pairs:
             return None
         
@@ -97,7 +100,11 @@ class SteadyProfitExtractor:
             return None
         
         # Calculate position size for profit extraction
-        balance = 42.0  # Will get from exchange in production
+        try:
+            gate_balance = self.gate.fetch_balance()
+            balance = gate_balance['USDT']['free']
+        except:
+            balance = 25.0  # Fallback
         position_size = balance * 0.30  # Use 30% of balance per trade
         
         if position_size < 5:  # Minimum $5 position
@@ -199,38 +206,103 @@ class SteadyProfitExtractor:
             'avg_profit_per_trade': self.daily_profit / max(self.daily_trades, 1)
         }
     
+    async def execute_profit_trade(self, trade: Dict) -> bool:
+        """
+        Execute a profit extraction trade on Gate.io
+        
+        Returns True if successful
+        """
+        try:
+            symbol = trade['symbol']
+            side = trade['side']
+            entry_price = trade['entry_price']
+            position_size_usd = trade['position_size_usd']
+            
+            # Ensure minimum $3.50 for Gate.io
+            if position_size_usd < 3.5:
+                position_size_usd = 3.5
+            
+            # Calculate quantity
+            quantity = position_size_usd / entry_price
+            
+            logger.info(f"⚡ STEADY EXECUTING: {symbol} {side}")
+            logger.info(f"   Size: ${position_size_usd:.2f}")
+            logger.info(f"   Entry: ${entry_price:.4f}")
+            logger.info(f"   Target: ${trade['take_profit']:.4f} ({self.take_profit_pct*100:.1f}% profit)")
+            
+            # Execute on Gate.io
+            if side.upper() == 'BUY':
+                params = {'createMarketBuyOrderRequiresPrice': False}
+                order = await asyncio.to_thread(
+                    self.gate.create_market_buy_order,
+                    symbol,
+                    position_size_usd,
+                    params
+                )
+            else:  # SELL
+                order = await asyncio.to_thread(
+                    self.gate.create_market_sell_order,
+                    symbol,
+                    quantity
+                )
+            
+            logger.info(f"✅ STEADY EXECUTED: {symbol} {side}")
+            logger.info(f"   Order ID: {order.get('id', 'unknown')}")
+            
+            # Register with profit taker
+            if self.profit_taker:
+                self.profit_taker.register_position(
+                    symbol=symbol,
+                    side=side,
+                    entry_price=entry_price,
+                    size=quantity,
+                    strategy='normal'  # 1% profit target
+                )
+                logger.info(f"   📝 Registered with profit taker (1% target)")
+            
+            self.daily_trades += 1
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ STEADY execution failed: {e}")
+            return False
+    
     async def run_profit_extraction(self):
         """
         Continuously monitor for profit extraction opportunities
+        ACTIVELY EXECUTES on Gate.io!
         """
-        logger.info("💰 Starting profit extraction engine...")
+        logger.info("💰 Starting STEADY profit extraction...")
+        logger.info("   → Will actively trade on Gate.io with 0.8-1.2% targets!")
         
         while True:
             try:
-                # Get recent signals
-                if hasattr(self.data_hub, 'signal_queue'):
-                    try:
-                        signal = await asyncio.wait_for(
-                            self.data_hub.signal_queue.get(),
-                            timeout=1.0
-                        )
-                        
-                        # Analyze for extraction
-                        extraction_trade = await self.analyze_signal_for_extraction(signal)
-                        
-                        if extraction_trade:
-                            # Execute immediately (auto-execution!)
-                            logger.info(f"⚡ AUTO-EXECUTING profit extraction trade...")
-                            # In production, would call execution engine here
-                            
-                    except asyncio.TimeoutError:
-                        pass
+                # Get recent signals from ALL engines
+                hub_signals = self.data_hub.get_signals(limit=50)
                 
-                await asyncio.sleep(0.5)  # Fast loop for quick reactions
+                if not hub_signals:
+                    await asyncio.sleep(10)
+                    continue
+                
+                # Analyze each for profit extraction
+                for signal in hub_signals[:5]:  # Top 5 signals
+                    # Analyze if good for extraction
+                    extraction_trade = await self.analyze_signal_for_extraction(signal)
+                    
+                    if extraction_trade:
+                        # EXECUTE IMMEDIATELY on Gate.io!
+                        success = await self.execute_profit_trade(extraction_trade)
+                        
+                        if success:
+                            # Wait before next trade
+                            await asyncio.sleep(30)
+                
+                # Check every 30 seconds for new opportunities
+                await asyncio.sleep(30)
                 
             except Exception as e:
-                logger.error(f"Profit extraction error: {e}")
-                await asyncio.sleep(5)
+                logger.error(f"❌ STEADY profit extraction error: {e}")
+                await asyncio.sleep(30)
 
 
 class FastScalper:
