@@ -1668,15 +1668,20 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             
             # AGGRESSIVE SCALPING - Fast wallet growth!
             try:
+                gate_ex = self.micro_wallet_grower.gate if hasattr(self, 'micro_wallet_grower') else None
+                profit_tk = self.auto_profit_taker if hasattr(self, 'auto_profit_taker') else None
+                
                 self.aggressive_scalper = AggressiveScalpingEngine(
-                    exchange=self.micro_wallet_grower.gate if hasattr(self, 'micro_wallet_grower') else None
+                    exchange=gate_ex,
+                    auto_profit_taker=profit_tk
                 )
                 self.scalping_coordinator = ScalpingCoordinator(max_concurrent=5)
                 self.advanced_orchestrators['aggressive_scalper'] = self.aggressive_scalper
                 logger.info("✅ 🔥 AGGRESSIVE SCALPING ENGINE WIRED!")
-                logger.info("   → Scans every 10 seconds")
+                logger.info("   → Connected to Gate.io for REAL trading!")
+                logger.info("   → Scans every 10 seconds, executes immediately!")
                 logger.info("   → 0.2-0.5% quick profits")
-                logger.info("   → 10-30 trades per hour possible!")
+                logger.info("   → Will ACTIVELY execute scalps!")
             except Exception as e:
                 logger.warning(f"⚠️  Aggressive scalper: {e}")
                 self.aggressive_scalper = None
@@ -1889,29 +1894,39 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                         if scalp_signals:
                             logger.info(f"🔥 AGGRESSIVE SCALPER: Found {len(scalp_signals)} fast opportunities!")
                             
+                            trades_executed = 0
+                            max_scalps_per_cycle = 2  # Execute 2 scalps per 10-second cycle
+                            
                             # Filter through coordinator (max 5 concurrent)
                             for signal in scalp_signals:
+                                if trades_executed >= max_scalps_per_cycle:
+                                    break
+                                
                                 if self.scalping_coordinator.can_take_scalp():
-                                    # Publish to data hub
-                                    signal['timestamp'] = datetime.now().isoformat()
-                                    self.data_hub.publish_signal(signal)
-                                    
                                     # Share with swarm for voting
                                     signal_with_votes = await self.collective_swarm.share_signal('AGGRESSIVE_SCALPER', signal)
                                     
-                                    # Track scalp
-                                    self.scalping_coordinator.add_scalp(signal)
-                                    
-                                    # Log signal (first 3 only)
-                                    if scalp_signals.index(signal) < 3:
-                                        strategy = signal.get('strategy', '')
-                                        symbol = signal.get('symbol', '')
-                                        side = signal.get('side', '').upper()
-                                        profit = signal.get('profit_target_pct', 0)
-                                        urgency = signal.get('urgency', 'NORMAL')
-                                        logger.info(f"   ⚡ [{urgency}] {strategy}: {symbol} {side} - {profit:.2f}% target")
+                                    # Check swarm approval
+                                    if signal_with_votes.get('swarm_confidence', 0) >= 0.50:
+                                        # EXECUTE DIRECTLY on Gate.io!
+                                        success = await self.aggressive_scalper.execute_scalp(signal_with_votes)
+                                        
+                                        if success:
+                                            trades_executed += 1
+                                            self.scalping_coordinator.add_scalp(signal)
+                                            
+                                            # Log execution
+                                            strategy = signal.get('strategy', '')
+                                            symbol = signal.get('symbol', '')
+                                            side = signal.get('side', '').upper()
+                                            profit = signal.get('profit_target_pct', 0)
+                                            logger.info(f"   ✅ EXECUTED [{trades_executed}/2]: {symbol} {side} - {profit:.2f}% target")
+                                            
+                                            # Wait between scalps
+                                            await asyncio.sleep(3)
                             
-                            logger.info(f"✅ Published {len(scalp_signals)} aggressive scalp signals!")
+                            if trades_executed > 0:
+                                logger.info(f"✅ AGGRESSIVE: Executed {trades_executed} scalps this cycle!")
                             
                             # Show stats every 10 cycles (every 100 seconds)
                             if cycle % 10 == 0:

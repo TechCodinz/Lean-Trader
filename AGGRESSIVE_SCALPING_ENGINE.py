@@ -36,8 +36,9 @@ class AggressiveScalpingEngine:
     This is how you grow $25 to $250 in a week!
     """
     
-    def __init__(self, exchange=None):
+    def __init__(self, exchange=None, auto_profit_taker=None):
         self.exchange = exchange
+        self.profit_taker = auto_profit_taker
         self.enabled = True
         
         # Fast timeframes for scalping
@@ -291,6 +292,66 @@ class AggressiveScalpingEngine:
                 logger.info(f"   ⚡ {strategy}: {symbol} {side} - {profit:.2f}% target")
         
         return all_signals
+    
+    async def execute_scalp(self, signal: Dict) -> bool:
+        """
+        Execute a scalp trade directly on Gate.io
+        
+        Returns True if successful
+        """
+        if not self.exchange:
+            return False
+        
+        try:
+            symbol = signal['symbol']
+            side = signal['side']
+            entry = signal['entry']
+            profit_target_pct = signal['profit_target_pct'] / 100  # Convert to decimal
+            
+            # Position size: $3.50 (meets Gate.io minimum)
+            position_size_usd = 3.5
+            quantity = position_size_usd / entry
+            
+            logger.info(f"⚡ AGGRESSIVE EXECUTING: {symbol} {side.upper()}")
+            logger.info(f"   Entry: ${entry:.4f}")
+            logger.info(f"   Target: {profit_target_pct*100:.2f}% profit")
+            logger.info(f"   Size: ${position_size_usd:.2f}")
+            
+            # Execute on Gate.io
+            if side.lower() == 'buy':
+                params = {'createMarketBuyOrderRequiresPrice': False}
+                order = await asyncio.to_thread(
+                    self.exchange.create_market_buy_order,
+                    symbol,
+                    position_size_usd,
+                    params
+                )
+            else:  # sell
+                order = await asyncio.to_thread(
+                    self.exchange.create_market_sell_order,
+                    symbol,
+                    quantity
+                )
+            
+            logger.info(f"✅ AGGRESSIVE SCALP EXECUTED: {symbol} {side.upper()}")
+            logger.info(f"   Order ID: {order.get('id', 'unknown')}")
+            
+            # Register with profit taker
+            if self.profit_taker:
+                self.profit_taker.register_position(
+                    symbol=symbol,
+                    side=side,
+                    entry_price=entry,
+                    size=quantity,
+                    strategy='quick_scalp'  # 0.3% target
+                )
+                logger.info(f"   📝 Registered for {profit_target_pct*100:.2f}% profit target")
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Aggressive scalp execution failed: {e}")
+            return False
     
     def get_stats(self) -> Dict:
         """Get scalping statistics"""
