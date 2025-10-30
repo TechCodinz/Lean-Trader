@@ -1100,11 +1100,20 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
         
         # STEADY PROFIT EXTRACTOR - THE CORE PROFIT ENGINE! (9KB)
         try:
-            self.steady_profit = SteadyProfitExtractor(self.data_hub, self.advanced_orchestrators.get('execution'))
-            self.advanced_systems['steady_profit'] = self.steady_profit
-            logger.info("✅ 💰 STEADY PROFIT EXTRACTOR - $10-40 daily on ALL timeframes!")
-            logger.info("   → Target: 0.8% per trade, 10-30 trades/day")
-            logger.info("   → Profit regardless of other models!")
+            # Give Steady Profit direct Gate.io access!
+            gate_exchange = self.micro_wallet_grower.gate if hasattr(self, 'micro_wallet_grower') else None
+            profit_taker = self.auto_profit_taker if hasattr(self, 'auto_profit_taker') else None
+            
+            if gate_exchange and profit_taker:
+                self.steady_profit = SteadyProfitExtractor(self.data_hub, gate_exchange, profit_taker)
+                self.advanced_systems['steady_profit'] = self.steady_profit
+                logger.info("✅ 💰 STEADY PROFIT EXTRACTOR - $10-40 daily on ALL timeframes!")
+                logger.info("   → Connected to Gate.io for REAL trading!")
+                logger.info("   → Target: 0.8% per trade, 1.2% profit, 0.8% stop")
+                logger.info("   → Will ACTIVELY execute trades with profit strategy!")
+            else:
+                logger.warning("⚠️  Steady Profit needs Gate.io and Profit Taker")
+                self.steady_profit = None
         except Exception as e:
             logger.warning(f"⚠️  Steady Profit: {e}")
             self.steady_profit = None
@@ -2274,8 +2283,9 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                         logger.error(traceback.format_exc())
                         await asyncio.sleep(30)
             
-            tasks.append(asyncio.create_task(run_steady_profit()))
-            logger.info("✅ 💰 STEADY PROFIT EXTRACTOR ACTIVE - $10-40 daily, ALL timeframes!")
+            # Use the Steady Profit's OWN execution method!
+            tasks.append(asyncio.create_task(self.steady_profit.run_profit_extraction()))
+            logger.info("✅ 💰 STEADY PROFIT EXTRACTOR ACTIVE - Trading on Gate.io with profit strategy!")
         
         # SESSION FILTER - Best session trading
         if self.session_clock and self.session_filter:
