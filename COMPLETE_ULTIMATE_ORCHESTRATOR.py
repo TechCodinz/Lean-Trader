@@ -283,7 +283,7 @@ except (ImportError, ModuleNotFoundError):
 from REVOLUTIONARY_AI_FEATURES import RevolutionaryAIManager
 
 # Persistence Manager - Load learned memory/databases
-from PERSISTENCE_MANAGER import PersistenceManager, initialize_persistence
+from PERSISTENCE_MANAGER import PersistenceManager
 
 # ============================================================================
 # CRITICAL MISSING SYSTEMS - Online Learner, News, Alpha, Awareness
