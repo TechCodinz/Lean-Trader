@@ -84,6 +84,18 @@ except Exception as e:
     APEX_SYSTEMS_AVAILABLE['leverage'] = False
     logger.warning(f"⚠️ Leverage optimizer unavailable: {e}")
 
+# QUANTUM ENHANCEMENTS - The final 15%!
+try:
+    from QUANTUM_ENHANCEMENTS import (
+        initialize_quantum_enhancements,
+        get_quantum_coordinator
+    )
+    APEX_SYSTEMS_AVAILABLE['quantum'] = True
+    logger.info("🌌 QUANTUM ENHANCEMENTS loaded - Pushing to 88%!")
+except Exception as e:
+    APEX_SYSTEMS_AVAILABLE['quantum'] = False
+    logger.warning(f"⚠️ Quantum enhancements unavailable: {e}")
+
 # Count active APEX systems
 APEX_ACTIVE_COUNT = sum(1 for v in APEX_SYSTEMS_AVAILABLE.values() if v)
 
@@ -169,6 +181,16 @@ class CompleteProfitSystem:
             except Exception as e:
                 logger.warning(f"⚠️ Leverage optimizer failed: {e}")
                 self.leverage_optimizer = None
+        
+        # QUANTUM ENHANCEMENTS
+        self.quantum_coordinator = None
+        if APEX_SYSTEMS_AVAILABLE.get('quantum'):
+            try:
+                self.quantum_coordinator = initialize_quantum_enhancements()
+                logger.info("🌌 Quantum enhancements initialized - 88% power!")
+            except Exception as e:
+                logger.warning(f"⚠️ Quantum enhancements failed: {e}")
+                self.quantum_coordinator = None
         
         # INFINITE GROWTH TIERS (with leverage logic but adapted for SPOT)
         self.tiers = {
