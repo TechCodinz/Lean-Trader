@@ -430,41 +430,28 @@ class CompleteUnifiedOrchestrator:
         self.pattern_memory = PatternMemory()
         self.ledger = Ledger()
         
-        # DYNAMIC UNIVERSE - Use discovered pairs if available!
-        if hasattr(self, 'dynamic_pairs') and self.dynamic_pairs and len(self.dynamic_pairs) > 100:
-            # Use discovered pairs (5,587+ pairs!)
+        # DYNAMIC UNIVERSE - Get from Universal Pair Fetcher!
+        universe = []
+        
+        # Priority 1: Universal Pair Fetcher (2000+ pairs!)
+        try:
+            from UNIVERSAL_PAIR_FETCHER import get_universal_fetcher
+            fetcher = get_universal_fetcher()
+            if fetcher and fetcher.all_pairs:
+                universe = fetcher.all_pairs
+                logger.info(f"🌍 USING UNIVERSAL FETCHER: {len(universe)} pairs!")
+        except Exception as e:
+            logger.debug(f"Universal fetcher not ready: {e}")
+        
+        # Priority 2: dynamic_pairs attribute
+        if not universe and hasattr(self, 'dynamic_pairs') and self.dynamic_pairs:
             universe = self.dynamic_pairs
             logger.info(f"🌍 DYNAMIC UNIVERSE: {len(universe)} discovered pairs!")
-        else:
-            # Fallback universe (will expand after discovery)
-            universe = [
-                # Top Crypto (35 pairs)
-                'BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'SOL/USDT', 'ADA/USDT',
-                'XRP/USDT', 'DOGE/USDT', 'DOT/USDT', 'MATIC/USDT', 'SHIB/USDT',
-                'AVAX/USDT', 'LINK/USDT', 'UNI/USDT', 'ATOM/USDT', 'LTC/USDT',
-                'BCH/USDT', 'NEAR/USDT', 'APT/USDT', 'ARB/USDT', 'OP/USDT',
-                'FTM/USDT', 'ALGO/USDT', 'VET/USDT', 'SAND/USDT', 'MANA/USDT',
-                'AXS/USDT', 'THETA/USDT', 'FIL/USDT', 'PEPE/USDT', 'WLD/USDT',
-                'INJ/USDT', 'SUI/USDT', 'SEI/USDT', 'TIA/USDT', 'ORDI/USDT',
-                
-                # Forex (20 pairs)
-                'EUR/USD', 'GBP/USD', 'USD/JPY', 'AUD/USD', 'USD/CAD',
-                'USD/CHF', 'NZD/USD', 'EUR/GBP', 'EUR/JPY', 'GBP/JPY',
-                'AUD/JPY', 'EUR/CHF', 'GBP/CHF', 'EUR/AUD', 'GBP/AUD',
-                'AUD/CAD', 'NZD/JPY', 'CAD/JPY', 'EUR/NZD', 'GBP/NZD',
-                
-                # Top Stocks (24 pairs) 
-                'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'NVDA',
-                'META', 'JPM', 'V', 'WMT', 'JNJ', 'PG',
-                'MA', 'HD', 'BAC', 'DIS', 'NFLX', 'ADBE',
-                'CRM', 'PYPL', 'INTC', 'CSCO', 'PFE', 'KO',
-                
-                # Commodities (13 pairs)
-                'GOLD', 'SILVER', 'OIL', 'NATGAS', 'COPPER',
-                'PLATINUM', 'WHEAT', 'CORN', 'SOYBEAN', 'COFFEE',
-                'SUGAR', 'COTTON', 'COCOA',
-            ]
-            logger.info(f"🌌 Base Universe: {len(universe)} pairs (expanding to 5000+ after discovery)")
+        
+        # Minimal fallback (only if fetcher hasn't run yet)
+        if not universe:
+            universe = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'BNB/USDT', 'XRP/USDT']
+            logger.warning(f"⚠️  TEMPORARY FALLBACK: {len(universe)} pairs (Universal Fetcher will expand this!)")
         self.ultra_core = UltraCore(self.router, universe, logger)
         
         awareness_cfg = AwarenessConfig()
