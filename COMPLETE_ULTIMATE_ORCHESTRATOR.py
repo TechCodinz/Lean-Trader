@@ -1100,13 +1100,38 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
         
         # STEADY PROFIT EXTRACTOR - THE CORE PROFIT ENGINE! (9KB)
         try:
-            # Give Steady Profit direct Gate.io access!
-            gate_exchange = self.micro_wallet_grower.gate if hasattr(self, 'micro_wallet_grower') else None
-            profit_taker = self.auto_profit_taker if hasattr(self, 'auto_profit_taker') else None
+            # Create standalone Gate.io connection for profit engines (doesn't need micro_wallet_grower)
+            import ccxt
+            import os
+            gate_key = os.getenv('GATE_API_KEY', 'a0508d8aadf3bcb76e16f4373e1f3a76')
+            gate_secret = os.getenv('GATE_API_SECRET', '451770a07dbede1b87bb92f5ce98e24029d2fe91e0053be2ec41771c953113f9')
+            
+            # Create dedicated Gate.io connection for profit engines
+            gate_exchange = ccxt.gate({
+                'apiKey': gate_key,
+                'secret': gate_secret,
+                'enableRateLimit': True
+            })
+            gate_exchange.load_markets()  # Pre-load markets
+            
+            # Get profit taker (auto-initialized from micro_wallet_grower if available, otherwise create standalone)
+            profit_taker = self.auto_profit_taker if hasattr(self, 'auto_profit_taker') and self.auto_profit_taker else None
+            
+            # Initialize profit taker if needed
+            if not profit_taker:
+                try:
+                    from AUTO_PROFIT_TAKER import AutoProfitTaker
+                    profit_taker = AutoProfitTaker(gate_exchange, self.data_hub)
+                    self.auto_profit_taker = profit_taker
+                    logger.info("✅ 💰 AUTO PROFIT TAKER initialized (standalone)")
+                except Exception as e:
+                    logger.warning(f"⚠️  Could not init standalone profit taker: {e}")
             
             if gate_exchange and profit_taker:
                 self.steady_profit = SteadyProfitExtractor(self.data_hub, gate_exchange, profit_taker)
                 self.advanced_systems['steady_profit'] = self.steady_profit
+                # Store gate connection for other engines too
+                self.profit_gate_exchange = gate_exchange
                 logger.info("✅ 💰 STEADY PROFIT EXTRACTOR - $10-40 daily on ALL timeframes!")
                 logger.info("   → Connected to Gate.io for REAL trading!")
                 logger.info("   → Target: 0.8% per trade, 1.2% profit, 0.8% stop")
@@ -1668,8 +1693,25 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             
             # AGGRESSIVE SCALPING - Fast wallet growth!
             try:
-                gate_ex = self.micro_wallet_grower.gate if hasattr(self, 'micro_wallet_grower') else None
-                profit_tk = self.auto_profit_taker if hasattr(self, 'auto_profit_taker') else None
+                # Use standalone profit gate exchange if available, otherwise fallback to micro_wallet_grower
+                gate_ex = getattr(self, 'profit_gate_exchange', None) or (self.micro_wallet_grower.gate if hasattr(self, 'micro_wallet_grower') and self.micro_wallet_grower else None)
+                
+                # If still None, create standalone connection
+                if not gate_ex:
+                    import ccxt
+                    import os
+                    gate_key = os.getenv('GATE_API_KEY', 'a0508d8aadf3bcb76e16f4373e1f3a76')
+                    gate_secret = os.getenv('GATE_API_SECRET', '451770a07dbede1b87bb92f5ce98e24029d2fe91e0053be2ec41771c953113f9')
+                    gate_ex = ccxt.gate({
+                        'apiKey': gate_key,
+                        'secret': gate_secret,
+                        'enableRateLimit': True
+                    })
+                    gate_ex.load_markets()
+                    self.profit_gate_exchange = gate_ex
+                    logger.info("✅ Created standalone Gate.io connection for aggressive scalper")
+                
+                profit_tk = self.auto_profit_taker if hasattr(self, 'auto_profit_taker') and self.auto_profit_taker else None
                 
                 self.aggressive_scalper = AggressiveScalpingEngine(
                     exchange=gate_ex,
@@ -2756,10 +2798,10 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                         logger.error(traceback.format_exc())
                         await asyncio.sleep(60)
             
-            # ENABLED - MICRO wallet grower with profit strategy from COMPLETE_PROFIT_SYSTEM
-            # Uses fee/slippage safeguards and proper profit targets
-            tasks.append(asyncio.create_task(run_micro_wallet_growth()))
-            logger.info("✅ 💎 MICRO WALLET GROWER ACTIVE - Growing wallet with profit strategy!")
+            # DISABLED - MICRO just churns without profit strategy, loses on fees!
+            # Using SCALPERS instead - they have REAL profit targets!
+            # tasks.append(asyncio.create_task(run_micro_wallet_growth()))
+            logger.info("⚠️  MICRO WALLET GROWER DISABLED - Using scalpers with profit strategies instead!")
         
         # ====================================================================
         # SWARM OPPORTUNITY SCANNER - Catches ALL missed opportunities! 🐝

@@ -95,8 +95,9 @@ class SteadyProfitExtractor:
         if symbol not in self.fast_pairs:
             return None
         
-        # Must have decent confidence
-        if confidence < 0.70:
+        # Must have decent confidence (lowered from 0.70 to 0.55 for more opportunities)
+        # Surface fix: Previous agent had this at 0.55-0.60 for better execution
+        if confidence < 0.55:
             return None
         
         # Calculate position size for profit extraction
