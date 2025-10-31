@@ -63,18 +63,25 @@ if len(sys.argv) > 1:
         elif arg == '--auto-confirm':
             auto_confirm = True
 
-# Safety check for live mode (skip if auto-confirm for systemd)
+# Safety check for live mode (skip if auto-confirm or stdin not available)
 if mode == 'live' and not auto_confirm:
-    print("⚠️  LIVE MODE - Trading with real money!")
-    try:
-        response = input("Are you sure? Type 'YES' to confirm: ")
-        if response != 'YES':
-            print("Cancelled.")
-            sys.exit(0)
-    except EOFError:
-        # Running as service without stdin - auto-confirm
-        print("⚠️  Running as background service - auto-confirming live mode")
-        pass
+    # Check if stdin is available (not running in background/nohup)
+    stdin_available = sys.stdin.isatty() if hasattr(sys.stdin, 'isatty') else False
+    
+    if stdin_available:
+        print("⚠️  LIVE MODE - Trading with real money!")
+        try:
+            response = input("Are you sure? Type 'YES' to confirm: ")
+            if response != 'YES':
+                print("Cancelled.")
+                sys.exit(0)
+        except (EOFError, OSError):
+            # Running as service without stdin - auto-confirm
+            print("⚠️  Running as background service - auto-confirming live mode")
+    else:
+        # Stdin not available (nohup/background) - auto-confirm
+        print("⚠️  LIVE MODE - Trading with real money!")
+        print("⚠️  Running in background (no stdin) - auto-confirming live mode")
 
 print(f"🎯 Mode: {mode.upper()}")
 print()
