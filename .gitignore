@@ -34,3 +34,7 @@ Thumbs.db
 tmp/
 temp/
 *.tmp
+venv/
+apex_venv/
+*.so
+*.so.*
