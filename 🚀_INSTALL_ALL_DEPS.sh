@@ -45,12 +45,15 @@ pip install --no-cache-dir \
     qiskit-algorithms \
     qiskit-ibm-runtime \
     qrcode[pil] \
+    Pillow \
     stripe \
     "tzlocal<5" \
     pytz \
     APScheduler \
     matplotlib \
-    seaborn
+    seaborn \
+    sqlalchemy \
+    python-dateutil
 
 echo
 echo "=========================================="
@@ -70,6 +73,9 @@ try:
     import langchain
     import telegram
     import bs4
+    from PIL import Image  # qrcode dependency
+    import sqlalchemy
+    import dateutil
     print('✅ All critical dependencies verified!')
 except ImportError as e:
     print(f'❌ Missing: {e}')

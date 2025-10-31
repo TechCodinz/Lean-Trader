@@ -70,3 +70,10 @@ APScheduler>=3.10.0
 # ============================================================================
 matplotlib>=3.7.0
 seaborn>=0.12.0
+
+# ============================================================================
+# ADDITIONAL (from deployment errors)
+# ============================================================================
+Pillow>=10.0.0  # Required for qrcode[pil]
+sqlalchemy>=2.0.0  # Database (if used)
+python-dateutil>=2.8.0  # Date utilities
