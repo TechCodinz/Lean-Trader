@@ -1191,12 +1191,39 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
         
         # MICRO_GATE_BOT - Grows ANY wallet from $1 to infinite!
         try:
-            self.micro_wallet_grower = MICRO_GATE_BOT()
+            # Initialize AUTO_PROFIT_TAKER first (if not already initialized)
+            if not hasattr(self, 'auto_profit_taker') or not self.auto_profit_taker:
+                try:
+                    from AUTO_PROFIT_TAKER import AutoProfitTaker
+                    # Get gate exchange from config (will create if needed)
+                    import ccxt
+                    import os
+                    gate_key = os.getenv('GATE_API_KEY', 'a0508d8aadf3bcb76e16f4373e1f3a76')
+                    gate_secret = os.getenv('GATE_API_SECRET', '451770a07dbede1b87bb92f5ce98e24029d2fe91e0053be2ec41771c953113f9')
+                    gate_exchange = ccxt.gate({
+                        'apiKey': gate_key,
+                        'secret': gate_secret,
+                        'enableRateLimit': True
+                    })
+                    gate_exchange.load_markets()
+                    self.auto_profit_taker = AutoProfitTaker(gate_exchange, self.data_hub)
+                    logger.info("✅ 💰 AUTO PROFIT TAKER initialized for MICRO")
+                except Exception as e:
+                    logger.warning(f"⚠️  Could not init profit taker for MICRO: {e}")
+                    self.auto_profit_taker = None
+            
+            # Initialize MICRO_GATE_BOT with profit taker and data hub
+            self.micro_wallet_grower = MICRO_GATE_BOT(
+                auto_profit_taker=self.auto_profit_taker if hasattr(self, 'auto_profit_taker') else None,
+                data_hub=self.data_hub
+            )
             self.advanced_systems['micro_wallet_grower'] = self.micro_wallet_grower
             logger.info("✅ 💎 MICRO WALLET GROWER - Grows from $1 to INFINITE!")
             logger.info("   → Auto-detects balance and scales positions")
             logger.info("   → MICRO positions (0.0001 BTC, 50 DOGE)")
-            logger.info("   → Aggressive growth strategy")
+            logger.info("   → Profit strategy: 0.5% target, 1.5% stop, fee-aware!")
+            logger.info("   → Auto profit taker integration (positions close automatically!)")
+            logger.info("   → Symbol cooldown (avoids fee churn)")
             
             # Initialize MONEY PRINTER ULTRA RARE (uses Gate.io exchange)
             try:
@@ -2764,17 +2791,10 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                                 if result:
                                     trades_executed += 1
                                     logger.info(f"✅ MICRO executed: {symbol} {side.upper()} (Trade {trades_executed}/{max_trades_per_cycle})")
+                                    logger.info(f"   📝 Position auto-registered in execute_trade (0.5% target, 1.5% stop)")
                                     
-                                    # Register position with profit taker
-                                    if hasattr(self, 'auto_profit_taker') and self.auto_profit_taker:
-                                        self.auto_profit_taker.register_position(
-                                            symbol=symbol,
-                                            side=side,
-                                            entry_price=price,
-                                            size=position_size,
-                                            strategy='quick_scalp'  # Micro = quick scalps
-                                        )
-                                        logger.info(f"   📝 Position registered with profit taker")
+                                    # Note: execute_trade() already registers with AUTO_PROFIT_TAKER
+                                    # No need to register again here
                                     
                                     # Wait a bit before next trade (avoid rate limits)
                                     await asyncio.sleep(2)
@@ -2798,10 +2818,13 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                         logger.error(traceback.format_exc())
                         await asyncio.sleep(60)
             
-            # DISABLED - MICRO just churns without profit strategy, loses on fees!
-            # Using SCALPERS instead - they have REAL profit targets!
-            # tasks.append(asyncio.create_task(run_micro_wallet_growth()))
-            logger.info("⚠️  MICRO WALLET GROWER DISABLED - Using scalpers with profit strategies instead!")
+            # ENABLED - MICRO wallet grower NOW HAS profit strategy!
+            # - Fee/slippage awareness (won't lose on fees)
+            # - Auto profit taker integration (positions close at 0.5% profit)
+            # - Symbol cooldown (avoids fee churn)
+            # - Multi-timeframe analysis
+            tasks.append(asyncio.create_task(run_micro_wallet_growth()))
+            logger.info("✅ 💎 MICRO WALLET GROWER ACTIVE - With profit strategy & auto profit taker!")
         
         # ====================================================================
         # SWARM OPPORTUNITY SCANNER - Catches ALL missed opportunities! 🐝

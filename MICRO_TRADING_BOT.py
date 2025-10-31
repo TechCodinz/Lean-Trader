@@ -5,7 +5,7 @@ import requests
 from datetime import datetime
 
 class MICRO_GATE_BOT:
-    def __init__(self):
+    def __init__(self, auto_profit_taker=None, data_hub=None):
         # TELEGRAM CONFIGURATION
         self.telegram_bot_token = "8291641352:AAFTGq-hIY_iS47aMOoGXrBDFlR_B3nCupg"
         self.admin_chat_id = "5329503447"
@@ -22,6 +22,18 @@ class MICRO_GATE_BOT:
 
         # Initialize Gate.io exchange
         self.gate = ccxt.gate(self.gate_config)
+        
+        # PROFIT TAKER INTEGRATION - CRITICAL FOR AUTO CLOSING POSITIONS!
+        self.auto_profit_taker = auto_profit_taker
+        self.data_hub = data_hub
+        
+        # PROFIT STRATEGY - Like aggressive scalper!
+        self.profit_target_pct = 0.005  # 0.5% profit target (micro positions)
+        self.stop_loss_pct = 0.015  # 1.5% stop loss
+        self.fee_rate_round_trip = 0.004  # 0.4% round-trip fees
+        self.min_net_profit_usd = 0.02  # Minimum $0.02 net profit after fees
+        self.symbol_cooldown_minutes = 3  # Avoid fee churn
+        self._last_executed_at = {}  # Track last execution per symbol
 
         # MICRO POSITION SIZES - VERY SMALL TO ENSURE SUFFICIENT BALANCE
         # These are extremely conservative to avoid "BALANCE_NOT_ENOUGH" errors
@@ -155,9 +167,27 @@ class MICRO_GATE_BOT:
             return "HOLD", 0, 0, 0, 0
 
     def execute_trade(self, symbol, signal, price, quantity=None):
-        """Execute trade with micro position sizing"""
+        """
+        Execute trade with micro position sizing AND profit strategy!
+        
+        NOW WITH:
+        - Fee/slippage awareness
+        - Auto profit taker registration
+        - Cooldown per symbol to avoid fee churn
+        - Minimum net profit check
+        """
+        from datetime import datetime, timedelta
+        import time
+        
         print(f"🔍 execute_trade called: {symbol} {signal} price={price} qty={quantity}")
         try:
+            # COOLDOWN CHECK - Avoid fee churn!
+            if symbol in self._last_executed_at:
+                elapsed = (datetime.now() - self._last_executed_at[symbol]).total_seconds() / 60
+                if elapsed < self.symbol_cooldown_minutes:
+                    print(f"⏸️  {symbol} in cooldown ({elapsed:.1f}m < {self.symbol_cooldown_minutes}m)")
+                    return None
+            
             # SAFETY CHECK: Stop if daily loss limit reached
             print(f"   Checking daily loss: {self.daily_loss:.2f} / {self.max_daily_loss:.2f}")
             if self.daily_loss >= self.max_daily_loss:
@@ -174,8 +204,27 @@ class MICRO_GATE_BOT:
             else:
                 position_size = quantity
             
+            position_cost = price * position_size
+            
+            # FEE/SLIPPAGE AWARENESS - Don't lose money on fees!
+            fees = position_cost * self.fee_rate_round_trip
+            slippage_bps = 10  # 0.1% slippage
+            slippage_cost = position_cost * (slippage_bps / 10000.0)
+            expected_profit = position_cost * self.profit_target_pct
+            net_expected = expected_profit - fees - slippage_cost
+            
+            print(f"   Position cost: ${position_cost:.2f}")
+            print(f"   Expected profit: ${expected_profit:.4f}")
+            print(f"   Fees: ${fees:.4f}, Slippage: ${slippage_cost:.4f}")
+            print(f"   Net expected: ${net_expected:.4f}")
+            
+            # Profitability check - avoid trades that lose to fees!
+            if net_expected < self.min_net_profit_usd:
+                print(f"❌ {symbol}: Net expected ${net_expected:.4f} < min ${self.min_net_profit_usd:.2f} - SKIPPING (would lose on fees)")
+                return None
+            
             # Calculate required balance
-            required_balance = price * position_size * 1.1  # Add 10% buffer for fees
+            required_balance = position_cost * 1.1  # Add 10% buffer for fees
 
             print(f"   Balance check: have ${balance:.2f}, need ${required_balance:.2f}")
             if balance < required_balance:
@@ -183,25 +232,58 @@ class MICRO_GATE_BOT:
                 return None
 
             print(f"   Signal type: {signal.upper()}")
+            order = None
+            executed_quantity = position_size
+            
             if signal.upper() == "BUY":
                 print(f"   Creating BUY order...")
                 # Gate.io market buy needs COST (total $ to spend), not quantity
-                cost_to_spend = price * position_size
+                cost_to_spend = position_cost
                 print(f"   Buying ${cost_to_spend:.2f} worth of {symbol}")
                 params = {'createMarketBuyOrderRequiresPrice': False}
                 order = self.gate.create_market_buy_order(symbol, cost_to_spend, params)
+                
+                # Get actual executed quantity from order
+                if order and 'filled' in order:
+                    executed_quantity = order['filled']
+                elif order and 'amount' in order:
+                    executed_quantity = order['amount']
+                
                 print(f"✅ MICRO BUY EXECUTED: {symbol} - Spent ${cost_to_spend:.2f}")
                 print(f"   Order ID: {order.get('id', 'unknown')}")
-                return order
+                print(f"   Quantity: {executed_quantity}")
+                
             elif signal.upper() == "SELL":
                 print(f"   Selling {position_size} {symbol}")
                 order = self.gate.create_market_sell_order(symbol, position_size)
+                executed_quantity = position_size
                 print(f"✅ MICRO SELL EXECUTED: {symbol} @ ${price:.4f} | Size: {position_size}")
                 print(f"   Order ID: {order.get('id', 'unknown')}")
-                return order
             else:
                 print(f"⚠️ Unknown signal type: {signal}")
                 return None
+            
+            # REGISTER WITH AUTO PROFIT TAKER - CRITICAL!
+            if order and self.auto_profit_taker:
+                try:
+                    entry_price = price
+                    side = signal.upper().lower()  # 'buy' or 'sell'
+                    
+                    self.auto_profit_taker.register_position(
+                        symbol=symbol,
+                        side=side,
+                        entry_price=entry_price,
+                        size=executed_quantity,
+                        strategy='micro_scalp'  # 0.5% target
+                    )
+                    print(f"   📝 Registered with AUTO PROFIT TAKER (0.5% target, 1.5% stop)")
+                except Exception as e:
+                    print(f"   ⚠️  Failed to register with profit taker: {e}")
+            
+            # Record execution time for cooldown
+            self._last_executed_at[symbol] = datetime.now()
+            
+            return order
 
         except Exception as e:
             print(f"❌ Trade execution failed: {e}")

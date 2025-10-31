@@ -29,6 +29,7 @@ class AutoProfitTaker:
         
         # Profit taking settings
         self.profit_targets = {
+            'micro_scalp': 0.005,  # 0.5% for micro scalps
             'quick_scalp': 0.003,  # 0.3% for quick scalps
             'normal': 0.01,  # 1% for normal trades
             'swing': 0.03,  # 3% for swing trades
