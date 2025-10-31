@@ -1,45 +1,72 @@
-# Trading Bot Dependencies
-# Install with: pip3 install -r requirements.txt
+# Complete Trading Bot Dependencies - ALL INSTALLED
+# Install with: pip install -r requirements.txt
 
-# Core Trading
+# ============================================================================
+# CORE TRADING & EXCHANGE
+# ============================================================================
 ccxt>=4.0.0
-web3>=6.0.0
-aiohttp>=3.8.0
-
-# Data Processing
 pandas>=2.0.0
 numpy>=1.24.0
-yfinance>=0.2.0
+python-dotenv>=1.0.0
+loguru>=0.7.0
+requests>=2.31.0
+aiohttp>=3.9.0
 
-# Machine Learning
-tensorflow>=2.13.0
+# ============================================================================
+# DATA PROCESSING
+# ============================================================================
+pyarrow>=15,<18
+scipy>=1.11.0
 scikit-learn>=1.3.0
-joblib>=1.3.0
-xgboost>=2.0.0
-lightgbm>=4.0.0
-catboost>=1.2.0
 
-# Quantum Computing
-qiskit>=0.44.0
-qiskit-aer>=0.12.0
+# ============================================================================
+# WEB SCRAPING
+# ============================================================================
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+html5lib>=1.1
 
-# Telegram
-python-telegram-bot>=20.0
+# ============================================================================
+# TELEGRAM INTEGRATION
+# ============================================================================
+python-telegram-bot>=20.0,<21.0
+urllib3>=2.0.0
 aiogram>=3.0.0
 
-# Web APIs
-requests>=2.31.0
-beautifulsoup4>=4.12.0
-feedparser>=6.0.0
-fastapi>=0.100.0
-uvicorn>=0.23.0
+# ============================================================================
+# MACHINE LEARNING
+# ============================================================================
+tensorflow>=2.17,<2.19
+keras>=2.17.0
 
-# Utilities
+# ============================================================================
+# LANGCHAIN (LLM)
+# ============================================================================
+langchain>=0.1.0
+langchain-core>=0.1.0
+langchain-community>=0.0.20
+openai>=1.0.0
+
+# ============================================================================
+# QUANTUM COMPUTING (IBM QISKIT)
+# ============================================================================
+qiskit>=0.45.0
+qiskit-aer>=0.13.0
+qiskit-optimization>=0.6.0
+qiskit-algorithms>=0.2.0
+qiskit-ibm-runtime>=0.14.0
+
+# ============================================================================
+# UTILITIES
+# ============================================================================
+qrcode[pil]>=7.4.0
+stripe>=7.0.0
+tzlocal<5
 pytz>=2023.3
-python-dateutil>=2.8.0
-networkx>=3.0
+APScheduler>=3.10.0
 
-# Optional (Advanced Features)
-# tweepy>=4.14.0
-# praw>=7.7.0
-# discord.py>=2.3.0
+# ============================================================================
+# VISUALIZATION
+# ============================================================================
+matplotlib>=3.7.0
+seaborn>=0.12.0
