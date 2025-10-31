@@ -688,7 +688,8 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
         # ========================================================================
         logger.info("\n🧠 Loading learned memory from previous runs...")
         try:
-            self.persistence_manager, self.learned_state = initialize_persistence()
+            self.persistence_manager = PersistenceManager()
+            self.learned_state = {}
             
             # Log what we loaded
             total_db_rows = sum(
