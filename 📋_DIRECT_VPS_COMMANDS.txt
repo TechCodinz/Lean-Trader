@@ -1,0 +1,106 @@
+# 📋 DIRECT VPS DEPLOYMENT COMMANDS
+
+# YOU ARE ON VPS NOW, so let's deploy manually
+
+# ============================================================================
+# Step 1: On LOCAL machine (workspace), create package
+# ============================================================================
+
+cd /workspace
+
+# Create deployment directory
+mkdir apex_deploy
+cd apex_deploy
+
+# Copy all files
+cp ../COMPLETE_PROFIT_SYSTEM.py .
+cp ../EXECUTION_ORCHESTRATOR.py .
+cp ../HIGH_VOLTAGE_NERVOUS_SYSTEM.py .
+cp ../OMNISCIENT_MARKET_SENSOR.py .
+cp ../PREDICTIVE_NEXT_MOVE_ENGINE.py .
+cp ../STRATEGY_EVOLUTION_ENGINE.py .
+cp ../INFINITE_GROWTH_ENGINE.py .
+cp ../DYNAMIC_LEVERAGE_OPTIMIZER.py .
+cp ../GODMODE_TRADING_CORE.py .
+cp ../QUANTUM_ENHANCEMENTS.py .
+cp ../PERSISTENCE_MANAGER.py .
+cp ../RUN_BOT.py .
+cp ../.env .
+
+# Create requirements.txt
+cat > requirements.txt << 'EOF'
+ccxt>=4.0.0
+pandas>=2.0.0
+numpy>=1.24.0
+scipy>=1.10.0
+scikit-learn>=1.3.0
+aiohttp>=3.8.0
+loguru>=0.7.0
+python-dotenv>=1.0.0
+EOF
+
+# Create tarball
+cd ..
+tar -czf apex_deploy.tar.gz apex_deploy/
+
+# Copy to VPS (replace YOUR_VPS_IP with actual IP)
+scp apex_deploy.tar.gz root@vmi2817884.contaboserver.net:~/
+
+# ============================================================================
+# Step 2: On VPS (you're already there), extract and setup
+# ============================================================================
+
+# Extract
+tar -xzf apex_deploy.tar.gz
+
+# Move to apex_bot
+rm -rf apex_bot
+mv apex_deploy apex_bot
+cd apex_bot
+
+# Create venv
+python3 -m venv apex_venv
+source apex_venv/bin/activate
+
+# Install packages
+pip install --upgrade pip
+pip install -r requirements.txt
+
+# Edit .env with your API keys
+nano .env
+
+# ============================================================================
+# Step 3: Create start/stop/monitor scripts
+# ============================================================================
+
+cat > start_apex.sh << 'STARTEOF'
+#!/bin/bash
+cd ~/apex_bot
+source apex_venv/bin/activate
+nohup python3 RUN_BOT.py --live > apex_bot.log 2>&1 &
+echo "✅ APEX Bot started! PID: $!"
+echo "Monitor: tail -f apex_bot.log"
+STARTEOF
+chmod +x start_apex.sh
+
+cat > stop_apex.sh << 'STOPEOF'
+#!/bin/bash
+pkill -f "RUN_BOT.py"
+echo "✅ APEX Bot stopped"
+STOPEOF
+chmod +x stop_apex.sh
+
+cat > monitor_apex.sh << 'MONITOREOF'
+#!/bin/bash
+tail -f ~/apex_bot/apex_bot.log
+MONITOREOF
+chmod +x monitor_apex.sh
+
+# ============================================================================
+# Step 4: Start bot
+# ============================================================================
+
+bash start_apex.sh
+
+# Monitor
+tail -f apex_bot.log

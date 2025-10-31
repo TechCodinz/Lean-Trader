@@ -127,7 +127,10 @@ class CompleteProfitSystem:
         self.exchange = ccxt.gate({
             'apiKey': api_key,
             'secret': api_secret,
-            'enableRateLimit': True
+            'enableRateLimit': True,
+            'options': {
+                'createMarketBuyOrderRequiresPrice': False,  # Pass cost in amount
+            }
         })
         
         # State
@@ -409,8 +412,17 @@ class CompleteProfitSystem:
             ticker = await asyncio.to_thread(self.exchange.fetch_ticker, symbol)
             current_price = ticker['last']
             
-            # Calculate amount
+            # Calculate amount (for display)
             amount = position_size / current_price
+            
+            # For Gate.io market buy orders, pass COST (in USDT) not amount
+            # For sell orders, pass amount in base currency
+            if side == 'buy':
+                order_amount = position_size  # Cost in USDT
+                display_amount = amount  # For logging
+            else:
+                order_amount = amount  # Amount in base currency
+                display_amount = amount
             
             # Verify minimum
             min_notional = 3.0
@@ -443,19 +455,21 @@ class CompleteProfitSystem:
             logger.info(f"   Tier: {tier_name.upper()}")
             logger.info(f"   Balance: ${self.current_balance:.2f}")
             logger.info(f"   Position: ${position_size:.2f} ({tier['risk']*100:.0f}%)")
-            logger.info(f"   TP: ${take_profit_price:.6f} (+{tier['target']*100:.2f}%)")
-            logger.info(f"   SL: ${stop_loss_price:.6f} (-{tier['stop']*100:.2f}%)")
-            logger.info(f"   Expected profit: ${profit_amount:.2f}")
+            logger.info(f"   Quantity: {display_amount:.6f}")
+            logger.info(f"   Entry: ${current_price:.6f}")
+            logger.info(f"   TP: ${take_profit_price:.6f} (+{tier['target']*100:.1f}%)")
+            logger.info(f"   SL: ${stop_loss_price:.6f} (-{tier['stop']*100:.1f}%)")
+            logger.info(f"   Expected: ${profit_amount:.2f} after fees")
             if APEX_ACTIVE_COUNT >= 3:
                 logger.info(f"   🔥 APEX ENHANCED: {APEX_ACTIVE_COUNT}/6 systems active")
             logger.info("")
             
-            # EXECUTE ORDER
+            # EXECUTE ORDER (Gate.io format)
             order = await asyncio.to_thread(
                 self.exchange.create_market_order,
                 symbol,
                 side,
-                amount
+                order_amount  # Cost for buy, amount for sell
             )
             
             # Record position

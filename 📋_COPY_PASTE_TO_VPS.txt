@@ -1,0 +1,68 @@
+# 📋 COPY-PASTE THIS ENTIRE BLOCK INTO YOUR VPS TERMINAL
+
+# This will pull APEX bot from git and set it up separately from your 4.1 bot
+
+cd ~
+
+# Step 1: Pull code from git
+echo "📥 Pulling APEX bot from git..."
+
+if [ -d "apex_bot" ]; then
+    echo "⚠️  apex_bot directory exists"
+    read -p "Remove and re-clone? (y/n): " confirm
+    if [ "$confirm" = "y" ]; then
+        rm -rf apex_bot
+    else
+        cd apex_bot
+        git pull
+        cd ~
+    fi
+fi
+
+# Clone if doesn't exist
+if [ ! -d "apex_bot" ]; then
+    # You need to provide your git repo URL here
+    echo "Enter your git repository URL:"
+    read REPO_URL
+    git clone "$REPO_URL" apex_bot
+    cd apex_bot
+    git checkout cursor/review-past-and-current-conversations-for-missing-implementations-d672
+    cd ~
+fi
+
+# Step 2: Setup venv
+echo ""
+echo "🔧 Setting up Python environment..."
+cd apex_bot
+
+# Install system deps
+apt-get update > /dev/null 2>&1
+apt-get install -y python3-venv python3-pip > /dev/null 2>&1
+
+# Create venv
+if [ -d "apex_venv" ]; then
+    rm -rf apex_venv
+fi
+
+python3 -m venv apex_venv
+source apex_venv/bin/activate
+
+# Install packages
+echo "📦 Installing packages..."
+pip install --upgrade pip > /dev/null 2>&1
+pip install ccxt pandas numpy scipy scikit-learn aiohttp loguru python-dotenv
+
+echo ""
+echo "✅ Setup complete!"
+echo ""
+echo "📁 APEX Bot: ~/apex_bot/"
+echo "📁 4.1 Bot: ~/bot/ (UNTOUCHED)"
+echo ""
+echo "🚀 To start APEX:"
+echo "   cd ~/apex_bot"
+echo "   source apex_venv/bin/activate"  
+echo "   nohup python3 RUN_BOT.py --live > apex_bot.log 2>&1 &"
+echo ""
+echo "📊 To monitor:"
+echo "   tail -f ~/apex_bot/apex_bot.log"
+echo ""
