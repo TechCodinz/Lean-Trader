@@ -142,29 +142,33 @@ class CompleteProfitSystem:
             try:
                 self.predictive_engine = PredictiveNextMoveEngine()
                 logger.info("🔮 Predictive engine initialized - Sees future!")
-            except:
-                pass
+            except Exception as e:
+                logger.warning(f"⚠️ Predictive engine failed: {e}")
+                self.predictive_engine = None
         
         if APEX_SYSTEMS_AVAILABLE.get('evolution'):
             try:
                 self.evolution_engine = StrategyEvolutionEngine(population_size=20)
                 logger.info("🧬 Evolution engine initialized - Creates strategies!")
-            except:
-                pass
+            except Exception as e:
+                logger.warning(f"⚠️ Evolution engine failed: {e}")
+                self.evolution_engine = None
         
         if APEX_SYSTEMS_AVAILABLE.get('infinite'):
             try:
                 self.infinite_growth = InfiniteGrowthEngine()
                 logger.info("♾️ Infinite growth initialized - Scales infinitely!")
-            except:
-                pass
+            except Exception as e:
+                logger.warning(f"⚠️ Infinite growth failed: {e}")
+                self.infinite_growth = None
         
         if APEX_SYSTEMS_AVAILABLE.get('leverage'):
             try:
                 self.leverage_optimizer = DynamicLeverageOptimizer()
                 logger.info("💰 Leverage optimizer initialized - Dynamic 1-100x!")
-            except:
-                pass
+            except Exception as e:
+                logger.warning(f"⚠️ Leverage optimizer failed: {e}")
+                self.leverage_optimizer = None
         
         # INFINITE GROWTH TIERS (with leverage logic but adapted for SPOT)
         self.tiers = {

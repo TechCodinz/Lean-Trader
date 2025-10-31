@@ -123,7 +123,8 @@ class InfiniteGrowthEngine:
         logger.info("=" * 80)
         logger.info("   Tiers configured:")
         for tier in self.tiers:
-            logger.info(f"   - {tier.name.upper()}: ${tier.min_balance:.0f}-${tier.max_balance:.0f if tier.max_balance != float('inf') else '∞'}")
+            max_display = f"${tier.max_balance:.0f}" if tier.max_balance != float('inf') else "∞"
+            logger.info(f"   - {tier.name.upper()}: ${tier.min_balance:.0f}-{max_display}")
         logger.info("")
         logger.info("   ♾️ INFINITE SCALING ACTIVATED")
         logger.info("=" * 80)
