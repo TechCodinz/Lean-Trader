@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
 """
-PERSISTENCE MANAGER
-Loads all learned memory/databases so bot doesn't start from scratch
-Designed for VPS deployment - preserves learning across restarts
+💾 PERSISTENCE MANAGER
+Saves and loads all learned knowledge, strategies, performance data
+
+This ensures the bot LEARNS and REMEMBERS across restarts.
+Critical for continuous improvement.
 """
 
-import os
 import json
 import pickle
-import sqlite3
+import os
+from datetime import datetime
+from typing import Dict, List, Any, Optional
 from pathlib import Path
-from typing import Dict, Any, Optional
 import logging
 
 logger = logging.getLogger(__name__)
@@ -18,291 +20,398 @@ logger = logging.getLogger(__name__)
 
 class PersistenceManager:
     """
-    Manages loading/saving of all learned knowledge:
-    - Database files (.db)
-    - Pattern memory (CSV, JSON)
-    - Model weights (.pkl)
-    - Trading history
-    - Strategy scores
+    Manages all persistent data for the trading bot
+    
+    Saves:
+    - Strategy evolution data (evolved strategies, fitness scores)
+    - Performance history (trades, win rate, profits)
+    - Market knowledge (patterns that worked, correlations)
+    - Meta-learning data (what features lead to fast learning)
+    - Quantum data (entanglements, causal relationships)
     """
     
-    def __init__(self):
-        # Use current directory instead of hardcoded /workspace
-        # This works on VPS, local, anywhere!
-        current_dir = Path(__file__).parent.absolute()
-        self.workspace = current_dir
-        self.data_dir = self.workspace / 'data'
-        self.models_dir = self.workspace / 'models'
-        self.runtime_dir = self.workspace / 'runtime'
+    def __init__(self, data_dir: str = "bot_data"):
+        self.data_dir = Path(data_dir)
+        self.data_dir.mkdir(exist_ok=True)
         
-        # Ensure directories exist
-        self.data_dir.mkdir(exist_ok=True, parents=True)
-        self.models_dir.mkdir(exist_ok=True, parents=True)
-        self.runtime_dir.mkdir(exist_ok=True, parents=True)
+        # Data files
+        self.strategy_file = self.data_dir / "strategies.json"
+        self.performance_file = self.data_dir / "performance.json"
+        self.market_knowledge_file = self.data_dir / "market_knowledge.json"
+        self.meta_learning_file = self.data_dir / "meta_learning.json"
+        self.quantum_data_file = self.data_dir / "quantum_data.json"
+        self.trades_file = self.data_dir / "trades.jsonl"  # Line-delimited for append
         
-        logger.info(f"📁 Persistence directories:")
-        logger.info(f"   Data: {self.data_dir}")
-        logger.info(f"   Models: {self.models_dir}")
-        logger.info(f"   Runtime: {self.runtime_dir}")
-        
-        self.loaded_databases = {}
-        self.loaded_memories = {}
-        self.loaded_models = {}
-        
-        logger.info("🧠 Persistence Manager initialized")
-    
-    def load_all_learned_data(self) -> Dict[str, Any]:
-        """
-        Load ALL learned data from previous runs
-        Returns comprehensive state dict
-        """
-        logger.info("\n" + "=" * 80)
-        logger.info("🔄 LOADING LEARNED MEMORY - Restoring previous knowledge...")
         logger.info("=" * 80)
+        logger.info("💾 PERSISTENCE MANAGER INITIALIZED")
+        logger.info("=" * 80)
+        logger.info(f"   Data directory: {self.data_dir.absolute()}")
+        logger.info(f"   Strategy file: {self.strategy_file.name}")
+        logger.info(f"   Performance file: {self.performance_file.name}")
+        logger.info(f"   Trades file: {self.trades_file.name}")
+        logger.info("")
+        logger.info("   💾 BOT WILL LEARN AND REMEMBER")
+        logger.info("=" * 80)
+    
+    # ========================================================================
+    # STRATEGY EVOLUTION PERSISTENCE
+    # ========================================================================
+    
+    def save_strategies(self, strategies: List[Dict]) -> bool:
+        """
+        Save evolved strategies to disk
         
-        state = {
-            'databases': {},
-            'patterns': {},
-            'models': {},
-            'history': {},
-            'scores': {},
-            'memory': {}
+        Args:
+            strategies: List of strategy dicts with fitness scores
+        """
+        try:
+            data = {
+                'timestamp': datetime.now().isoformat(),
+                'count': len(strategies),
+                'strategies': strategies
+            }
+            
+            with open(self.strategy_file, 'w') as f:
+                json.dump(data, f, indent=2)
+            
+            logger.info(f"💾 Saved {len(strategies)} strategies to disk")
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to save strategies: {e}")
+            return False
+    
+    def load_strategies(self) -> Optional[List[Dict]]:
+        """
+        Load evolved strategies from disk
+        
+        Returns:
+            List of strategies or None if file doesn't exist
+        """
+        try:
+            if not self.strategy_file.exists():
+                logger.info("📂 No saved strategies found (first run)")
+                return None
+            
+            with open(self.strategy_file, 'r') as f:
+                data = json.load(f)
+            
+            strategies = data.get('strategies', [])
+            timestamp = data.get('timestamp', 'unknown')
+            
+            logger.info(f"✅ Loaded {len(strategies)} strategies from disk")
+            logger.info(f"   Last saved: {timestamp}")
+            
+            return strategies
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to load strategies: {e}")
+            return None
+    
+    # ========================================================================
+    # PERFORMANCE DATA PERSISTENCE
+    # ========================================================================
+    
+    def save_performance(self, performance_data: Dict) -> bool:
+        """
+        Save performance metrics
+        
+        Args:
+            performance_data: Dict with win_rate, total_profit, trade_count, etc.
+        """
+        try:
+            # Load existing data
+            if self.performance_file.exists():
+                with open(self.performance_file, 'r') as f:
+                    history = json.load(f)
+            else:
+                history = {'entries': []}
+            
+            # Add new entry
+            entry = {
+                'timestamp': datetime.now().isoformat(),
+                **performance_data
+            }
+            history['entries'].append(entry)
+            
+            # Keep last 1000 entries
+            history['entries'] = history['entries'][-1000:]
+            
+            # Save
+            with open(self.performance_file, 'w') as f:
+                json.dump(history, f, indent=2)
+            
+            logger.debug(f"💾 Saved performance data")
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to save performance: {e}")
+            return False
+    
+    def load_performance(self) -> Optional[Dict]:
+        """
+        Load performance history
+        
+        Returns:
+            Dict with performance history or None
+        """
+        try:
+            if not self.performance_file.exists():
+                logger.info("📂 No performance history found (first run)")
+                return None
+            
+            with open(self.performance_file, 'r') as f:
+                data = json.load(f)
+            
+            entries = data.get('entries', [])
+            logger.info(f"✅ Loaded {len(entries)} performance entries")
+            
+            return data
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to load performance: {e}")
+            return None
+    
+    # ========================================================================
+    # TRADE LOGGING (Append-only for efficiency)
+    # ========================================================================
+    
+    def log_trade(self, trade_data: Dict) -> bool:
+        """
+        Log a single trade (append-only for efficiency)
+        
+        Args:
+            trade_data: Dict with symbol, side, entry, exit, profit, etc.
+        """
+        try:
+            # Add timestamp
+            trade_data['timestamp'] = datetime.now().isoformat()
+            
+            # Append to file (JSONL format - one JSON per line)
+            with open(self.trades_file, 'a') as f:
+                f.write(json.dumps(trade_data) + '\n')
+            
+            logger.debug(f"💾 Logged trade: {trade_data.get('symbol')} {trade_data.get('profit_pct', 0):.2%}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to log trade: {e}")
+            return False
+    
+    def load_trades(self, limit: int = 1000) -> List[Dict]:
+        """
+        Load recent trades
+        
+        Args:
+            limit: Max number of trades to load (from end)
+        
+        Returns:
+            List of trade dicts
+        """
+        try:
+            if not self.trades_file.exists():
+                logger.info("📂 No trade history found (first run)")
+                return []
+            
+            trades = []
+            with open(self.trades_file, 'r') as f:
+                for line in f:
+                    if line.strip():
+                        trades.append(json.loads(line))
+            
+            # Return last N trades
+            trades = trades[-limit:]
+            
+            logger.info(f"✅ Loaded {len(trades)} recent trades")
+            return trades
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to load trades: {e}")
+            return []
+    
+    # ========================================================================
+    # MARKET KNOWLEDGE PERSISTENCE
+    # ========================================================================
+    
+    def save_market_knowledge(self, knowledge: Dict) -> bool:
+        """
+        Save market knowledge (patterns, correlations, what works)
+        
+        Args:
+            knowledge: Dict with patterns, symbol performance, etc.
+        """
+        try:
+            data = {
+                'timestamp': datetime.now().isoformat(),
+                'knowledge': knowledge
+            }
+            
+            with open(self.market_knowledge_file, 'w') as f:
+                json.dump(data, f, indent=2)
+            
+            logger.info(f"💾 Saved market knowledge")
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to save market knowledge: {e}")
+            return False
+    
+    def load_market_knowledge(self) -> Optional[Dict]:
+        """Load market knowledge"""
+        try:
+            if not self.market_knowledge_file.exists():
+                logger.info("📂 No market knowledge found (first run)")
+                return None
+            
+            with open(self.market_knowledge_file, 'r') as f:
+                data = json.load(f)
+            
+            knowledge = data.get('knowledge', {})
+            timestamp = data.get('timestamp', 'unknown')
+            
+            logger.info(f"✅ Loaded market knowledge (last updated: {timestamp})")
+            return knowledge
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to load market knowledge: {e}")
+            return None
+    
+    # ========================================================================
+    # META-LEARNING DATA PERSISTENCE
+    # ========================================================================
+    
+    def save_meta_learning(self, meta_data: Dict) -> bool:
+        """
+        Save meta-learning data (what features lead to fast learning, etc.)
+        """
+        try:
+            data = {
+                'timestamp': datetime.now().isoformat(),
+                'meta_data': meta_data
+            }
+            
+            with open(self.meta_learning_file, 'w') as f:
+                json.dump(data, f, indent=2)
+            
+            logger.info(f"💾 Saved meta-learning data")
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to save meta-learning data: {e}")
+            return False
+    
+    def load_meta_learning(self) -> Optional[Dict]:
+        """Load meta-learning data"""
+        try:
+            if not self.meta_learning_file.exists():
+                logger.info("📂 No meta-learning data found (first run)")
+                return None
+            
+            with open(self.meta_learning_file, 'r') as f:
+                data = json.load(f)
+            
+            meta_data = data.get('meta_data', {})
+            logger.info(f"✅ Loaded meta-learning data")
+            return meta_data
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to load meta-learning data: {e}")
+            return None
+    
+    # ========================================================================
+    # QUANTUM DATA PERSISTENCE
+    # ========================================================================
+    
+    def save_quantum_data(self, quantum_data: Dict) -> bool:
+        """
+        Save quantum enhancement data (entanglements, causal graphs, etc.)
+        """
+        try:
+            data = {
+                'timestamp': datetime.now().isoformat(),
+                'quantum_data': quantum_data
+            }
+            
+            with open(self.quantum_data_file, 'w') as f:
+                json.dump(data, f, indent=2)
+            
+            logger.info(f"💾 Saved quantum data")
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to save quantum data: {e}")
+            return False
+    
+    def load_quantum_data(self) -> Optional[Dict]:
+        """Load quantum enhancement data"""
+        try:
+            if not self.quantum_data_file.exists():
+                logger.info("📂 No quantum data found (first run)")
+                return None
+            
+            with open(self.quantum_data_file, 'r') as f:
+                data = json.load(f)
+            
+            quantum_data = data.get('quantum_data', {})
+            logger.info(f"✅ Loaded quantum data")
+            return quantum_data
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to load quantum data: {e}")
+            return None
+    
+    # ========================================================================
+    # STATISTICS & ANALYSIS
+    # ========================================================================
+    
+    def get_stats(self) -> Dict:
+        """
+        Get statistics about saved data
+        """
+        stats = {
+            'strategies_saved': self.strategy_file.exists(),
+            'performance_history': self.performance_file.exists(),
+            'market_knowledge': self.market_knowledge_file.exists(),
+            'meta_learning': self.meta_learning_file.exists(),
+            'quantum_data': self.quantum_data_file.exists(),
         }
         
-        # 1. Load all .db files
-        state['databases'] = self._load_databases()
+        # Count trades
+        if self.trades_file.exists():
+            with open(self.trades_file, 'r') as f:
+                stats['trade_count'] = sum(1 for line in f if line.strip())
+        else:
+            stats['trade_count'] = 0
         
-        # 2. Load pattern memory
-        state['patterns'] = self._load_pattern_memory()
+        return stats
+    
+    def print_status(self):
+        """Print status of persistent data"""
+        stats = self.get_stats()
         
-        # 3. Load trading history
-        state['history'] = self._load_trading_history()
-        
-        # 4. Load strategy scores
-        state['scores'] = self._load_strategy_scores()
-        
-        # 5. Load brain memory
-        state['memory'] = self._load_brain_memory()
-        
-        # 6. Load model weights
-        state['models'] = self._load_model_weights()
-        
-        logger.info("\n✅ LEARNED MEMORY LOADED - Bot will use previous knowledge!")
         logger.info("=" * 80)
-        
-        return state
-    
-    def _load_databases(self) -> Dict[str, Any]:
-        """Load all SQLite databases"""
-        databases = {}
-        
-        db_files = [
-            'ultra_trading_system.db',
-            'evolution_engine.db',
-            'ultimate_bot_450_models.db',
-            'nobel_complete.db',
-            'nobel_simple.db',
-            'divine_intelligence.db',
-            'enhanced_trading_bot.db'
-        ]
-        
-        for db_file in db_files:
-            db_path = self.workspace / db_file
-            if db_path.exists():
-                try:
-                    # Connect and get row count
-                    conn = sqlite3.connect(str(db_path))
-                    cursor = conn.cursor()
-                    cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
-                    tables = cursor.fetchall()
-                    
-                    db_data = {'path': str(db_path), 'tables': []}
-                    for table in tables:
-                        table_name = table[0]
-                        cursor.execute(f"SELECT COUNT(*) FROM {table_name};")
-                        count = cursor.fetchone()[0]
-                        db_data['tables'].append({'name': table_name, 'rows': count})
-                    
-                    conn.close()
-                    databases[db_file] = db_data
-                    
-                    total_rows = sum(t['rows'] for t in db_data['tables'])
-                    logger.info(f"  ✅ {db_file}: {len(db_data['tables'])} tables, {total_rows} total rows")
-                    
-                except Exception as e:
-                    logger.warning(f"  ⚠️  {db_file}: {e}")
-        
-        logger.info(f"📊 Loaded {len(databases)} databases with learned data")
-        return databases
-    
-    def _load_pattern_memory(self) -> Dict[str, Any]:
-        """Load pattern memory from CSV and JSON"""
-        patterns = {}
-        
-        # Pattern memory CSV
-        pattern_csv = self.data_dir / 'pattern_memory.csv'
-        if pattern_csv.exists():
-            try:
-                import pandas as pd
-                df = pd.read_csv(pattern_csv)
-                patterns['memory_csv'] = {
-                    'path': str(pattern_csv),
-                    'patterns': len(df),
-                    'data': df.to_dict('records') if len(df) < 1000 else []
-                }
-                logger.info(f"  ✅ pattern_memory.csv: {len(df)} learned patterns")
-            except Exception as e:
-                logger.warning(f"  ⚠️  pattern_memory.csv: {e}")
-        
-        # Pattern scores JSON
-        scores_json = self.data_dir / 'pattern_scores.json'
-        if scores_json.exists():
-            try:
-                with open(scores_json, 'r') as f:
-                    scores = json.load(f)
-                patterns['scores_json'] = {
-                    'path': str(scores_json),
-                    'patterns': len(scores) if isinstance(scores, dict) else 0,
-                    'data': scores
-                }
-                logger.info(f"  ✅ pattern_scores.json: {len(scores) if isinstance(scores, dict) else 0} scored patterns")
-            except Exception as e:
-                logger.warning(f"  ⚠️  pattern_scores.json: {e}")
-        
-        logger.info(f"🎯 Loaded {len(patterns)} pattern memory systems")
-        return patterns
-    
-    def _load_trading_history(self) -> Dict[str, Any]:
-        """Load trading history"""
-        history = {}
-        
-        history_csv = self.data_dir / 'history.csv'
-        if history_csv.exists():
-            try:
-                import pandas as pd
-                df = pd.read_csv(history_csv)
-                history['csv'] = {
-                    'path': str(history_csv),
-                    'trades': len(df),
-                    'size_mb': history_csv.stat().st_size / (1024*1024)
-                }
-                logger.info(f"  ✅ history.csv: {len(df)} historical trades ({history['csv']['size_mb']:.1f} MB)")
-            except Exception as e:
-                logger.warning(f"  ⚠️  history.csv: {e}")
-        
-        logger.info(f"📈 Loaded trading history")
-        return history
-    
-    def _load_strategy_scores(self) -> Dict[str, Any]:
-        """Load strategy performance scores"""
-        scores = {}
-        
-        # Best params
-        best_params = self.workspace / 'best_params.json'
-        if best_params.exists():
-            try:
-                with open(best_params, 'r') as f:
-                    data = json.load(f)
-                scores['best_params'] = {
-                    'path': str(best_params),
-                    'strategies': len(data) if isinstance(data, dict) else 0,
-                    'data': data
-                }
-                logger.info(f"  ✅ best_params.json: Best parameters for strategies loaded")
-            except Exception as e:
-                logger.warning(f"  ⚠️  best_params.json: {e}")
-        
-        logger.info(f"🏆 Loaded strategy scores")
-        return scores
-    
-    def _load_brain_memory(self) -> Dict[str, Any]:
-        """Load brain/memory state"""
-        memory = {}
-        
-        brain_json = self.runtime_dir / 'brain.json'
-        if brain_json.exists():
-            try:
-                with open(brain_json, 'r') as f:
-                    data = json.load(f)
-                memory['brain'] = {
-                    'path': str(brain_json),
-                    'positions': len(data.get('positions', {})),
-                    'trades': len(data.get('trades', [])),
-                    'data': data
-                }
-                logger.info(f"  ✅ brain.json: {memory['brain']['positions']} positions, {memory['brain']['trades']} trades")
-            except Exception as e:
-                logger.warning(f"  ⚠️  brain.json: {e}")
-        
-        logger.info(f"🧠 Loaded brain memory")
-        return memory
-    
-    def _load_model_weights(self) -> Dict[str, Any]:
-        """Load ML model weights"""
-        models = {}
-        
-        # Look for .pkl files
-        pkl_files = list(self.workspace.glob('*.pkl'))
-        for pkl_file in pkl_files[:10]:  # Limit to 10
-            try:
-                with open(pkl_file, 'rb') as f:
-                    # Just check if we can load it
-                    data = pickle.load(f)
-                models[pkl_file.name] = {
-                    'path': str(pkl_file),
-                    'size_kb': pkl_file.stat().st_size / 1024,
-                    'loaded': True
-                }
-                logger.info(f"  ✅ {pkl_file.name}: Model weights loaded ({models[pkl_file.name]['size_kb']:.1f} KB)")
-            except Exception as e:
-                logger.debug(f"  ⚠️  {pkl_file.name}: {e}")
-        
-        if models:
-            logger.info(f"🤖 Loaded {len(models)} model weight files")
-        
-        return models
-    
-    def save_state(self, state: Dict[str, Any]) -> None:
-        """Save current state for next run"""
-        try:
-            # Save to persistent state file
-            state_file = self.workspace / 'persistent_state.json'
-            with open(state_file, 'w') as f:
-                # Only save serializable data
-                serializable = {
-                    'timestamp': str(Path.cwd()),
-                    'databases_loaded': list(state.get('databases', {}).keys()),
-                    'patterns_loaded': list(state.get('patterns', {}).keys()),
-                    'history_loaded': list(state.get('history', {}).keys()),
-                }
-                json.dump(serializable, f, indent=2)
-            logger.info(f"💾 State saved to {state_file}")
-        except Exception as e:
-            logger.warning(f"Failed to save state: {e}")
+        logger.info("💾 PERSISTENCE STATUS")
+        logger.info("=" * 80)
+        logger.info(f"   Strategies: {'✅ Saved' if stats['strategies_saved'] else '❌ None'}")
+        logger.info(f"   Performance: {'✅ Saved' if stats['performance_history'] else '❌ None'}")
+        logger.info(f"   Market Knowledge: {'✅ Saved' if stats['market_knowledge'] else '❌ None'}")
+        logger.info(f"   Meta-Learning: {'✅ Saved' if stats['meta_learning'] else '❌ None'}")
+        logger.info(f"   Quantum Data: {'✅ Saved' if stats['quantum_data'] else '❌ None'}")
+        logger.info(f"   Trades Logged: {stats['trade_count']}")
+        logger.info("=" * 80)
 
 
-def initialize_persistence() -> PersistenceManager:
-    """
-    Initialize and load all persistent data
-    Call this at bot startup
-    """
-    manager = PersistenceManager()
-    learned_state = manager.load_all_learned_data()
-    return manager, learned_state
+# Global instance
+_persistence_manager = None
+
+def get_persistence_manager(data_dir: str = "bot_data") -> PersistenceManager:
+    """Get or create global persistence manager"""
+    global _persistence_manager
+    if _persistence_manager is None:
+        _persistence_manager = PersistenceManager(data_dir)
+    return _persistence_manager
 
 
-if __name__ == "__main__":
-    # Test loading
-    logging.basicConfig(level=logging.INFO)
-    manager, state = initialize_persistence()
-    
-    print("\n" + "=" * 80)
-    print("LEARNED DATA SUMMARY")
-    print("=" * 80)
-    print(f"Databases:       {len(state['databases'])}")
-    print(f"Pattern systems: {len(state['patterns'])}")
-    print(f"History files:   {len(state['history'])}")
-    print(f"Score systems:   {len(state['scores'])}")
-    print(f"Brain memory:    {len(state['memory'])}")
-    print(f"Model weights:   {len(state['models'])}")
-    print("=" * 80)
+# Module initialization
+logger.info("💾 PERSISTENCE MANAGER MODULE LOADED")
+logger.info("   Bot will save and load learned knowledge")
