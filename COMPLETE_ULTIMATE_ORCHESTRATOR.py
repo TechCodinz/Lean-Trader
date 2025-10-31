@@ -1340,6 +1340,16 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             except:
                 actual_balance = 25.0  # Fallback
             logger.info("   🔗 Wiring Gate.io to Execution Orchestrator...")
+            
+            # Initialize Universal Pair Fetcher
+            try:
+                logger.info("   🌍 Initializing Universal Pair Fetcher...")
+                from UNIVERSAL_PAIR_FETCHER import initialize_universal_fetcher
+                self.universal_fetcher = initialize_universal_fetcher(self.micro_wallet_grower.gate)
+                asyncio.create_task(self.universal_fetcher.fetch_all_pairs())
+                logger.info("   ✅ Universal Pair Fetcher active - discovering ALL pairs!")
+            except Exception as e:
+                logger.warning(f"   ⚠️  Universal Pair Fetcher: {e}")
         
         self.advanced_orchestrators['execution'] = ExecutionOrchestrator(
             self.data_hub,
