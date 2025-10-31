@@ -51,6 +51,17 @@ class CompleteProfitSystem:
         self.starting_balance = 0.0
         self.open_positions = {}
         self.closed_trades = deque(maxlen=500)
+
+        # Execution safety/config (fee- and slippage-aware)
+        # Fee rate defaults to 0.40% round-trip (0.20% in + 0.20% out) unless overridden
+        self.fee_rate_round_trip = float(os.getenv('FEE_RATE_ROUND_TRIP', '0.004'))
+        # Slippage allowance in basis points (default 10 bps = 0.10%)
+        self.slippage_bps = float(os.getenv('SLIPPAGE_BPS', '10'))
+        # Minimum expected net profit per trade in USD to proceed (default $0.03)
+        self.min_net_profit_usd = float(os.getenv('MIN_NET_PROFIT_USD', '0.03'))
+        # Cooldown per symbol in minutes to avoid churn
+        self.symbol_cooldown_minutes = float(os.getenv('SYMBOL_COOLDOWN_MIN', '3'))
+        self._last_executed_at: Dict[str, datetime] = {}
         
         # Auto-adaptive tiers
         self.tiers = {
@@ -135,6 +146,16 @@ class CompleteProfitSystem:
         if symbol in self.open_positions:
             logger.debug(f"⚠️ {symbol}: Already in position")
             return None
+
+        # Symbol cooldown to prevent fee churn
+        last_time = self._last_executed_at.get(symbol)
+        if last_time is not None:
+            minutes_since = (datetime.now() - last_time).total_seconds() / 60
+            if minutes_since < self.symbol_cooldown_minutes:
+                logger.debug(
+                    f"⏳ {symbol}: Cooldown active ({minutes_since:.1f}m < {self.symbol_cooldown_minutes}m)"
+                )
+                return None
         
         try:
             # Fetch current balance
@@ -167,8 +188,8 @@ class CompleteProfitSystem:
                 logger.warning(f"⚠️ {symbol}: Market not found")
                 return None
             
-            min_amount = market['limits']['amount']['min']
-            min_cost = market['limits']['cost']['min']
+            min_amount = (market.get('limits', {}).get('amount', {}) or {}).get('min', 0) or 0
+            min_cost = (market.get('limits', {}).get('cost', {}) or {}).get('min', 0) or 0
             
             if quantity < min_amount:
                 logger.debug(f"❌ {symbol}: Quantity {quantity:.8f} < min {min_amount}")
@@ -186,15 +207,21 @@ class CompleteProfitSystem:
                 tp_price = price * (1 - tier['target'])
                 sl_price = price * (1 + tier['stop'])
             
-            # Expected profit/loss
+            # Expected profit/loss with fees and slippage awareness
             expected_profit = position_usd * tier['target']
             max_loss = position_usd * tier['stop']
-            fees = position_usd * 0.004
-            net_expected = expected_profit - fees
+            # Round-trip fee estimate (entry + exit)
+            fees = position_usd * self.fee_rate_round_trip
+            # Slippage buffer on both sides (bps → percent)
+            slippage_pct = self.slippage_bps / 10000.0
+            slippage_cost = position_usd * slippage_pct
+            net_expected = expected_profit - fees - slippage_cost
             
-            # Fee check
-            if net_expected <= fees:
-                logger.debug(f"❌ {symbol}: Net profit ${net_expected:.4f} <= fees ${fees:.4f}")
+            # Profitability check (avoid loading trades that lose to fees/slippage)
+            if net_expected <= self.min_net_profit_usd:
+                logger.debug(
+                    f"❌ {symbol}: Net expected ${net_expected:.4f} <= min ${self.min_net_profit_usd:.2f}"
+                )
                 return None
             
             logger.info(f"🎯 EXECUTING: {side.upper()} {symbol}")
@@ -216,6 +243,8 @@ class CompleteProfitSystem:
             )
             
             self.total_executions_succeeded += 1
+            # Record last execution time for cooldown
+            self._last_executed_at[symbol] = datetime.now()
             
             logger.info(f"✅ ORDER EXECUTED: {order.get('id', 'UNKNOWN')}")
             logger.info(f"   Status: {order.get('status', 'unknown')}")
