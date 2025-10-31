@@ -171,8 +171,18 @@ from SENTIENT_SCALPING_COORDINATOR import SentientScalpingCoordinator, HotPairTr
 from TELEGRAM_ORCHESTRATOR import TelegramOrchestrator
 from TELEGRAM_SIGNAL_MONITOR import monitor_signals_for_telegram
 
-# Import IBM QUANTUM ENGINE - Quantum computing for trading
-from IBM_QUANTUM_ENGINE import IBMQuantumEngine
+# Import IBM QUANTUM ENGINE - Quantum computing for trading (optional)
+try:
+    from IBM_QUANTUM_ENGINE import IBMQuantumEngine
+except Exception as e:
+    # Logger may not be initialized yet, use print instead
+    try:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"⚠️  IBM Quantum Engine not available: {e}")
+    except:
+        print(f"⚠️  IBM Quantum Engine not available: {e}")
+    IBMQuantumEngine = None
 
 # Import CROSS-EXCHANGE ARBITRAGE - Risk-free profits
 from CROSS_EXCHANGE_ARBITRAGE import CrossExchangeArbitrage, P2PArbitrageScanner
@@ -1417,9 +1427,16 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
         )
         logger.info("✅ 📱 TELEGRAM ORCHESTRATOR WIRED - Admin, VIP, Free channels + Remote trading!")
         
-        # 6. IBM QUANTUM ENGINE - Quantum computing advantage!
-        self.advanced_orchestrators['quantum'] = IBMQuantumEngine(mode=self.mode)
-        logger.info("✅ 🔮 IBM QUANTUM ENGINE WIRED - Quantum predictions, optimization, risk!")
+        # 6. IBM QUANTUM ENGINE - Quantum computing advantage! (optional)
+        try:
+            if IBMQuantumEngine is not None:
+                self.advanced_orchestrators['quantum'] = IBMQuantumEngine(mode=self.mode)
+                logger.info("✅ 🔮 IBM QUANTUM ENGINE WIRED - Quantum predictions, optimization, risk!")
+            else:
+                logger.info("⚠️  IBM QUANTUM ENGINE skipped (qiskit not available)")
+        except Exception as e:
+            logger.warning(f"⚠️  IBM Quantum Engine failed to initialize: {e}")
+            self.advanced_orchestrators['quantum'] = None
         
         # 7. ULTRASONIC RARE STRATEGIES - PhD-level techniques!
         try:
@@ -1864,12 +1881,15 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             else:
                 logger.info("⚠️  Telegram disabled (no bot token)")
         
-        # START IBM QUANTUM ENGINE - Quantum Analysis!
-        if 'quantum' in self.advanced_orchestrators:
-            tasks.append(
-                asyncio.create_task(self.advanced_orchestrators['quantum'].run_quantum_loop())
-            )
-            logger.info("✅ 🔮 QUANTUM LOOP STARTED - Quantum advantage active!")
+        # START IBM QUANTUM ENGINE - Quantum Analysis! (optional)
+        if 'quantum' in self.advanced_orchestrators and self.advanced_orchestrators['quantum'] is not None:
+            try:
+                tasks.append(
+                    asyncio.create_task(self.advanced_orchestrators['quantum'].run_quantum_loop())
+                )
+                logger.info("✅ 🔮 QUANTUM LOOP STARTED - Quantum advantage active!")
+            except Exception as e:
+                logger.warning(f"⚠️  Quantum loop failed to start: {e}")
         
         # START DEX ORCHESTRATOR - Moon Spotting & DEX Trading!
         if 'dex' in self.advanced_orchestrators:
