@@ -1,152 +1,290 @@
 #!/usr/bin/env python3
 """
-DYNAMIC PAIR DISCOVERY - Auto-discover profitable pairs from ALL markets
-No hardcoded limits - scout everything, trade everything profitable
+DYNAMIC PAIR DISCOVERY
+Auto-discovers hot trading pairs, removes dead ones
+No hardcoded pairs - constantly refreshing trading universe
 """
-import ccxt
-import logging
+
 import asyncio
+import logging
+from typing import Dict, List, Set, Optional
 from datetime import datetime, timedelta
+from collections import defaultdict
+import ccxt
 
 logger = logging.getLogger(__name__)
 
 
 class DynamicPairDiscovery:
     """
-    Discovers profitable pairs automatically from:
-    - All crypto exchanges (Bybit, Binance, OKX, etc.)
-    - Forex markets
-    - Stock markets
-    - Commodity markets
-    
-    Continuously adds new pairs based on:
-    - Volume (liquidity)
-    - Volatility (profit opportunity)
-    - Momentum (trending)
+    Discovers and maintains a dynamic list of active trading pairs
+    - Scans all pairs on exchange
+    - Filters for volume, volatility, momentum
+    - Removes dead/slow pairs
+    - Constantly refreshes (every 5 minutes)
     """
     
-    def __init__(self):
-        self.discovered_pairs = set()
-        self.active_pairs = set()
-        self.pair_performance = {}
+    def __init__(self, exchange, min_volume_24h: float = 50000):
+        self.exchange = exchange
+        self.min_volume_24h = min_volume_24h
         
-        # Initialize exchanges for discovery
-        self.exchanges = {
-            'bybit': ccxt.bybit({'enableRateLimit': True}),
-            'binance': ccxt.binance({'enableRateLimit': True}),
-            'okx': ccxt.okx({'enableRateLimit': True}),
-            'kucoin': ccxt.kucoin({'enableRateLimit': True}),
-        }
+        # Dynamic pair sets
+        self.hot_pairs: Set[str] = set()        # High volume + volatility
+        self.fast_pairs: Set[str] = set()       # Fast movers (>1% in 1h)
+        self.stable_pairs: Set[str] = set()     # Stable volume pairs
+        self.dead_pairs: Set[str] = set()       # Removed (low volume)
+        
+        # Pair metrics
+        self.pair_metrics: Dict[str, Dict] = {}
+        
+        # Last refresh
+        self.last_refresh = None
+        self.refresh_interval = 300  # 5 minutes
         
         logger.info("🔍 Dynamic Pair Discovery initialized")
+        logger.info(f"   Min 24h volume: ${min_volume_24h:,.0f}")
     
-    async def discover_all_markets(self):
-        """Discover ALL available trading pairs across all exchanges"""
-        
-        all_pairs = set()
-        
-        for exchange_name, exchange in self.exchanges.items():
-            try:
-                logger.info(f"🔍 Scanning {exchange_name} for all markets...")
+    async def discover_pairs(self) -> Dict[str, List[str]]:
+        """
+        Main discovery method - finds all tradeable pairs
+        Returns categorized pairs
+        """
+        try:
+            logger.info("🔍 Discovering trading pairs...")
+            
+            # Fetch all tickers
+            tickers = await asyncio.to_thread(self.exchange.fetch_tickers)
+            
+            hot = []
+            fast = []
+            stable = []
+            dead = []
+            
+            for symbol, ticker in tickers.items():
+                # Only USDT pairs
+                if not symbol.endswith('/USDT'):
+                    continue
                 
-                markets = await asyncio.to_thread(exchange.load_markets)
+                # Skip perpetuals, futures
+                if any(x in symbol for x in ['PERP', 'PERPETUAL', ':', '_']):
+                    continue
                 
-                for symbol in markets.keys():
-                    # Add all USDT pairs (most liquid)
-                    if '/USDT' in symbol or '/USD' in symbol:
-                        all_pairs.add(symbol)
-                        self.discovered_pairs.add(symbol)
-                
-                logger.info(f"✅ {exchange_name}: Found {len([s for s in all_pairs if s in markets])} pairs")
-                
-            except Exception as e:
-                logger.error(f"❌ {exchange_name} discovery error: {e}")
-        
-        logger.info(f"🌍 TOTAL DISCOVERED: {len(all_pairs)} tradeable pairs across all exchanges!")
-        return list(all_pairs)
+                try:
+                    # Get metrics
+                    volume_24h = ticker.get('quoteVolume', 0) or 0
+                    price = ticker.get('last', 0) or ticker.get('close', 0) or 0
+                    change_24h = ticker.get('percentage', 0) or 0
+                    
+                    if not price or price <= 0:
+                        continue
+                    
+                    # Calculate metrics
+                    metrics = {
+                        'symbol': symbol,
+                        'price': price,
+                        'volume_24h': volume_24h,
+                        'change_24h': change_24h,
+                        'last_updated': datetime.now()
+                    }
+                    
+                    # Categorize
+                    if volume_24h < self.min_volume_24h:
+                        dead.append(symbol)
+                        continue
+                    
+                    # Hot: High volume + significant change
+                    if volume_24h > 500000 and abs(change_24h) > 2:
+                        hot.append(symbol)
+                        metrics['category'] = 'HOT'
+                    
+                    # Fast: Big price movement
+                    elif abs(change_24h) > 5:
+                        fast.append(symbol)
+                        metrics['category'] = 'FAST'
+                    
+                    # Stable: Good volume, moderate movement
+                    elif volume_24h > self.min_volume_24h:
+                        stable.append(symbol)
+                        metrics['category'] = 'STABLE'
+                    
+                    self.pair_metrics[symbol] = metrics
+                    
+                except Exception as e:
+                    logger.debug(f"Error processing {symbol}: {e}")
+                    continue
+            
+            # Update sets
+            self.hot_pairs = set(hot)
+            self.fast_pairs = set(fast)
+            self.stable_pairs = set(stable)
+            self.dead_pairs = set(dead)
+            
+            self.last_refresh = datetime.now()
+            
+            logger.info(f"✅ Pair discovery complete:")
+            logger.info(f"   🔥 HOT pairs: {len(hot)} (high volume + volatility)")
+            logger.info(f"   ⚡ FAST pairs: {len(fast)} (big movers)")
+            logger.info(f"   📊 STABLE pairs: {len(stable)} (good volume)")
+            logger.info(f"   💀 DEAD pairs: {len(dead)} (removed)")
+            
+            return {
+                'hot': hot,
+                'fast': fast,
+                'stable': stable,
+                'dead': dead
+            }
+            
+        except Exception as e:
+            logger.error(f"❌ Pair discovery error: {e}")
+            return {'hot': [], 'fast': [], 'stable': [], 'dead': []}
     
-    async def filter_profitable_pairs(self, all_pairs):
-        """
-        Filter pairs by profitability criteria:
-        - High volume (liquidity)
-        - Good volatility (profit opportunity)
-        - Recent momentum
-        """
+    async def get_top_opportunities(self, limit: int = 20) -> List[Dict]:
+        """Get top trading opportunities right now"""
+        opportunities = []
         
-        profitable_pairs = []
-        
-        for pair in all_pairs[:100]:  # Start with top 100, will expand
-            try:
-                # Get 24h stats from Bybit (fastest)
-                ticker = await asyncio.to_thread(
-                    self.exchanges['bybit'].fetch_ticker, pair
-                )
-                
-                volume_usd = ticker.get('quoteVolume', 0)
-                price_change = abs(ticker.get('percentage', 0))
-                
-                # Criteria for profitable pairs:
-                # 1. Volume > $100k/day (liquid enough to trade)
-                # 2. Price change > 1% (volatile enough for profit)
-                if volume_usd > 100000 and price_change > 1:
-                    profitable_pairs.append({
-                        'symbol': pair,
-                        'volume': volume_usd,
-                        'volatility': price_change,
-                        'score': volume_usd * price_change  # Profit potential score
-                    })
-                
-            except:
+        for symbol, metrics in self.pair_metrics.items():
+            if symbol in self.dead_pairs:
                 continue
+            
+            # Score each pair
+            score = 0
+            
+            # Volume score (0-40 points)
+            volume = metrics.get('volume_24h', 0)
+            if volume > 10_000_000:
+                score += 40
+            elif volume > 1_000_000:
+                score += 30
+            elif volume > 500_000:
+                score += 20
+            elif volume > 100_000:
+                score += 10
+            
+            # Volatility score (0-40 points)
+            change = abs(metrics.get('change_24h', 0))
+            if change > 10:
+                score += 40
+            elif change > 5:
+                score += 30
+            elif change > 2:
+                score += 20
+            elif change > 1:
+                score += 10
+            
+            # Category bonus (0-20 points)
+            category = metrics.get('category', '')
+            if category == 'HOT':
+                score += 20
+            elif category == 'FAST':
+                score += 15
+            elif category == 'STABLE':
+                score += 10
+            
+            opportunities.append({
+                'symbol': symbol,
+                'score': score,
+                'volume_24h': volume,
+                'change_24h': metrics.get('change_24h', 0),
+                'category': category,
+                'price': metrics.get('price', 0)
+            })
         
-        # Sort by profit potential
-        profitable_pairs.sort(key=lambda x: x['score'], reverse=True)
+        # Sort by score
+        opportunities.sort(key=lambda x: x['score'], reverse=True)
         
-        logger.info(f"💰 Found {len(profitable_pairs)} highly profitable pairs!")
-        
-        return [p['symbol'] for p in profitable_pairs]
+        return opportunities[:limit]
     
-    async def continuous_discovery(self):
-        """
-        Continuously discover new profitable pairs
-        Runs every 1 hour to find emerging opportunities
-        """
+    async def should_trade_pair(self, symbol: str) -> bool:
+        """Check if we should trade this pair"""
+        # Dead pairs - never trade
+        if symbol in self.dead_pairs:
+            return False
+        
+        # Hot/Fast pairs - always trade
+        if symbol in self.hot_pairs or symbol in self.fast_pairs:
+            return True
+        
+        # Stable pairs - trade if volume is good
+        if symbol in self.stable_pairs:
+            metrics = self.pair_metrics.get(symbol, {})
+            return metrics.get('volume_24h', 0) > self.min_volume_24h
+        
+        # Unknown pair - be cautious
+        return False
+    
+    async def refresh_if_needed(self):
+        """Refresh pairs if interval has passed"""
+        if self.last_refresh is None:
+            await self.discover_pairs()
+            return
+        
+        elapsed = (datetime.now() - self.last_refresh).seconds
+        if elapsed >= self.refresh_interval:
+            logger.info("🔄 Refreshing pair discovery...")
+            await self.discover_pairs()
+    
+    async def run_continuous_discovery(self):
+        """Run continuous pair discovery loop"""
+        logger.info("🔄 Starting continuous pair discovery...")
         
         while True:
             try:
-                logger.info("🔍 Starting market discovery scan...")
-                
-                # Discover all available pairs
-                all_pairs = await self.discover_all_markets()
-                
-                # Filter for profitable ones
-                profitable = await self.filter_profitable_pairs(all_pairs)
-                
-                # Add new profitable pairs to active trading
-                new_pairs = set(profitable) - self.active_pairs
-                if new_pairs:
-                    self.active_pairs.update(new_pairs)
-                    logger.info(f"✅ Added {len(new_pairs)} new profitable pairs!")
-                    logger.info(f"📊 TOTAL ACTIVE PAIRS: {len(self.active_pairs)}")
-                
-                # Wait 1 hour before next scan
-                await asyncio.sleep(3600)
-                
+                await self.discover_pairs()
+                await asyncio.sleep(self.refresh_interval)
             except Exception as e:
-                logger.error(f"Discovery error: {e}")
-                await asyncio.sleep(300)  # Retry in 5 min
+                logger.error(f"Discovery loop error: {e}")
+                await asyncio.sleep(60)
     
-    def get_active_pairs(self):
-        """Get current list of active profitable pairs"""
-        return list(self.active_pairs)
+    def get_all_active_pairs(self) -> List[str]:
+        """Get all currently active trading pairs"""
+        return list(self.hot_pairs | self.fast_pairs | self.stable_pairs)
+    
+    def get_statistics(self) -> Dict:
+        """Get discovery statistics"""
+        return {
+            'total_active': len(self.hot_pairs) + len(self.fast_pairs) + len(self.stable_pairs),
+            'hot_pairs': len(self.hot_pairs),
+            'fast_pairs': len(self.fast_pairs),
+            'stable_pairs': len(self.stable_pairs),
+            'dead_pairs': len(self.dead_pairs),
+            'last_refresh': self.last_refresh.isoformat() if self.last_refresh else None,
+            'next_refresh_in': self.refresh_interval - (datetime.now() - self.last_refresh).seconds if self.last_refresh else 0
+        }
 
 
 # Global instance
-_discovery_engine = None
+_pair_discovery = None
 
-def get_discovery_engine():
-    """Get or create singleton discovery engine"""
-    global _discovery_engine
-    if _discovery_engine is None:
-        _discovery_engine = DynamicPairDiscovery()
-    return _discovery_engine
+def initialize_pair_discovery(exchange, min_volume: float = 50000):
+    """Initialize global pair discovery"""
+    global _pair_discovery
+    _pair_discovery = DynamicPairDiscovery(exchange, min_volume)
+    return _pair_discovery
+
+def get_pair_discovery():
+    """Get global pair discovery instance"""
+    return _pair_discovery
+
+
+if __name__ == "__main__":
+    # Test
+    import os
+    logging.basicConfig(level=logging.INFO)
+    
+    exchange = ccxt.gate({
+        'apiKey': os.getenv('GATE_API_KEY'),
+        'secret': os.getenv('GATE_API_SECRET'),
+    })
+    
+    discovery = DynamicPairDiscovery(exchange)
+    
+    async def test():
+        pairs = await discovery.discover_pairs()
+        print(f"\nDiscovered {len(pairs['hot'])} hot pairs")
+        
+        opps = await discovery.get_top_opportunities(10)
+        print("\nTop 10 opportunities:")
+        for opp in opps:
+            print(f"  {opp['symbol']:15} Score: {opp['score']:3} Vol: ${opp['volume_24h']:>12,.0f} Change: {opp['change_24h']:>6.2f}%")
+    
+    asyncio.run(test())
