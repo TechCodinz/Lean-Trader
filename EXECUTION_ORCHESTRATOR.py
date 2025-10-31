@@ -246,7 +246,7 @@ class ExecutionOrchestrator:
         self.partial_tp = None  # PartialTPManager
         
         # Execution settings
-        self.min_confidence = 0.75  # 75% minimum confidence to execute (lowered for more opportunities)
+        self.min_confidence = float(os.getenv('MIN_CONFIDENCE', '0.65'))  # Read from env, default 65% for more opportunities
         self.execution_enabled = True
         
         # Performance tracking

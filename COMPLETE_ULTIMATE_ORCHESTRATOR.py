@@ -2756,10 +2756,10 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                         logger.error(traceback.format_exc())
                         await asyncio.sleep(60)
             
-            # DISABLED - MICRO just churns without profit strategy, loses on fees!
-            # Using SCALPERS instead - they have REAL profit targets!
-            # tasks.append(asyncio.create_task(run_micro_wallet_growth()))
-            logger.info("⚠️  MICRO WALLET GROWER DISABLED - Using scalpers with profit strategies instead!")
+            # ENABLED - MICRO wallet grower with profit strategy from COMPLETE_PROFIT_SYSTEM
+            # Uses fee/slippage safeguards and proper profit targets
+            tasks.append(asyncio.create_task(run_micro_wallet_growth()))
+            logger.info("✅ 💎 MICRO WALLET GROWER ACTIVE - Growing wallet with profit strategy!")
         
         # ====================================================================
         # SWARM OPPORTUNITY SCANNER - Catches ALL missed opportunities! 🐝
