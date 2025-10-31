@@ -274,7 +274,8 @@ class CompleteProfitSystem:
                     hit_sl = current_price >= sl_price
                 
                 # Check time-based exit
-                elapsed_minutes = (datetime.now() - position['entry_time']).seconds / 60
+                elapsed = datetime.now() - position['entry_time']
+                elapsed_minutes = elapsed.total_seconds() / 60  # Use total_seconds() to handle hours/days
                 max_hold = position['max_hold_minutes']
                 time_exit = elapsed_minutes > max_hold
                 
@@ -340,12 +341,28 @@ class CompleteProfitSystem:
                 'reason': reason,
                 'tier': position['tier'],
                 'confidence': position['confidence'],
-                'duration_minutes': (datetime.now() - position['entry_time']).seconds / 60,
+                'duration_minutes': (datetime.now() - position['entry_time']).total_seconds() / 60,
                 'closed_at': datetime.now()
             })
             
             # Update balance
             self.current_balance += profit_usd
+            
+            # Refresh actual balance from exchange to stay in sync
+            try:
+                balance_data = await asyncio.to_thread(self.exchange.fetch_balance)
+                actual_balance = balance_data.get('USDT', {}).get('free', 0.0)
+                if abs(actual_balance - self.current_balance) > 0.01:  # Allow small discrepancy
+                    logger.info(f"💰 Balance sync: ${self.current_balance:.2f} → ${actual_balance:.2f}")
+                    self.current_balance = actual_balance
+            except Exception as e:
+                logger.debug(f"Balance refresh failed (using estimated): {e}")
+            
+            # Update tier if balance changed significantly
+            old_tier = self.current_tier
+            self.get_current_tier()
+            if self.current_tier != old_tier:
+                logger.info(f"🎉 Tier updated: {old_tier} → {self.current_tier}")
             
             # Remove from open positions
             del self.open_positions[symbol]
@@ -357,9 +374,25 @@ class CompleteProfitSystem:
         """Background loop that monitors positions"""
         logger.info("👁️ Starting position monitoring loop...")
         
+        balance_refresh_counter = 0
         while True:
             try:
                 await self.monitor_positions()
+                
+                # Refresh balance from exchange every 5 minutes (30 iterations * 10s = 5min)
+                balance_refresh_counter += 1
+                if balance_refresh_counter >= 30:
+                    try:
+                        balance_data = await asyncio.to_thread(self.exchange.fetch_balance)
+                        actual_balance = balance_data.get('USDT', {}).get('free', 0.0)
+                        if abs(actual_balance - self.current_balance) > 0.01:
+                            logger.info(f"💰 Periodic balance refresh: ${self.current_balance:.2f} → ${actual_balance:.2f}")
+                            self.current_balance = actual_balance
+                            self.get_current_tier()  # Update tier if needed
+                        balance_refresh_counter = 0
+                    except Exception as e:
+                        logger.debug(f"Periodic balance refresh failed: {e}")
+                
                 await asyncio.sleep(10)  # Check every 10 seconds
             except Exception as e:
                 logger.error(f"Monitor loop error: {e}")

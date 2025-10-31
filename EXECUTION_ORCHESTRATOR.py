@@ -278,14 +278,32 @@ class ExecutionOrchestrator:
         # Initialize profit system if available
         if self.profit_system:
             await self.profit_system.initialize()
+            
+            # Sync position sizer balance with actual exchange balance
+            if hasattr(self.profit_system, 'current_balance'):
+                self.position_sizer.update_balance(self.profit_system.current_balance)
+                logger.info(f"💰 Position sizer balance synced: ${self.profit_system.current_balance:.2f}")
+            
             # Start position monitoring loop in background
             asyncio.create_task(self.profit_system.run_monitoring_loop())
             logger.info("✅ COMPLETE PROFIT SYSTEM monitoring active!")
         
+        balance_sync_counter = 0
         while self.execution_enabled:
             try:
                 # Reset daily stats if new day
                 self.risk_manager.reset_daily_stats()
+                
+                # Sync balance with profit system periodically (every 2 minutes: 24 iterations * 5s)
+                balance_sync_counter += 1
+                if balance_sync_counter >= 24 and self.profit_system:
+                    try:
+                        if hasattr(self.profit_system, 'current_balance'):
+                            self.position_sizer.update_balance(self.profit_system.current_balance)
+                            logger.debug(f"💰 Balance synced in execution loop: ${self.profit_system.current_balance:.2f}")
+                        balance_sync_counter = 0
+                    except Exception as e:
+                        logger.debug(f"Balance sync error: {e}")
                 
                 # Check for decisions in alert queue
                 if not self.data_hub.alert_queue.empty():
@@ -486,9 +504,15 @@ class ExecutionOrchestrator:
                     
                     if execution_result:
                         logger.info("✅ COMPLETE PROFIT SYSTEM executed successfully!")
+                        
+                        # Sync position sizer balance after successful trade
+                        if hasattr(self.profit_system, 'current_balance'):
+                            self.position_sizer.update_balance(self.profit_system.current_balance)
                     
                 except Exception as e:
                     logger.error(f"COMPLETE PROFIT SYSTEM execution error: {e}")
+                    import traceback
+                    logger.error(traceback.format_exc())
             
             # Fallback: Try REAL_PROFIT_BOT (Gate.io)
             if not execution_result and 'real_profit' in self.engines and self.engines['real_profit']:
