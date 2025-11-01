@@ -164,20 +164,19 @@ class SessionAwareTrading:
         return multiplier >= 0.70
     
     def get_optimal_pairs_for_session(self) -> List[str]:
-        """Get list of optimal pairs for current session"""
-        session = self.get_current_session()
+        """Get list of optimal pairs for current session - uses ALL pairs from Universal Fetcher"""
+        # Get ALL pairs from Universal Fetcher
+        try:
+            from UNIVERSAL_PAIR_FETCHER import get_universal_fetcher
+            fetcher = get_universal_fetcher()
+            if fetcher and fetcher.all_pairs:
+                # Return top pairs by volume (all sessions)
+                return fetcher.top_volume_pairs if fetcher.top_volume_pairs else fetcher.all_pairs[:50]
+        except:
+            pass
         
-        if session == 'LONDON-NY_OVERLAP':
-            # All pairs good during overlap
-            return ['BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'SOL/USDT', 'XRP/USDT']
-        
-        elif session == 'LONDON':
-            # Euro/GBP focus
-            return ['BTC/USDT', 'ETH/USDT', 'EUR/USD', 'GBP/USD']
-        
-        elif session == 'NEW_YORK':
-            # Crypto + USD pairs
-            return ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'DOGE/USDT', 'PEPE/USDT']
+        # Fallback
+        return ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'BNB/USDT', 'XRP/USDT']
         
         elif session == 'ASIA':
             # Asia-focused
