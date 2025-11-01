@@ -2659,10 +2659,20 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                                     self.micro_wallet_grower.crypto_pairs = unique_pairs
                                     logger.info(f"✅ MICRO using {len(unique_pairs)} pairs from SIGNAL ENGINES!")
                             
-                            # Last resort fallback
+                            # Get pairs from Universal Fetcher
                             if not self.micro_wallet_grower.crypto_pairs:
-                                self.micro_wallet_grower.crypto_pairs = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'BNB/USDT', 'DOGE/USDT']
-                                logger.warning(f"⚠️  MICRO using 5 fallback pairs (discovery engines not ready)")
+                                try:
+                                    from UNIVERSAL_PAIR_FETCHER import get_universal_fetcher
+                                    fetcher = get_universal_fetcher()
+                                    if fetcher and len(fetcher.all_pairs) > 100:
+                                        self.micro_wallet_grower.crypto_pairs = fetcher.top_volume_pairs[:50] if fetcher.top_volume_pairs else fetcher.all_pairs[:50]
+                                        logger.info(f"✅ MICRO using {len(self.micro_wallet_grower.crypto_pairs)} pairs from Universal Fetcher!")
+                                    else:
+                                        self.micro_wallet_grower.crypto_pairs = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT']
+                                        logger.warning("⚠️  Fetcher not ready yet")
+                                except Exception as e:
+                                    self.micro_wallet_grower.crypto_pairs = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT']
+                                    logger.error(f"❌ Fetcher error: {e}")
                         
                         # Get ACTUAL signals from data hub (with direction & confidence!)
                         hub_signals = self.data_hub.get_signals(limit=50)
