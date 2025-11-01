@@ -178,10 +178,6 @@ class SessionAwareTrading:
         # Fallback
         return ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'BNB/USDT', 'XRP/USDT']
         
-        elif session == 'ASIA':
-            # Asia-focused
-            return ['BTC/USDT', 'ETH/USDT', 'BNB/USDT']
-        
         else:  # OFF_HOURS
             # Only major liquid pairs
             return ['BTC/USDT', 'ETH/USDT']
