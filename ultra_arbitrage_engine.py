@@ -129,8 +129,15 @@ class UltraArbitrageEngine:
         # Start scanning tasks for different priority levels
         tasks = []
 
-        # Divide universe into priority groups
+        # Divide universe into priority groups - check Universal Fetcher dynamically  
         all_symbols = self.universe
+        try:
+            from UNIVERSAL_PAIR_FETCHER import get_universal_fetcher
+            fetcher = get_universal_fetcher()
+            if fetcher and len(fetcher.all_pairs) > 100:
+                all_symbols = fetcher.all_pairs
+        except:
+            pass
         
         # High priority: First third of symbols
         high_priority_symbols = all_symbols[:len(all_symbols)//3] if all_symbols else ['BTC/USDT', 'ETH/USDT']

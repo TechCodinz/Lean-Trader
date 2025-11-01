@@ -150,8 +150,15 @@ class UltraScalpingEngine:
         opportunities = []
 
         try:
-            # Get market data for ALL symbols in universe
+            # Get market data for ALL symbols - check Universal Fetcher dynamically
             symbols = self.universe
+            try:
+                from UNIVERSAL_PAIR_FETCHER import get_universal_fetcher
+                fetcher = get_universal_fetcher()
+                if fetcher and len(fetcher.all_pairs) > 100:
+                    symbols = fetcher.all_pairs
+            except:
+                pass
 
             for symbol in symbols:
                 # Get price data
