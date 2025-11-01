@@ -448,10 +448,26 @@ class CompleteUnifiedOrchestrator:
             universe = self.dynamic_pairs
             logger.info(f"🌍 DYNAMIC UNIVERSE: {len(universe)} discovered pairs!")
         
-        # Minimal fallback (only if fetcher hasn't run yet)
+        # If still no universe, wait for fetcher
         if not universe:
-            universe = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'BNB/USDT', 'XRP/USDT']
-            logger.warning(f"⚠️  TEMPORARY FALLBACK: {len(universe)} pairs (Universal Fetcher will expand this!)")
+            logger.info("⏳ Waiting for Universal Pair Fetcher...")
+            import time
+            for i in range(20):  # Wait up to 20 seconds
+                time.sleep(1)
+                try:
+                    from UNIVERSAL_PAIR_FETCHER import get_universal_fetcher
+                    fetcher = get_universal_fetcher()
+                    if fetcher and len(fetcher.all_pairs) > 100:
+                        universe = fetcher.all_pairs
+                        logger.info(f"✅ Got {len(universe)} pairs from Universal Fetcher!")
+                        break
+                except:
+                    pass
+            
+            # Last resort
+            if not universe:
+                universe = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT']
+                logger.error(f"❌ STILL using fallback: {len(universe)} pairs - Fetcher failed!")
         self.ultra_core = UltraCore(self.router, universe, logger)
         
         awareness_cfg = AwarenessConfig()

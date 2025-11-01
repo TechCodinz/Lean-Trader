@@ -44,7 +44,7 @@ class MarketSession:
         'LONDON_NY_OVERLAP': {
             'start': time(13, 0),  # 13:00 UTC
             'end': time(16, 0),    # 16:00 UTC
-            'major_pairs': ['EURUSD', 'GBPUSD', 'XAUUSD', 'BTC/USDT', 'ETH/USDT'],
+            'major_pairs': [],  # Will be populated from Universal Fetcher
             'volatility': 'VERY_HIGH',
             'characteristics': 'Maximum liquidity, best for scalping'
         }
@@ -398,7 +398,7 @@ class SmartScalpingEngine:
         self.confluence_signals = 0
         self.executed_trades = 0
         
-        logger.info("🎯 Smart Scalping Engine initialized")
+        logger.info("?? Smart Scalping Engine initialized")
         logger.info(f"   Universe: {len(self.universe)} pairs")
         logger.info(f"   Multi-timeframe: {len(self.mtf_analyzer.TIMEFRAMES)} timeframes")
         logger.info(f"   Session aware: 4 sessions tracked")
@@ -420,7 +420,7 @@ class SmartScalpingEngine:
         current_session = MarketSession.get_current_session()
         session_volatility = MarketSession.get_session_volatility(current_session)
         
-        logger.info(f"🕐 Current Session: {current_session} ({session_volatility} volatility)")
+        logger.info(f"?? Current Session: {current_session} ({session_volatility} volatility)")
         
         # GET PAIRS FROM DATA HUB (not hardcoded!)
         optimal_pairs = []
@@ -429,21 +429,21 @@ class SmartScalpingEngine:
             hub_signals = self.data_hub.get_signals(limit=100)
             # Extract unique symbols
             optimal_pairs = list(set([s.get('symbol') for s in hub_signals if s.get('symbol')]))
-            logger.info(f"📡 Got {len(optimal_pairs)} pairs from data hub signals")
+            logger.info(f"?? Got {len(optimal_pairs)} pairs from data hub signals")
         
         # If no hub data yet, use universe (which could be from discovery)
         if not optimal_pairs and self.universe:
             optimal_pairs = self.universe
-            logger.info(f"📊 Using universe: {len(optimal_pairs)} pairs")
+            logger.info(f"?? Using universe: {len(optimal_pairs)} pairs")
         
         # Last resort: Use session-appropriate pairs
         if not optimal_pairs:
             optimal_pairs = MarketSession.get_optimal_pairs(current_session)
-            logger.info(f"⚠️ Using session pairs: {len(optimal_pairs)} pairs")
+            logger.info(f"?? Using session pairs: {len(optimal_pairs)} pairs")
         
         all_pairs = list(set(optimal_pairs))
         
-        logger.info(f"📊 Scanning {len(all_pairs)} optimal pairs for {current_session}")
+        logger.info(f"?? Scanning {len(all_pairs)} optimal pairs for {current_session}")
         
         for symbol in all_pairs:
             try:
@@ -451,7 +451,7 @@ class SmartScalpingEngine:
                 should_trade, reason = self.session_tracker.should_trade_pair(symbol, current_session)
                 
                 if not should_trade:
-                    logger.debug(f"⏭️  Skipping {symbol}: {reason}")
+                    logger.debug(f"??  Skipping {symbol}: {reason}")
                     continue
                 
                 # Analyze all timeframes
@@ -528,7 +528,7 @@ class SmartScalpingEngine:
                     
                     signals.append(signal)
                     
-                    logger.info(f"⚡ CONFLUENCE SIGNAL: {symbol}")
+                    logger.info(f"? CONFLUENCE SIGNAL: {symbol}")
                     logger.info(f"   Direction: {direction}")
                     logger.info(f"   Confidence: {confidence:.1%}")
                     logger.info(f"   Session: {current_session}")
@@ -541,7 +541,7 @@ class SmartScalpingEngine:
         # Log statistics
         if self.total_signals > 0:
             confluence_rate = self.confluence_signals / self.total_signals
-            logger.info(f"📊 Confluence Rate: {confluence_rate:.1%} ({self.confluence_signals}/{self.total_signals})")
+            logger.info(f"?? Confluence Rate: {confluence_rate:.1%} ({self.confluence_signals}/{self.total_signals})")
         
         return signals
     
