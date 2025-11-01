@@ -177,10 +177,6 @@ class SessionAwareTrading:
         
         # Fallback
         return ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'BNB/USDT', 'XRP/USDT']
-        
-        else:  # OFF_HOURS
-            # Only major liquid pairs
-            return ['BTC/USDT', 'ETH/USDT']
     
     async def find_session_opportunities(self, session: str) -> List[Dict]:
         """
