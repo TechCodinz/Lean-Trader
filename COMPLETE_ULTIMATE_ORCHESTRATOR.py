@@ -668,17 +668,6 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
         # Additional advanced systems
         self.advanced_systems = {}
         self.advanced_orchestrators = {}
-
-    async def _get_all_pairs(self):
-        """Get all pairs from Universal Fetcher"""
-        try:
-            from UNIVERSAL_PAIR_FETCHER import get_universal_fetcher
-            fetcher = get_universal_fetcher()
-            if fetcher and len(fetcher.all_pairs) > 100:
-                return fetcher.top_volume_pairs[:50] if fetcher.top_volume_pairs else fetcher.all_pairs[:50]
-        except Exception as e:
-            pass
-        return ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'BNB/USDT', 'XRP/USDT']
         
         # 🧠 COLLECTIVE SWARM INTELLIGENCE - Self-aware auto-adjusting coordination
         self.collective_swarm = CollectiveSwarmIntelligence(self.data_hub)
