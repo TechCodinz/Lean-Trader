@@ -1,0 +1,37 @@
+╔══════════════════════════════════════════════════════════════════════╗
+║                    🚨 RUN THIS NOW ON VPS                           ║
+╚══════════════════════════════════════════════════════════════════════╝
+
+You have local changes that need to be handled first.
+
+RUN THIS ONE COMMAND:
+
+cd ~/apex_bot && git stash && git pull origin continue-from-micro-fix && bash FORCE_APPLY_FIX.sh
+
+═══════════════════════════════════════════════════════════════════════
+
+OR run these commands one by one:
+
+cd ~/apex_bot
+git stash
+git pull origin continue-from-micro-fix
+bash FORCE_APPLY_FIX.sh
+
+═══════════════════════════════════════════════════════════════════════
+
+WHAT THIS DOES:
+
+1. git stash          → Saves your local changes temporarily
+2. git pull           → Gets latest code from branch
+3. bash script        → Applies the fix and restarts bot
+
+═══════════════════════════════════════════════════════════════════════
+
+AFTER RUNNING:
+
+✅ No more '_get_all_pairs' error
+✅ Bot using all 2,426 discovered pairs
+✅ Trading multiple different pairs
+✅ 100% operational
+
+═══════════════════════════════════════════════════════════════════════
