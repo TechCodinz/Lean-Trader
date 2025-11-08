@@ -65,10 +65,29 @@ class SwarmAgent:
         self.signal_cooldown = 1.0  # Minimum seconds between signals
         self.learning_rate = 0.01
         self.performance_history = deque(maxlen=1000)
+        
+        # 🌟 CONSCIOUSNESS INTEGRATION: Connect to consciousness harmonizer
+        try:
+            from CONSCIOUSNESS_HARMONIZER import get_consciousness_harmonizer
+            self.consciousness = get_consciousness_harmonizer()
+            # Register this agent with unique frequency based on specialization
+            freq_map = {'scalping': 240, 'arbitrage': 120, 'trend': 60, 'black_swan': 97}
+            frequency = freq_map.get(specialization, 120)
+            self.consciousness.register_engine(
+                f"Swarm Agent {agent_id} ({specialization})",
+                float(frequency),
+                "intuitive"
+            )
+        except:
+            self.consciousness = None
 
     async def analyze_market(self, symbol: str, timeframe: str) -> Optional[SwarmSignal]:
         """Analyze market and generate signal based on specialization"""
         try:
+            # 🌟 Send consciousness pulse
+            if self.consciousness:
+                self.consciousness.pulse(f"Swarm Agent {self.agent_id} ({self.specialization})", 0.8)
+            
             current_time = time.time()
             if current_time - self.last_signal_time < self.signal_cooldown:
                 return None
