@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+env/
+ENV/
+apex_venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+
+# Logs
+*.log
+logs/
+
+# Database files (runtime data, not structure)
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+!*_structure.db
+
+# Backups
+backups/*.tar.gz
+backups/*.json
+
+# Environment
+.env.local
+.env.backup
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Documentation (not needed in container)
+*.md
+!README.md
+
+# Test files
+test_*.py
+*_test.py

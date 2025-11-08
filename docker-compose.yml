@@ -1,34 +1,97 @@
+# 🐳 COMPLETE TRADING BOT - PRODUCTION DOCKER COMPOSE
+version: '3.8'
+
 services:
-  metrics:
-    image: python:3.11-slim
-    working_dir: /app
-    volumes:
-      - ./:/app
-    command: >-
-      bash -lc "pip install -r requirements.txt || pip install --no-cache-dir fastapi uvicorn prometheus_client &&
-      python -m observability.http_metrics --host 0.0.0.0 --port 8000"
-    ports:
-      - "8000:8000"
-
-  prometheus:
-    image: prom/prometheus:latest
-    volumes:
-      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./infra/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
-    ports:
-      - "9090:9090"
-    depends_on:
-      - metrics
-
-  grafana:
-    image: grafana/grafana:latest
-    ports:
-      - "${GRAFANA_HOST_PORT:-3001}:3000"
+  # Main trading bot
+  trading-bot:
+    build: .
+    container_name: apex_trading_bot
+    restart: unless-stopped
     environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
+      - TRADING_MODE=${TRADING_MODE:-live}
+      - ENABLE_LIVE=${ENABLE_LIVE:-true}
+      - AUTOMATED_MODE=true
+      - SKIP_CONFIRMATIONS=true
     volumes:
-      - ./infra/grafana/provisioning:/etc/grafana/provisioning
-      - ./infra/grafana/dashboards:/var/lib/grafana/dashboards
-      - ./infra/grafana/provisioning/alerting:/etc/grafana/provisioning/alerting
+      - ./bot_data:/app/bot_data
+      - ./logs:/app/logs
+      - ./backups:/app/backups
+      - ./.env:/app/.env:ro
+    networks:
+      - trading-network
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import os; exit(0 if os.path.exists('/app/bot_data/health.txt') else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "10"
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          cpus: '1'
+          memory: 2G
+
+  # Streamlit dashboard (optional)
+  dashboard:
+    build: .
+    container_name: apex_dashboard
+    restart: unless-stopped
+    command: streamlit run streamlit_dashboard.py --server.port 8501 --server.address 0.0.0.0
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./bot_data:/app/bot_data:ro
+      - ./logs:/app/logs:ro
+    networks:
+      - trading-network
+    depends_on:
+      - trading-bot
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  # Nginx reverse proxy (optional, for SSL and load balancing)
+  nginx:
+    image: nginx:alpine
+    container_name: apex_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    networks:
+      - trading-network
+    depends_on:
+      - dashboard
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  trading-network:
+    driver: bridge
+
+volumes:
+  bot_data:
+  logs:
+  backups:
