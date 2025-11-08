@@ -276,7 +276,13 @@ class ConfidenceValidator:
 class ProfessionalRiskManager:
     """Main risk management coordinator"""
     
-    def __init__(self, balance: float):
+    def __init__(self, balance: float = None, initial_balance: float = None):
+        # Accept both parameter names for compatibility
+        if initial_balance is not None:
+            balance = initial_balance
+        if balance is None:
+            balance = 1000.0  # Default balance
+        
         self.balance = balance
         self.volatility_stops = VolatilityAdjustedStops()
         self.portfolio_manager = PortfolioRiskManager()
