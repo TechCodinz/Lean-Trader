@@ -9,8 +9,17 @@ from sklearn.ensemble import (
     RandomForestClassifier,
     GradientBoostingClassifier,
 )
-from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CallbackQueryHandler
+try:
+    from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
+    from telegram.ext import Application, CallbackQueryHandler
+    TELEGRAM_AVAILABLE = True
+except ImportError:
+    TELEGRAM_AVAILABLE = False
+    Bot = None
+    InlineKeyboardButton = None
+    InlineKeyboardMarkup = None
+    Application = None
+    CallbackQueryHandler = None
 
 # Setup logger
 logger = logging.getLogger(__name__)

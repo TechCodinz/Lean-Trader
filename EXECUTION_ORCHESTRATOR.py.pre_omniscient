@@ -2,6 +2,8 @@
 """
 EXECUTION ORCHESTRATOR - THE MISSING PIECE
 Smart trade execution with risk management, position sizing, and profit optimization
+
+NOW WITH: Direct Gate.io execution using COMPLETE_PROFIT_SYSTEM
 """
 
 import asyncio
@@ -13,6 +15,15 @@ import time
 
 logger = logging.getLogger(__name__)
 
+# Import the COMPLETE PROFIT SYSTEM
+try:
+    from COMPLETE_PROFIT_SYSTEM import CompleteProfitSystem, get_profit_system, initialize_profit_system
+    PROFIT_SYSTEM_AVAILABLE = True
+    logger.info("✅ COMPLETE PROFIT SYSTEM loaded - Direct Gate.io execution ready!")
+except Exception as e:
+    logger.warning(f"⚠️ COMPLETE PROFIT SYSTEM not available: {e}")
+    PROFIT_SYSTEM_AVAILABLE = False
+
 
 class SmartPositionSizer:
     """Smart position sizing based on account balance and risk"""
@@ -21,7 +32,12 @@ class SmartPositionSizer:
         self.balance = initial_balance
         self.max_risk_per_trade = 0.02  # 2% max risk
         self.max_position_pct = 0.10  # 10% max position size
-        self.min_position_usd = 10.0  # $10 minimum
+        
+        # Adaptive minimum based on balance
+        if initial_balance < 100:
+            self.min_position_usd = 3.5  # $3.50 minimum for small accounts (Gate.io minimum)
+        else:
+            self.min_position_usd = 10.0  # $10 minimum for larger accounts
         
         # Dynamic sizing based on confidence
         self.use_dynamic_sizing = True
@@ -211,6 +227,18 @@ class ExecutionOrchestrator:
         self.position_sizer = SmartPositionSizer(initial_balance=1000.0)
         self.risk_manager = SmartRiskManager()
         
+        # COMPLETE PROFIT SYSTEM - Direct Gate.io execution
+        self.profit_system = None
+        if PROFIT_SYSTEM_AVAILABLE:
+            try:
+                import os
+                api_key = os.getenv('GATE_API_KEY', 'a0508d8aadf3bcb76e16f4373e1f3a76')
+                api_secret = os.getenv('GATE_API_SECRET', '451770a07dbede1b87bb92f5ce98e24029d2fe91e0053be2ec41771c953113f9')
+                self.profit_system = CompleteProfitSystem(api_key, api_secret)
+                logger.info("✅ COMPLETE PROFIT SYSTEM initialized - Direct Gate.io execution!")
+            except Exception as e:
+                logger.error(f"Failed to init profit system: {e}")
+        
         # ADVANCED COMPONENTS (wired externally)
         self.action_decider = None  # AdvancedActionDecider
         self.trailing_stop = None  # TrailingStopManager
@@ -218,7 +246,7 @@ class ExecutionOrchestrator:
         self.partial_tp = None  # PartialTPManager
         
         # Execution settings
-        self.min_confidence = 0.80  # 80% minimum confidence to execute
+        self.min_confidence = 0.75  # 75% minimum confidence to execute (lowered for more opportunities)
         self.execution_enabled = True
         
         # Performance tracking
@@ -227,16 +255,32 @@ class ExecutionOrchestrator:
         self.total_profit = 0.0
         self.execution_times = deque(maxlen=100)
         
-        logger.info("⚡ Execution Orchestrator initialized (SMART LOGIC)")
+        logger.info("⚡ Execution Orchestrator initialized (SMART LOGIC + COMPLETE PROFIT SYSTEM)")
         logger.info(f"   Mode: {mode}")
         logger.info(f"   Min Confidence: {self.min_confidence}")
         logger.info(f"   Risk per trade: {self.position_sizer.max_risk_per_trade:.1%}")
+        logger.info(f"   Profit System: {'✅ ACTIVE' if self.profit_system else '❌ INACTIVE'}")
     
     async def run_execution_loop(self):
         """
-        Main execution loop - monitors decisions and executes high-confidence trades
+        Main execution loop - monitors data hub and executes high-confidence trades
+        
+        ACTIVELY TRADES:
+        - Smart Scalping signals (75%+ confluence)
+        - Aggressive Scalping signals (momentum/breakouts)
+        - Sentient Scalping signals (hot pairs)
+        - Money Printer signals (arbitrage/market making)
+        - All other engine signals
         """
         logger.info("⚡ Starting SMART execution loop...")
+        logger.info("   → Will execute ALL scalper signals with profit targets!")
+        
+        # Initialize profit system if available
+        if self.profit_system:
+            await self.profit_system.initialize()
+            # Start position monitoring loop in background
+            asyncio.create_task(self.profit_system.run_monitoring_loop())
+            logger.info("✅ COMPLETE PROFIT SYSTEM monitoring active!")
         
         while self.execution_enabled:
             try:
@@ -250,10 +294,40 @@ class ExecutionOrchestrator:
                     # Validate and execute
                     await self.process_decision(decision)
                 
-                # Monitor open positions
+                # ACTIVELY CHECK HUB FOR NEW SIGNALS (don't just wait for alert queue!)
+                signals = self.data_hub.get_signals(limit=20)
+                
+                for signal in signals:
+                    # Only execute high-confidence scalper signals
+                    source = signal.get('source', '')
+                    strategy = signal.get('strategy', '')
+                    confidence = signal.get('confidence', 0)
+                    
+                    # Convert confidence to 0-1 range if needed
+                    if confidence > 1:
+                        confidence = confidence / 100
+                    
+                    # Execute if:
+                    # - From scalpers (Smart, Aggressive, Sentient)
+                    # - Or high confidence (>70%)
+                    # - Has profit targets
+                    is_scalper = any(x in source or x in strategy for x in [
+                        'Scalp', 'SCALP', 'Aggressive', 'Sentient', 'MOMENTUM', 'BREAKOUT', 'VOLATILITY'
+                    ])
+                    
+                    has_targets = signal.get('take_profit') or signal.get('profit_target_pct')
+                    
+                    if (is_scalper or confidence >= 0.70) and has_targets:
+                        # Execute this signal!
+                        await self.execute_signal(signal)
+                        
+                        # Rate limit
+                        await asyncio.sleep(1)
+                
+                # Monitor open positions (close at profit targets!)
                 await self.monitor_positions()
                 
-                await asyncio.sleep(1)  # Check every second
+                await asyncio.sleep(5)  # Check every 5 seconds
                 
             except Exception as e:
                 logger.error(f"Execution loop error: {e}")
@@ -392,11 +466,32 @@ class ExecutionOrchestrator:
                 stop_loss = price * (1 + stop_loss_pct)
                 take_profit = price * (1 - take_profit_pct)
             
-            # Choose execution engine based on signal source
+            # USE COMPLETE PROFIT SYSTEM for direct Gate.io execution
             execution_result = None
             
-            # Try REAL_PROFIT_BOT first (Gate.io)
-            if 'real_profit' in self.engines and self.engines['real_profit']:
+            if self.profit_system:
+                try:
+                    # Execute using COMPLETE PROFIT SYSTEM
+                    # This does ACTUAL Gate.io orders, not delegation
+                    logger.info("🚀 Using COMPLETE PROFIT SYSTEM for direct execution...")
+                    
+                    signal_dict = {
+                        'symbol': symbol,
+                        'side': side,
+                        'confidence': confidence,
+                        'price': price
+                    }
+                    
+                    execution_result = await self.profit_system.execute_signal(signal_dict)
+                    
+                    if execution_result:
+                        logger.info("✅ COMPLETE PROFIT SYSTEM executed successfully!")
+                    
+                except Exception as e:
+                    logger.error(f"COMPLETE PROFIT SYSTEM execution error: {e}")
+            
+            # Fallback: Try REAL_PROFIT_BOT (Gate.io)
+            if not execution_result and 'real_profit' in self.engines and self.engines['real_profit']:
                 try:
                     execution_result = self.engines['real_profit'].execute_trade(
                         symbol=symbol,
@@ -406,7 +501,7 @@ class ExecutionOrchestrator:
                 except Exception as e:
                     logger.debug(f"Real profit execution: {e}")
             
-            # Fallback to enhanced bot (Bybit/other exchanges)
+            # Fallback 2: Enhanced bot (Bybit/other exchanges)
             if not execution_result and 'enhanced' in self.engines:
                 try:
                     # Would execute on Bybit or other exchange

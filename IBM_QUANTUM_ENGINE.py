@@ -94,7 +94,7 @@ class QuantumMarketPredictor:
         
         return features
     
-    def create_quantum_circuit(self, features: np.ndarray, params: Optional[np.ndarray] = None) -> QuantumCircuit:
+    def create_quantum_circuit(self, features: np.ndarray, params: Optional[np.ndarray] = None):
         """Create quantum circuit for market prediction"""
         
         if not QISKIT_AVAILABLE:
@@ -243,7 +243,7 @@ class QuantumPortfolioOptimizer:
             logger.error(f"Quantum optimization error: {e}")
             return self._classical_fallback(returns, risks, budget)
     
-    def _create_qaoa_circuit(self, returns: np.ndarray, risks: np.ndarray, n_qubits: int) -> QuantumCircuit:
+    def _create_qaoa_circuit(self, returns: np.ndarray, risks: np.ndarray, n_qubits: int):
         """Create QAOA circuit for portfolio optimization"""
         
         qc = QuantumCircuit(n_qubits)
@@ -362,7 +362,7 @@ class QuantumRiskAnalyzer:
             logger.error(f"Quantum risk error: {e}")
             return self._classical_risk(position)
     
-    def _create_risk_circuit(self, entry: float, stop_loss: float, volatility: float) -> QuantumCircuit:
+    def _create_risk_circuit(self, entry: float, stop_loss: float, volatility: float):
         """Create quantum circuit for risk estimation"""
         
         qc = QuantumCircuit(self.n_qubits)

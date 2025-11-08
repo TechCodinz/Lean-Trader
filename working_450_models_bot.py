@@ -6,8 +6,15 @@ import sqlite3
 import logging
 from datetime import datetime
 from pathlib import Path
-from aiogram import Bot
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+try:
+    from aiogram import Bot
+    from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+    AIOGRAM_AVAILABLE = True
+except ImportError:
+    AIOGRAM_AVAILABLE = False
+    Bot = None
+    InlineKeyboardButton = None
+    InlineKeyboardMarkup = None
 from sklearn.ensemble import (
     RandomForestClassifier,
     GradientBoostingClassifier,

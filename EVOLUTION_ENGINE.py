@@ -9,7 +9,12 @@ import json
 import sqlite3
 import threading
 import time
-import tensorflow as tf
+try:
+    import tensorflow as tf
+    TENSORFLOW_AVAILABLE = True
+except ImportError:
+    TENSORFLOW_AVAILABLE = False
+    tf = None
 from datetime import datetime
 import random
 import numpy as np
@@ -31,8 +36,14 @@ warnings.filterwarnings('ignore')
 # Claude 4.1 Opus Advanced Features Integration
 try:
     from langchain_core.tools import Tool
+    LANGCHAIN_AVAILABLE = True
 except ImportError:
-    from langchain.tools import Tool
+    try:
+        from langchain.tools import Tool
+        LANGCHAIN_AVAILABLE = True
+    except ImportError:
+        LANGCHAIN_AVAILABLE = False
+        Tool = None
 try:
     from langchain.memory import ConversationBufferMemory
 except ImportError:
