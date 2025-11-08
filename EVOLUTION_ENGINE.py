@@ -50,11 +50,12 @@ except ImportError:
     ConversationBufferMemory = None
 
 class ULTIMATE_EVOLUTION_ENGINE:
-    def __init__(self, data_hub=None, universe=None):
+    def __init__(self, data_hub=None, universe=None, database_path=None):
         print("🚀 INITIALIZING ULTIMATE EVOLUTION ENGINE WITH CLAUDE 4.1 OPUS FEATURES...")
 
         # Data Hub for signal publishing
         self.data_hub = data_hub
+        self.database_path = database_path  # Store for later use
 
         # Core Evolution Parameters
         self.evolution_cycle = 0

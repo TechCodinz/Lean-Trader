@@ -26,7 +26,13 @@ logger = logging.getLogger(__name__)
 class CircuitBreakerSystem:
     """Emergency stop and protection system"""
     
-    def __init__(self, risk_manager=None):
+    def __init__(self, risk_manager=None, balance=None, initial_balance=None):
+        # Accept multiple parameter formats for compatibility
+        if initial_balance is not None:
+            balance = initial_balance
+        if balance is None:
+            balance = 1000.0  # Default balance
+        
         self.risk_manager = risk_manager
         
         # Circuit breaker state
@@ -43,9 +49,9 @@ class CircuitBreakerSystem:
         self.volatility_spike_threshold = 0.10  # 10% move in 1 min
         
         # Tracking
-        self.daily_start_balance = 0
-        self.peak_balance = 0
-        self.current_balance = 0
+        self.daily_start_balance = balance
+        self.peak_balance = balance
+        self.current_balance = balance
         self.consecutive_losses = 0
         self.recent_trades = deque(maxlen=50)
         self.last_prices = deque(maxlen=60)  # 1 minute of price data
