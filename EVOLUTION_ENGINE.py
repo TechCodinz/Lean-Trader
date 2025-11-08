@@ -1826,6 +1826,18 @@ class ULTIMATE_EVOLUTION_ENGINE:
     def register_new_model(self, model):
         """Register a new model in the evolution database"""
         try:
+            # Convert datetime objects to strings for JSON serialization
+            def convert_datetimes(obj):
+                if isinstance(obj, datetime):
+                    return obj.isoformat()
+                elif isinstance(obj, dict):
+                    return {k: convert_datetimes(v) for k, v in obj.items()}
+                elif isinstance(obj, list):
+                    return [convert_datetimes(item) for item in obj]
+                return obj
+            
+            model_copy = convert_datetimes(model.copy())
+            
             cursor = self.evo_db.cursor()
             cursor.execute(
                 '''
@@ -1833,18 +1845,18 @@ class ULTIMATE_EVOLUTION_ENGINE:
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             ''',
                 (
-                    model['generation'],
-                    model['type'],
-                    model['performance'],
-                    model['spawn_time'],
-                    json.dumps(model.get('parent_models', [])),
+                    model_copy['generation'],
+                    model_copy['type'],
+                    model_copy['performance'],
+                    model_copy.get('spawn_time', datetime.now().isoformat()),
+                    json.dumps(model_copy.get('parent_models', [])),
                     json.dumps(self.get_current_market_conditions()),
-                    json.dumps(model),
+                    json.dumps(model_copy),
                 ),
             )
             self.evo_db.commit()
 
-            print(f"✅ Registered new model: {model['name']}")
+            print(f"✅ Registered new model: {model_copy['name']}")
 
         except Exception as e:
             print(f"❌ Model registration error: {e}")
