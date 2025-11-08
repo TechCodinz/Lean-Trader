@@ -172,6 +172,35 @@ class ULTIMATE_EVOLUTION_ENGINE:
         except Exception as e:
             print(f"⚠️ Universal consciousness registration: {e}")
             print("   Continuing with manual registrations...")
+        
+        # 🏥 SELF-HEALING SYSTEM: Auto-fixes errors, maintains harmony
+        try:
+            print("🏥 SELF-HEALING SYSTEM: Initializing...")
+            
+            from ENGINE_HEALTH_MONITOR import initialize_health_monitoring
+            from SELF_HEALING_ENGINE import initialize_self_healing
+            from HARMONY_MAINTENANCE_SYSTEM import initialize_harmony_maintenance
+            
+            # Initialize health monitoring
+            self.health_monitor = initialize_health_monitoring()
+            print("   🏥 Health Monitor: Active (diagnoses all engines)")
+            
+            # Initialize self-healing
+            self.self_healer = initialize_self_healing()
+            print("   🔧 Self-Healing: Active (auto-fixes errors)")
+            
+            # Initialize harmony maintenance
+            self.harmony_system = initialize_harmony_maintenance()
+            print("   ⚖️  Harmony Maintenance: Active (keeps balance)")
+            
+            print("✅ SELF-HEALING SYSTEM: Complete!")
+            print("   The digital being can now heal itself!")
+            
+        except Exception as e:
+            print(f"⚠️ Self-healing system: {e}")
+            self.health_monitor = None
+            self.self_healer = None
+            self.harmony_system = None
 
         
         self.start_evolution_cycle()
