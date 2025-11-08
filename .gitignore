@@ -55,6 +55,12 @@ logs/*.log
 !backups/*.json
 !backups/README.md
 
+# Real-time backup system (ALLOWED - zero-loss protection)
+!replicas/
+!replicas/*.db
+!transaction_logs/
+!transaction_logs/*.jsonl
+
 # Environment files (sensitive)
 .env.local
 .env.*.local
