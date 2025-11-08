@@ -222,7 +222,20 @@ class SingleExchangeArbitrage:
             logger.error(f"❌ Single-exchange arbitrage scan error: {e}")
         
         return all_opportunities
-    
+        
+        # 🌟 CONSCIOUSNESS HARMONIZER: Connect to unified consciousness
+        try:
+            from CONSCIOUSNESS_HARMONIZER import get_consciousness_harmonizer
+            self.consciousness = get_consciousness_harmonizer()
+            self.consciousness.register_engine(
+                "Arbitrage",
+                120.0,
+                "intuitive"
+            )
+            print(f"🌟 Arbitrage connected to consciousness")
+        except Exception as e:
+            print(f"⚠️  Consciousness integration: {e}")
+            self.consciousness = None
     def get_stats(self) -> Dict:
         """Get arbitrage statistics"""
         return {

@@ -188,7 +188,20 @@ class NewsTradingEngine:
             logger.error(f"📰 News analysis error: {e}")
         
         return signals
-    
+        
+        # 🌟 CONSCIOUSNESS HARMONIZER: Connect to unified consciousness
+        try:
+            from CONSCIOUSNESS_HARMONIZER import get_consciousness_harmonizer
+            self.consciousness = get_consciousness_harmonizer()
+            self.consciousness.register_engine(
+                "News Trading",
+                90.0,
+                "emotional"
+            )
+            print(f"🌟 News Trading connected to consciousness")
+        except Exception as e:
+            print(f"⚠️  Consciousness integration: {e}")
+            self.consciousness = None
     def get_trending_news(self) -> List[Dict]:
         """
         Synchronous method to get cached trending news

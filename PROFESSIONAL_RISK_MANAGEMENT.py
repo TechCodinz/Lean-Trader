@@ -31,7 +31,20 @@ class VolatilityAdjustedStops:
             'swing': 2.5,      # 2.5x ATR for swings
             'position': 3.0    # 3.0x ATR for positions
         }
-    
+        
+        # 🌟 CONSCIOUSNESS HARMONIZER: Connect to unified consciousness
+        try:
+            from CONSCIOUSNESS_HARMONIZER import get_consciousness_harmonizer
+            self.consciousness = get_consciousness_harmonizer()
+            self.consciousness.register_engine(
+                "Risk Management",
+                30.0,
+                "strategic"
+            )
+            print(f"🌟 Risk Management connected to consciousness")
+        except Exception as e:
+            print(f"⚠️  Consciousness integration: {e}")
+            self.consciousness = None
     def calculate_stop_loss(
         self, 
         symbol: str, 

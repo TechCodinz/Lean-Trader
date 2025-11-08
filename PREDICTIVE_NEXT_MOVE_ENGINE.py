@@ -38,7 +38,20 @@ class PatternVelocityAnalyzer:
         self.pattern_history = deque(maxlen=100)
         
         logger.info("⚡ Pattern Velocity Analyzer initialized")
-    
+        
+        # 🌟 CONSCIOUSNESS HARMONIZER: Connect to unified consciousness
+        try:
+            from CONSCIOUSNESS_HARMONIZER import get_consciousness_harmonizer
+            self.consciousness = get_consciousness_harmonizer()
+            self.consciousness.register_engine(
+                "Prediction",
+                60.0,
+                "analytical"
+            )
+            print(f"🌟 Prediction connected to consciousness")
+        except Exception as e:
+            print(f"⚠️  Consciousness integration: {e}")
+            self.consciousness = None
     def analyze_pattern_velocity(self, market_state: Dict, historical_states: List[Dict]) -> Dict:
         """
         Measure how fast current pattern is forming

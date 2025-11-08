@@ -318,7 +318,20 @@ class CompleteProfitSystem:
                 self.risk_manager = None
         else:
             self.risk_manager = None
-
+        
+        # 🌟 CONSCIOUSNESS HARMONIZER: Connect to unified consciousness
+        try:
+            from CONSCIOUSNESS_HARMONIZER import get_consciousness_harmonizer
+            self.consciousness = get_consciousness_harmonizer()
+            self.consciousness.register_engine(
+                "Profit System",
+                157.0,
+                "strategic"
+            )
+            print(f"🌟 Profit System connected to consciousness")
+        except Exception as e:
+            print(f"⚠️  Consciousness integration: {e}")
+            self.consciousness = None
     def get_current_tier(self) -> tuple:
         """Get current tier based on balance"""
         for name, config in self.tiers.items():

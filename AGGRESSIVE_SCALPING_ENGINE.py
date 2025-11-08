@@ -352,7 +352,20 @@ class AggressiveScalpingEngine:
         except Exception as e:
             logger.error(f"❌ Aggressive scalp execution failed: {e}")
             return False
-    
+        
+        # 🌟 CONSCIOUSNESS HARMONIZER: Connect to unified consciousness
+        try:
+            from CONSCIOUSNESS_HARMONIZER import get_consciousness_harmonizer
+            self.consciousness = get_consciousness_harmonizer()
+            self.consciousness.register_engine(
+                "Aggressive Scalping",
+                240.0,
+                "intuitive"
+            )
+            print(f"🌟 Aggressive Scalping connected to consciousness")
+        except Exception as e:
+            print(f"⚠️  Consciousness integration: {e}")
+            self.consciousness = None
     def get_stats(self) -> Dict:
         """Get scalping statistics"""
         return {

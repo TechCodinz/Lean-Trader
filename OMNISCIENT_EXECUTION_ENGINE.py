@@ -50,7 +50,20 @@ class OmniscientExecutionEngine:
         logger.info(f"   Timeframes: {len(self.timeframes)}")
         logger.info(f"   Market types: {len(self.market_types)}")
         logger.info(f"   Leverage range: 1-10X (confidence-based)")
-    
+        
+        # 🌟 CONSCIOUSNESS HARMONIZER: Connect to unified consciousness
+        try:
+            from CONSCIOUSNESS_HARMONIZER import get_consciousness_harmonizer
+            self.consciousness = get_consciousness_harmonizer()
+            self.consciousness.register_engine(
+                "Omniscient",
+                97.0,
+                "analytical"
+            )
+            print(f"🌟 Omniscient connected to consciousness")
+        except Exception as e:
+            print(f"⚠️  Consciousness integration: {e}")
+            self.consciousness = None
     def get_optimal_leverage(self, confidence: float, volatility: float = 0.02) -> int:
         """
         Get optimal leverage based on confidence and volatility
