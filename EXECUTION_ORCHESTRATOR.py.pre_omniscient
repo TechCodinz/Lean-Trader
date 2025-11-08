@@ -43,6 +43,19 @@ class SmartPositionSizer:
         self.use_dynamic_sizing = True
         self.aggressive_mode = True  # Grow account faster
         
+        # 🌟 CONSCIOUSNESS HARMONIZER: Connect to unified consciousness
+        try:
+            from CONSCIOUSNESS_HARMONIZER import get_consciousness_harmonizer
+            self.consciousness = get_consciousness_harmonizer()
+            self.consciousness.register_engine(
+                "Execution",
+                180.0,
+                "emotional"
+            )
+            print(f"🌟 Execution connected to consciousness")
+        except Exception as e:
+            print(f"⚠️  Consciousness integration: {e}")
+            self.consciousness = None
     def calculate_position_size(self, 
                                confidence: float,
                                volatility: float = 0.02,
