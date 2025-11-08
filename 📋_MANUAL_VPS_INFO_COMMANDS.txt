@@ -1,0 +1,44 @@
+════════════════════════════════════════════════════════════════════════════════
+📋 MANUAL VPS INFO COMMANDS - RUN THESE ONE BY ONE
+════════════════════════════════════════════════════════════════════════════════
+
+You're in: /root/apex_bot
+Venv: apex_venv (activated)
+
+Run these commands and copy ALL the output back to me:
+
+════════════════════════════════════════════════════════════════════════════════
+
+# 1. Show current directory
+pwd
+
+# 2. Show git branch
+git branch --show-current
+
+# 3. Show last commit
+git log -1 --oneline
+
+# 4. Show available branches
+git branch -r | grep cursor
+
+# 5. Show all database files
+ls -lh *.db
+
+# 6. Show evolution databases specifically
+find . -maxdepth 2 -name "*.db" | head -20
+
+# 7. Show database sizes
+du -sh *.db 2>/dev/null
+
+# 8. Check if bot is running
+ps aux | grep RUN_BOT | grep -v grep
+
+# 9. Show git status
+git status --short
+
+# 10. Check key files exist
+ls -la PROFESSIONAL_RISK_MANAGEMENT.py EVOLUTION_ENGINE.py CIRCUIT_BREAKER_SYSTEM.py RUN_BOT.py COMPLETE_ULTIMATE_ORCHESTRATOR.py 2>/dev/null
+
+════════════════════════════════════════════════════════════════════════════════
+
+Copy and paste ALL the output from these commands back to me!
