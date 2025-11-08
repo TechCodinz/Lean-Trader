@@ -1868,12 +1868,17 @@ class ULTIMATE_EVOLUTION_ENGINE:
 
     def load_existing_models(self):
         """Load existing models from database on startup"""
+        import sqlite3
         try:
-            cursor = self.evo_db.cursor()
+            # Connect directly to database file (don't use self.evo_db which doesn't exist)
+            db = sqlite3.connect('evolution_engine.db')
+            cursor = db.cursor()
             
             # Load all existing models
             cursor.execute("SELECT * FROM model_evolution ORDER BY generation DESC")
             rows = cursor.fetchall()
+            
+            db.close()
             
             if rows:
                 print(f"🔄 LOADING EXISTING EVOLUTION DATA...")
