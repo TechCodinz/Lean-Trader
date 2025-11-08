@@ -1,0 +1,169 @@
+════════════════════════════════════════════════════════════════════════════════
+⚡ GET VPS INFO - COPY THIS TO YOUR VPS NOW ⚡
+════════════════════════════════════════════════════════════════════════════════
+
+This will collect all information about your VPS setup so I can give you the
+EXACT commands tailored to your specific configuration.
+
+════════════════════════════════════════════════════════════════════════════════
+STEP 1: SSH INTO YOUR VPS
+════════════════════════════════════════════════════════════════════════════════
+
+ssh root@your-vps-ip
+
+════════════════════════════════════════════════════════════════════════════════
+STEP 2: RUN THE DIAGNOSTIC COMMAND
+════════════════════════════════════════════════════════════════════════════════
+
+Copy and paste this ONE command:
+
+curl -sL https://raw.githubusercontent.com/TechCodinz/Lean-Trader/cursor/check-last-agent-stop-point-for-bot-functionality-8296/%F0%9F%94%8D_VPS_DIAGNOSTIC_GET_INFO.sh | bash
+
+════════════════════════════════════════════════════════════════════════════════
+ALTERNATIVE: MANUAL DIAGNOSTIC
+════════════════════════════════════════════════════════════════════════════════
+
+If the above doesn't work, run these commands one by one:
+
+# Find bot directory
+echo "=== BOT DIRECTORY ==="
+find / -name "RUN_BOT.py" 2>/dev/null | head -5
+
+# Once found, cd into it (replace path)
+cd /path/to/your/bot
+
+# Get git info
+echo "=== GIT INFO ==="
+git branch --show-current
+git log -1 --oneline
+git remote -v
+git status --short
+
+# Get current branch list
+echo "=== BRANCHES ==="
+git branch
+git branch -r | grep -E "main|cursor|production"
+
+# Check Python
+echo "=== PYTHON ==="
+python3 --version
+ls -la venv/ apex_venv/ 2>/dev/null
+
+# Check databases
+echo "=== DATABASES ==="
+ls -lh *.db
+find . -maxdepth 2 -name "*.db" -exec du -h {} \;
+
+# Check running processes
+echo "=== PROCESSES ==="
+ps aux | grep -E "RUN_BOT|python.*bot" | grep -v grep
+
+# Check logs
+echo "=== LOGS ==="
+ls -lh *.log
+tail -5 bot.log 2>/dev/null
+
+# Check disk space
+echo "=== DISK ==="
+df -h .
+du -sh .
+
+# Check key files
+echo "=== KEY FILES ==="
+ls -la RUN_BOT.py COMPLETE_ULTIMATE_ORCHESTRATOR.py PROFESSIONAL_RISK_MANAGEMENT.py EVOLUTION_ENGINE.py CIRCUIT_BREAKER_SYSTEM.py 2>/dev/null
+
+# Check backups
+echo "=== BACKUPS ==="
+ls -lht $HOME/bot_backups/ 2>/dev/null | head -5
+
+echo "=== SUMMARY ==="
+pwd
+whoami
+uname -a
+
+════════════════════════════════════════════════════════════════════════════════
+STEP 3: COPY ALL THE OUTPUT
+════════════════════════════════════════════════════════════════════════════════
+
+After running the diagnostic:
+
+1. Copy ALL the output (scroll up to get everything)
+2. Paste it back to me
+3. I'll analyze it and give you EXACT commands
+
+════════════════════════════════════════════════════════════════════════════════
+WHAT I'LL GET FROM THIS
+════════════════════════════════════════════════════════════════════════════════
+
+✅ Your exact bot directory path
+✅ Your current git branch
+✅ Your evolution database files and sizes
+✅ Whether bot is running or not
+✅ Your Python/venv setup
+✅ Your available branches
+✅ Your disk space
+✅ Any existing backups
+✅ Any uncommitted changes
+
+════════════════════════════════════════════════════════════════════════════════
+THEN I'LL GIVE YOU
+════════════════════════════════════════════════════════════════════════════════
+
+✅ EXACT cd command for your bot directory
+✅ EXACT backup command for your setup
+✅ EXACT git commands for your branch
+✅ EXACT fix commands that will work
+✅ EXACT restart commands
+✅ No guessing, no errors
+
+════════════════════════════════════════════════════════════════════════════════
+EXAMPLE OF WHAT YOU'LL GET BACK
+════════════════════════════════════════════════════════════════════════════════
+
+After you send me the output, I'll give you something like:
+
+```bash
+# YOUR EXACT COMMANDS (custom for your VPS):
+
+# 1. Go to your bot (your exact path)
+cd /root/apex_bot
+
+# 2. Backup everything (your exact databases)
+mkdir -p $HOME/bot_backups/backup_$(date +%Y%m%d_%H%M%S)
+cp -r evolution_engine.db divine_intelligence_latest.db [all your DBs] $HOME/bot_backups/...
+
+# 3. Apply fixes (your exact branch)
+git fetch origin
+git checkout cursor/check-last-agent-stop-point-for-bot-functionality-8296
+git pull
+
+# 4. Restart (your exact process)
+pkill -9 -f RUN_BOT.py
+nohup python3 RUN_BOT.py > bot.log 2>&1 &
+
+# All customized for YOUR setup!
+```
+
+════════════════════════════════════════════════════════════════════════════════
+WHY THIS IS BETTER
+════════════════════════════════════════════════════════════════════════════════
+
+Instead of:
+❌ "cd /path/to/your/bot" (you have to guess)
+❌ Generic commands that might not work
+❌ Not knowing what to backup
+❌ Hoping everything is right
+
+You get:
+✅ Exact paths for YOUR VPS
+✅ Commands that WILL work
+✅ Backup of YOUR specific files
+✅ No guessing, no errors
+
+════════════════════════════════════════════════════════════════════════════════
+🚀 RUN IT NOW
+════════════════════════════════════════════════════════════════════════════════
+
+SSH into your VPS and run the diagnostic command above.
+Then send me ALL the output.
+I'll give you perfect commands in seconds!
