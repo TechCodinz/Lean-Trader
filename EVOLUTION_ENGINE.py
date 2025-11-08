@@ -125,6 +125,10 @@ class ULTIMATE_EVOLUTION_ENGINE:
         self.initialize_market_collectors()  # Moved here from initialize_evolution_systems
         
         self.initialize_evolution_systems()
+        
+        # 🔥 LOAD EXISTING DATA (so we don't start from scratch!)
+        self.load_existing_models()
+        
         self.connect_to_live_bot()
         
         # ⚡ REAL-TIME BACKUP SYSTEM: ZERO DATA LOSS - Backs up EVERY cycle
@@ -1862,6 +1866,37 @@ class ULTIMATE_EVOLUTION_ENGINE:
         except Exception as e:
             print(f"❌ Model registration error: {e}")
 
+    def load_existing_models(self):
+        """Load existing models from database on startup"""
+        try:
+            cursor = self.evo_db.cursor()
+            
+            # Load all existing models
+            cursor.execute("SELECT * FROM model_evolution ORDER BY generation DESC")
+            rows = cursor.fetchall()
+            
+            if rows:
+                print(f"🔄 LOADING EXISTING EVOLUTION DATA...")
+                print(f"   Found {len(rows)} models in database")
+                
+                # Get the highest generation number
+                max_generation = max(row[4] for row in rows if row[4])  # generation is index 4
+                self.evolution_cycle = int(max_generation) if max_generation else 0
+                self.models_spawned = len(rows)
+                
+                print(f"✅ LOADED: Generation {self.evolution_cycle}, {len(rows)} models")
+                print(f"🚀 Bot will CONTINUE from where it left off!")
+                
+                return True
+            else:
+                print("ℹ️  No existing data - starting fresh")
+                return False
+                
+        except Exception as e:
+            print(f"⚠️  Failed to load existing models: {e}")
+            print("   Starting fresh")
+            return False
+    
     def get_total_models(self):
         """Get total number of active models"""
         total = (
