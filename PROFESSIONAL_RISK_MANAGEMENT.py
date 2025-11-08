@@ -430,3 +430,9 @@ def initialize_risk_management(balance: float) -> ProfessionalRiskManager:
     global _risk_manager
     _risk_manager = ProfessionalRiskManager(balance)
     return _risk_manager
+
+# For backward compatibility
+ProfessionalRiskManagement = ProfessionalRiskManager
+
+# Export main classes
+__all__ = ['ProfessionalRiskManager', 'PortfolioRiskManager', 'ProfessionalRiskManagement']

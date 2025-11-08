@@ -1,0 +1,9 @@
+{
+  "circuit_tripped": true,
+  "trip_reason": "DAILY_LOSS: Daily loss limit hit: -6.00%",
+  "trip_time": "2025-11-08T12:35:42.471921",
+  "resume_time": "2025-11-08T13:35:42.471921",
+  "daily_start_balance": 1000,
+  "peak_balance": 1050,
+  "consecutive_losses": 0
+}

@@ -175,8 +175,12 @@ class CircuitBreakerSystem:
         
         self.save_state()
         
-        # Send alert
-        asyncio.create_task(self._send_trip_alert())
+        # Send alert (try to create task if loop exists)
+        try:
+            asyncio.create_task(self._send_trip_alert())
+        except RuntimeError:
+            # No event loop running, schedule for later or skip
+            pass
     
     def can_resume(self) -> bool:
         """Check if bot can resume trading"""
