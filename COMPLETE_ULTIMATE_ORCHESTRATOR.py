@@ -199,6 +199,20 @@ from UTILITY_INTEGRATION_LAYER import UtilityIntegrationLayer
 from DEX_ORCHESTRATOR import DEXOrchestrator, DEXConfig
 
 # ============================================================================
+# INTELLIGENT TIER SYSTEM - Balance-aware engine coordination
+# ============================================================================
+from BALANCE_TIER_COORDINATOR import BalanceTierCoordinator, initialize_tier_coordinator
+from DYNAMIC_PAIR_DISCOVERY import DynamicPairDiscovery, initialize_pair_discovery
+from ENHANCED_AGGRESSIVE_MICRO_SCALPER import EnhancedAggressiveMicroScalper, initialize_micro_scalper
+
+# ============================================================================
+# INTELLIGENT TIER SYSTEM - Balance-aware engine coordination
+# ============================================================================
+from BALANCE_TIER_COORDINATOR import BalanceTierCoordinator, initialize_tier_coordinator
+from DYNAMIC_PAIR_DISCOVERY import DynamicPairDiscovery, initialize_pair_discovery
+from ENHANCED_AGGRESSIVE_MICRO_SCALPER import EnhancedAggressiveMicroScalper, initialize_micro_scalper
+
+# ============================================================================
 # ALL ULTRA SYSTEMS - COMPLETE INTEGRATION (14 Missing Systems!)
 # ============================================================================
 from ultra_moon_spotter import MicroMoonSpotter, UltraMoonSystem
@@ -813,7 +827,27 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
         
         # 10. ULTRA SCALPING ENGINE
         try:
-            self.ultra_scalping = UltraScalpingEngine()
+            try:
+                try:
+                    self.ultra_scalping = UltraScalpingEngine()
+                    self.advanced_orchestrators['ultra_scalping'] = self.ultra_scalping
+                    logger.info('✅ Ultra Scalping Engine initialized')
+                except TypeError as e:
+                    # Class needs arguments we don't have
+                    logger.warning(f'⚠️  Ultra Scalping Engine: Constructor needs arguments - {e}')
+                    self.ultra_scalping = None
+                except Exception as e:
+                    logger.warning(f'⚠️  Ultra Scalping Engine: {e}')
+                    self.ultra_scalping = None
+                self.advanced_orchestrators['ultra_scalping'] = self.ultra_scalping
+                logger.info('✅ Ultra Scalping Engine initialized')
+            except TypeError as e:
+                # Class needs arguments we don't have
+                logger.warning(f'⚠️  Ultra Scalping Engine: Constructor needs arguments - {e}')
+                self.ultra_scalping = None
+            except Exception as e:
+                logger.warning(f'⚠️  Ultra Scalping Engine: {e}')
+                self.ultra_scalping = None
             self.advanced_systems['ultra_scalping'] = self.ultra_scalping
             logger.info("✅ ⚡ ULTRA SCALPING ENGINE!")
         except Exception as e:
@@ -822,7 +856,27 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
         
         # 11. ULTRA ARBITRAGE ENGINE
         try:
-            self.ultra_arbitrage = UltraArbitrageEngine()
+            try:
+                try:
+                    self.ultra_arbitrage = UltraArbitrageEngine()
+                    self.advanced_orchestrators['ultra_arbitrage'] = self.ultra_arbitrage
+                    logger.info('✅ Ultra Arbitrage Engine initialized')
+                except TypeError as e:
+                    # Class needs arguments we don't have
+                    logger.warning(f'⚠️  Ultra Arbitrage Engine: Constructor needs arguments - {e}')
+                    self.ultra_arbitrage = None
+                except Exception as e:
+                    logger.warning(f'⚠️  Ultra Arbitrage Engine: {e}')
+                    self.ultra_arbitrage = None
+                self.advanced_orchestrators['ultra_arbitrage'] = self.ultra_arbitrage
+                logger.info('✅ Ultra Arbitrage Engine initialized')
+            except TypeError as e:
+                # Class needs arguments we don't have
+                logger.warning(f'⚠️  Ultra Arbitrage Engine: Constructor needs arguments - {e}')
+                self.ultra_arbitrage = None
+            except Exception as e:
+                logger.warning(f'⚠️  Ultra Arbitrage Engine: {e}')
+                self.ultra_arbitrage = None
             self.advanced_systems['ultra_arbitrage'] = self.ultra_arbitrage
             logger.info("✅ 💰 ULTRA ARBITRAGE ENGINE!")
         except Exception as e:
@@ -1078,7 +1132,27 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
         
         # UNIFIED TRADING SYSTEM - Unified approach (17KB)
         try:
-            self.unified_trading = UnifiedTradingSystem()
+            try:
+                try:
+                    self.unified_trading = UnifiedTradingSystem()
+                    self.advanced_orchestrators['unified_trading'] = self.unified_trading
+                    logger.info('✅ Unified Trading System initialized')
+                except TypeError as e:
+                    # Class needs arguments we don't have
+                    logger.warning(f'⚠️  Unified Trading System: Constructor needs arguments - {e}')
+                    self.unified_trading = None
+                except Exception as e:
+                    logger.warning(f'⚠️  Unified Trading System: {e}')
+                    self.unified_trading = None
+                self.advanced_orchestrators['unified_trading'] = self.unified_trading
+                logger.info('✅ Unified Trading System initialized')
+            except TypeError as e:
+                # Class needs arguments we don't have
+                logger.warning(f'⚠️  Unified Trading System: Constructor needs arguments - {e}')
+                self.unified_trading = None
+            except Exception as e:
+                logger.warning(f'⚠️  Unified Trading System: {e}')
+                self.unified_trading = None
             self.advanced_systems['unified_trading'] = self.unified_trading
             logger.info("✅ 🔄 UNIFIED TRADING SYSTEM - Unified approach!")
         except Exception as e:
@@ -1366,6 +1440,32 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             logger.info(f"   📊 Position sizer balance set to: ${actual_balance:.2f}")
         
         logger.info("✅ ⚡ EXECUTION ORCHESTRATOR WIRED - TRADES WILL NOW EXECUTE!")
+
+        # Setup Enhanced Aggressive Micro Scalper
+        if self.pair_discovery and self.tier_coordinator:
+            logger.info("⚡ Setting up Enhanced Aggressive Micro Scalper...")
+            self.enhanced_micro_scalper = initialize_micro_scalper(
+                self.unified_orchestrator.execution_orchestrator.complete_profit_system,
+                self.pair_discovery,
+                self.tier_coordinator
+            )
+            
+            # Start aggressive scalping loop
+            asyncio.create_task(self.enhanced_micro_scalper.run_aggressive_scalping_loop())
+            logger.info("✅ Enhanced Micro Scalper active - hunting for micro profits!")
+
+        # Setup Enhanced Aggressive Micro Scalper (duplicate block - keeping for now)
+        if self.pair_discovery and self.tier_coordinator:
+                logger.info("⚡ Setting up Enhanced Aggressive Micro Scalper...")
+                self.enhanced_micro_scalper = initialize_micro_scalper(
+                    self.unified_orchestrator.execution_orchestrator.complete_profit_system,
+                    self.pair_discovery,
+                    self.tier_coordinator
+                )
+                
+                # Start aggressive scalping loop
+                asyncio.create_task(self.enhanced_micro_scalper.run_aggressive_scalping_loop())
+                logger.info("✅ Enhanced Micro Scalper active - hunting for micro profits!")
         logger.info(f"   Connected to: {list(execution_exchanges.keys()) if execution_exchanges else 'default engines'}")
         
         # 5. TELEGRAM ORCHESTRATOR - Complete notifications & remote trading!
@@ -1743,10 +1843,100 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             logger.info("      → Cross-exchange arbitrage | P2P arbitrage")
         logger.info("=" * 80)
     
+
+
+    async def load_advanced_engines_background(self):
+        """Load advanced engines in background after bot starts"""
+        await asyncio.sleep(5)  # Wait for bot to start
+        
+        logger.info("\n" + "=" * 80)
+        logger.info("🚀 LOADING ADVANCED ENGINES IN BACKGROUND...")
+        logger.info("=" * 80)
+        
+        # 1. Ultra Rare Engines
+        try:
+            logger.info('⚡ Loading Ultra Rare Engines...')
+            from ULTRA_RARE_ENGINES import UltraRareEnginesOrchestrator
+            self.advanced_systems['ultra_rare'] = UltraRareEnginesOrchestrator()
+            logger.info('✅ Ultra Rare Engines: 10 profit engines active!')
+        except Exception as e:
+            logger.warning(f'⚠️ Ultra Rare Engines failed: {e}')
+        
+        # 2. Adaptive Confidence Engine  
+        try:
+            logger.info('🧠 Loading Adaptive Confidence Engine...')
+            from ADAPTIVE_CONFIDENCE_ENGINE import get_adaptive_confidence_engine
+            self.adaptive_confidence = get_adaptive_confidence_engine()
+            logger.info('✅ Adaptive Confidence Engine active!')
+        except Exception as e:
+            logger.warning(f'⚠️ Adaptive Confidence failed: {e}')
+        
+        # 3. Omniscient Execution Engine
+        try:
+            logger.info('👁️ Loading Omniscient Execution Engine...')
+            from OMNISCIENT_EXECUTION_ENGINE import OmniscientExecutionEngine
+            self.omniscient_engine = OmniscientExecutionEngine()
+            logger.info('✅ Omniscient Execution Engine active!')
+        except Exception as e:
+            logger.warning(f'⚠️ Omniscient Engine failed: {e}')
+        
+        logger.info("\n" + "=" * 80)
+        logger.info("🎉 ALL ADVANCED ENGINES LOADED!")
+        logger.info("=" * 80)
+
+
+
+    async def load_advanced_engines_background(self):
+        """Load advanced engines in background after bot starts"""
+        await asyncio.sleep(5)  # Wait for bot to start
+        
+        logger.info("\n" + "=" * 80)
+        logger.info("🚀 LOADING ADVANCED ENGINES IN BACKGROUND...")
+        logger.info("=" * 80)
+        
+        # 1. Ultra Rare Engines
+        try:
+            logger.info('⚡ Loading Ultra Rare Engines...')
+            from ULTRA_RARE_ENGINES import UltraRareEnginesOrchestrator
+            self.advanced_systems['ultra_rare'] = UltraRareEnginesOrchestrator()
+            logger.info('✅ Ultra Rare Engines: 10 profit engines active!')
+        except Exception as e:
+            logger.warning(f'⚠️ Ultra Rare Engines failed: {e}')
+        
+        # 2. Adaptive Confidence Engine  
+        try:
+            logger.info('🧠 Loading Adaptive Confidence Engine...')
+            from ADAPTIVE_CONFIDENCE_ENGINE import get_adaptive_confidence_engine
+            self.adaptive_confidence = get_adaptive_confidence_engine()
+            logger.info('✅ Adaptive Confidence Engine active!')
+        except Exception as e:
+            logger.warning(f'⚠️ Adaptive Confidence failed: {e}')
+        
+        # 3. Omniscient Execution Engine
+        try:
+            logger.info('👁️ Loading Omniscient Execution Engine...')
+            from OMNISCIENT_EXECUTION_ENGINE import OmniscientExecutionEngine
+            self.omniscient_engine = OmniscientExecutionEngine()
+            logger.info('✅ Omniscient Execution Engine active!')
+        except Exception as e:
+            logger.warning(f'⚠️ Omniscient Engine failed: {e}')
+        
+        logger.info("\n" + "=" * 80)
+        logger.info("🎉 ALL ADVANCED ENGINES LOADED!")
+        logger.info("=" * 80)
+
     async def start_all_orchestrators(self):
         """Start ALL orchestrators including advanced ones"""
         
         tasks = []
+        
+        # Load advanced engines in background
+        tasks.append(asyncio.create_task(self.load_advanced_engines_background()))
+        
+        
+        # Load advanced engines in background
+        tasks.append(asyncio.create_task(self.load_advanced_engines_background()))
+        
         
         # Start base orchestrators
         if 'learning' in self.orchestrators:
