@@ -1,0 +1,44 @@
+⚡ COPY PASTE THIS ON YOUR VPS ⚡
+=====================================
+
+# Option 1: ONE LINE COMMAND (automatic)
+curl -sL https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/cursor/check-last-agent-stop-point-for-bot-functionality-8296/%E2%9A%A1_COPY_PASTE_VPS_FIX_EVERYTHING.sh | bash
+
+# Option 2: MANUAL COMMANDS (if above doesn't work)
+
+cd /path/to/your/bot  # Change this to your bot directory
+
+# Fetch updates
+git fetch origin
+
+# Switch to branch with fixes
+git checkout cursor/check-last-agent-stop-point-for-bot-functionality-8296
+
+# Pull all fixes
+git pull origin cursor/check-last-agent-stop-point-for-bot-functionality-8296
+
+# Restart bot
+pkill -9 -f RUN_BOT.py
+nohup python3 RUN_BOT.py > bot.log 2>&1 &
+
+# Watch logs
+tail -f bot.log
+
+=====================================
+✅ DONE - ALL FIXES APPLIED
+=====================================
+
+WHAT WAS FIXED:
+✅ Risk management parameter errors
+✅ Evolution engine JSON errors  
+✅ Circuit breaker parameter errors
+✅ All compatibility issues
+
+VERIFICATION:
+After bot starts, check for:
+✅ No "unexpected keyword argument" errors
+✅ No "Object of type datetime" errors
+✅ Bot loads successfully
+✅ Signals are generated
+
+If you see any errors, copy them and report back!
