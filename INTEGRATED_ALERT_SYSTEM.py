@@ -312,12 +312,15 @@ Bot is now offline. Restart when ready!
     
     async def _send_to_admin(self, message: str):
         """Send message to admin chat"""
-        if self.admin_chat_id and BASIC_TELEGRAM_AVAILABLE:
+        if BASIC_TELEGRAM_AVAILABLE:
             try:
-                # Use basic telegram if premium not available
-                basic_send(message)
+                # Use basic telegram notifier (already working)
+                from telegram_notifier import send_message
+                send_message(message)
             except Exception as e:
                 logger.error(f"Failed to send admin message: {e}")
+        else:
+            logger.warning("Telegram not available")
     
     async def _send_to_vip(self, message: str):
         """Send message to VIP chat"""
