@@ -30,6 +30,20 @@ from collections import deque, defaultdict
 
 logger = logging.getLogger(__name__)
 
+# Professional Risk Management
+try:
+    from PROFESSIONAL_RISK_MANAGEMENT import (
+        get_risk_manager,
+        initialize_risk_management,
+        ProfessionalRiskManager
+    )
+    RISK_MANAGEMENT_AVAILABLE = True
+except ImportError:
+    RISK_MANAGEMENT_AVAILABLE = False
+    get_risk_manager = None
+    initialize_risk_management = None
+    logger.warning('⚠️ Professional Risk Management not available')
+
 # ============================================================================
 # APEX SYSTEM IMPORTS - The God-Tier Intelligence
 # ============================================================================
@@ -294,6 +308,17 @@ class CompleteProfitSystem:
             logger.error(f"Initialization error: {e}")
             return False
     
+        # Initialize professional risk management
+        if RISK_MANAGEMENT_AVAILABLE:
+            try:
+                self.risk_manager = initialize_risk_management(self.current_balance)
+                logger.info("🛡️ Professional Risk Management activated!")
+            except Exception as e:
+                logger.warning(f"⚠️ Risk manager initialization failed: {e}")
+                self.risk_manager = None
+        else:
+            self.risk_manager = None
+
     def get_current_tier(self) -> tuple:
         """Get current tier based on balance"""
         for name, config in self.tiers.items():

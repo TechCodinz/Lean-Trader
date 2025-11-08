@@ -1,40 +1,86 @@
-# Security - Never commit these!
-.env
-*.key
-*.pem
-private_keys/
-
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
+venv/
+env/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
-# Databases
-*.db
-*.sqlite
-*.sqlite3
-
-# Logs
-*.log
-logs/
+# Virtual Environments
+apex_venv/
+trading_venv/
+.venv/
 
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
+
+# Logs (Keep structure, ignore large logs)
+*.log
+!structure.log
+logs/*.log
+!logs/.gitkeep
+
+# Database files (Large runtime data - backup separately)
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Keep empty db files for structure
+!*_structure.db
+
+# Environment files (sensitive)
+.env.local
+.env.*.local
+
+# Backups
+*_backup_*/
+backup_*/
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Temporary
+# Trading data (backup separately, too large for git)
+bot_data/trades.jsonl
+bot_data/market_data/
+bot_data/historical/
+
+# Keep structure files
+!bot_data/.gitkeep
+!bot_data/README.md
+
+# Temporary files
 tmp/
 temp/
 *.tmp
-venv/
-apex_venv/
-*.so
-*.so.*
+
+# Large data files
+*.csv
+*.parquet
+*.h5
+*.hdf5
+
+# Keep example/template files
+!example_*.csv
+!template_*.csv
