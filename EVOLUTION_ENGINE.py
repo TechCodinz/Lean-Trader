@@ -125,6 +125,16 @@ class ULTIMATE_EVOLUTION_ENGINE:
         
         self.initialize_evolution_systems()
         self.connect_to_live_bot()
+        
+        # 🔄 AUTO-BACKUP SYSTEM: Protects against VPS failures
+        try:
+            from AUTOMATIC_CLOUD_BACKUP import initialize_auto_backup
+            self.backup_system = initialize_auto_backup(backup_every_n_cycles=100)
+            print("✅ Auto-backup system enabled (every 100 cycles)")
+        except Exception as e:
+            print(f"⚠️ Auto-backup not available: {e}")
+            self.backup_system = None
+        
         self.start_evolution_cycle()
 
     def initialize_claude_features(self):
@@ -1505,6 +1515,13 @@ class ULTIMATE_EVOLUTION_ENGINE:
 
                 # Update collective intelligence
                 self.update_collective_intelligence()
+
+                # 🔄 AUTO-BACKUP: Save learned data to cloud every N cycles
+                try:
+                    if hasattr(self, 'backup_system') and self.backup_system:
+                        self.backup_system.on_evolution_cycle(self.evolution_cycle)
+                except Exception as backup_error:
+                    print(f"⚠️ Auto-backup error: {backup_error}")
 
                 # Sleep for evolution cycle
                 time.sleep(60)  # 1 minute evolution cycles

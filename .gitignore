@@ -49,6 +49,12 @@ logs/*.log
 # Keep empty db files for structure
 !*_structure.db
 
+# Auto-backup files (ALLOWED - these protect your learned data)
+!backups/
+!backups/*.tar.gz
+!backups/*.json
+!backups/README.md
+
 # Environment files (sensitive)
 .env.local
 .env.*.local
