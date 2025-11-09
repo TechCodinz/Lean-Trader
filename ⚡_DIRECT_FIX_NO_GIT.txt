@@ -1,0 +1,31 @@
+════════════════════════════════════════════════════════════════════════════════
+🔥 DIRECT FIX - BYPASS GIT COMPLETELY!
+════════════════════════════════════════════════════════════════════════════════
+
+GIT IS BROKEN ON YOUR VPS (backup files causing conflicts).
+SO LET'S DOWNLOAD THE FIXED FILE DIRECTLY!
+
+════════════════════════════════════════════════════════════════════════════════
+COPY-PASTE THIS ON YOUR VPS:
+════════════════════════════════════════════════════════════════════════════════
+
+# Stop bot
+pkill -f COMPLETE_ULTIMATE_ORCHESTRATOR
+
+# Backup current file
+cp EVOLUTION_ENGINE.py EVOLUTION_ENGINE.py.backup
+
+# Download the fixed file directly from GitHub
+curl -o EVOLUTION_ENGINE.py 'https://raw.githubusercontent.com/TechCodinz/Lean-Trader/continue-from-micro-fix/EVOLUTION_ENGINE.py'
+
+# Start bot
+source apex_venv/bin/activate
+nohup python3 COMPLETE_ULTIMATE_ORCHESTRATOR.py > bot.log 2>&1 &
+
+# Watch for SUCCESS
+tail -f bot.log | grep -A 3 "LOADING EXISTING"
+
+════════════════════════════════════════════════════════════════════════════════
+
+This bypasses git completely and downloads the fixed file directly!
+

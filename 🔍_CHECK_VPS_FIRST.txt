@@ -1,0 +1,38 @@
+════════════════════════════════════════════════════════════════════════════════
+⚠️  THE PULL FAILED - BOT IS RUNNING OLD CODE
+════════════════════════════════════════════════════════════════════════════════
+
+WHAT HAPPENED:
+❌ git pull failed: "divergent branches"
+❌ Bot started anyway with OLD code (no fix)
+❌ It won't load your 11,082 rows yet
+
+NEED TO CHECK:
+We need to see what changed on the VPS that's causing the conflict.
+
+════════════════════════════════════════════════════════════════════════════════
+RUN THESE DIAGNOSTIC COMMANDS FIRST (don't do anything else yet):
+════════════════════════════════════════════════════════════════════════════════
+
+# Stop the bot (it's running old code anyway)
+pkill -f COMPLETE_ULTIMATE_ORCHESTRATOR
+
+# Check what's different
+cd ~/apex_bot
+git status
+
+# Show me what changed locally
+git log --oneline -5
+
+# Show me what's coming from remote
+git log --oneline origin/continue-from-micro-fix -5
+
+════════════════════════════════════════════════════════════════════════════════
+
+PASTE THE OUTPUT HERE.
+
+Then I'll give you the EXACT safe command to merge without losing anything.
+
+DON'T RUN ANY MORE COMMANDS YET - let me see the status first.
+
+════════════════════════════════════════════════════════════════════════════════
