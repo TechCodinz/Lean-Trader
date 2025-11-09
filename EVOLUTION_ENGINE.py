@@ -1884,8 +1884,8 @@ class ULTIMATE_EVOLUTION_ENGINE:
                 print(f"🔄 LOADING EXISTING EVOLUTION DATA...")
                 print(f"   Found {len(rows)} models in database")
                 
-                # Get the highest generation number
-                max_generation = max(row[4] for row in rows if row[4])  # generation is index 4
+                # Get the highest generation number (index 1, not 4!)
+                max_generation = max(row[1] for row in rows if row[1])  # generation is index 1
                 self.evolution_cycle = int(max_generation) if max_generation else 0
                 self.models_spawned = len(rows)
                 
