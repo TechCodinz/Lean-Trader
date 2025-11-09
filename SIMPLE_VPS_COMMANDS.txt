@@ -1,77 +1,46 @@
-╔══════════════════════════════════════════════════════════════════════════════╗
-║                                                                              ║
-║              SIMPLE VPS COMMANDS - Copy & Paste These                        ║
-║                                                                              ║
-╚══════════════════════════════════════════════════════════════════════════════╝
+════════════════════════════════════════════════════════════════════════════════
+🚀 SIMPLE VPS SETUP COMMANDS (COPY-PASTE THESE)
+════════════════════════════════════════════════════════════════════════════════
 
+STEP 1: Stop bot
+────────────────────────────────────────────────────────────────────────────────
+pkill -f COMPLETE_ULTIMATE_ORCHESTRATOR
+────────────────────────────────────────────────────────────────────────────────
 
-YOUR BOT IS CORRECT! ✅
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 2: Pull latest code
+────────────────────────────────────────────────────────────────────────────────
+cd ~/apex_bot
+git checkout -f continue-from-micro-fix
+git pull --no-rebase origin continue-from-micro-fix
+────────────────────────────────────────────────────────────────────────────────
 
-The pair discovery integration is in:
-  ✅ COMPLETE_ULTIMATE_ORCHESTRATOR.py (the correct file)
-  ✅ Used by RUN_BOT.py (your actual running bot)
-  ✅ Already committed to git (commit 2b2cd57)
+STEP 3: Download & run setup script
+────────────────────────────────────────────────────────────────────────────────
+curl -L -o setup_vps.sh https://raw.githubusercontent.com/TechCodinz/Lean-Trader/continue-from-micro-fix/setup_vps.sh
+bash setup_vps.sh
+────────────────────────────────────────────────────────────────────────────────
 
+OR if files already pulled, just activate IMMORTAL MEMORY:
+────────────────────────────────────────────────────────────────────────────────
+python3 IMMORTAL_MEMORY_SYSTEM.py
+python3 INTEGRATE_IMMORTAL_MEMORY.py
+────────────────────────────────────────────────────────────────────────────────
 
-ON YOUR VPS - RUN THESE COMMANDS:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 4: Start bot
+────────────────────────────────────────────────────────────────────────────────
+nohup python3 COMPLETE_ULTIMATE_ORCHESTRATOR.py > apex.log 2>&1 &
+────────────────────────────────────────────────────────────────────────────────
 
-# 1. Go to bot directory
-cd /root/trading_bot
+STEP 5: Monitor
+────────────────────────────────────────────────────────────────────────────────
+tail -f apex.log
+────────────────────────────────────────────────────────────────────────────────
 
-# 2. Pull latest changes
-git pull origin cursor/discover-profitable-trading-pairs-5d1e
+YOU SHOULD SEE:
+✅ LOADED: Generation 1020, 11082 models
+🧠 IMMORTAL MEMORY activated - Data will NEVER be lost!
+💾 BACKED UP: Generation 1020, 11082 rows → 3 locations
 
-# 3. Restart the bot
-sudo systemctl restart trading-bot-live
-
-# 4. Watch the logs
-sudo journalctl -u trading-bot-live -f
-
-
-WHAT TO LOOK FOR IN LOGS:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-You should see:
-  ✅ "🔍 Dynamic Pair Discovery initialized"
-  ✅ "✅ Dynamic Pair Discovery ready - Will scan 5000+ pairs!"
-  ✅ "🔍 DYNAMIC PAIR DISCOVERY CYCLE"
-  ✅ "✅ Discovered 5594 total pairs" (your test showed this number!)
-  ✅ "💰 Found XXX profitable pairs"
-  ✅ "✅ AUTO-ADDED XXX NEW PAIRS TO TRADING!"
-
-
-ALTERNATIVE - USE THE DEPLOY SCRIPT:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Or copy DEPLOY_PAIR_DISCOVERY_TO_VPS.sh to your VPS and run:
-  bash DEPLOY_PAIR_DISCOVERY_TO_VPS.sh
-
-It will:
-  ✅ Check git status
-  ✅ Pull latest changes
-  ✅ Verify files exist
-  ✅ Restart bot
-  ✅ Show logs
-
-
-VERIFY IT'S WORKING:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-After 30 minutes, check logs again:
-  sudo journalctl -u trading-bot-live -f
-
-You should see a new discovery cycle with pairs being added!
-
-
-THAT'S IT! ✅
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Your bot will now automatically:
-  • Discover 5000+ pairs every 30 minutes
-  • Add profitable ones
-  • Remove dead ones  
-  • Trade continuously with maximum opportunities
-
-No manual work needed! 🚀💰
+════════════════════════════════════════════════════════════════════════════════
+DONE! Your bot has photographic memory! 🧠✨
+════════════════════════════════════════════════════════════════════════════════
