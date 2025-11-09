@@ -1,0 +1,220 @@
+════════════════════════════════════════════════════════════════════════════════
+📋 QUICK VPS DIAGNOSTIC COMMANDS
+════════════════════════════════════════════════════════════════════════════════
+
+COPY-PASTE THESE COMMANDS ON YOUR VPS:
+
+════════════════════════════════════════════════════════════════════════════════
+🔍 FULL STATUS CHECK (RECOMMENDED - RUN THIS FIRST)
+════════════════════════════════════════════════════════════════════════════════
+
+cd ~/apex_bot && bash 🔍_CHECK_VPS_STATUS.sh
+
+(If file doesn't exist yet, pull it first: git pull origin continue-from-micro-fix)
+
+════════════════════════════════════════════════════════════════════════════════
+🤖 CHECK RUNNING BOT PROCESSES
+════════════════════════════════════════════════════════════════════════════════
+
+# See all Python processes:
+ps aux | grep python | grep -v grep
+
+# See specifically the orchestrator:
+ps aux | grep ORCHESTRATOR | grep -v grep
+
+# See with full command:
+ps auxww | grep -E "ORCHESTRATOR|EVOLUTION" | grep -v grep
+
+════════════════════════════════════════════════════════════════════════════════
+📊 CHECK REAL-TIME BOT ACTIVITY
+════════════════════════════════════════════════════════════════════════════════
+
+# Watch live log (Ctrl+C to stop):
+tail -f apex.log
+
+# Or if using nohup.out:
+tail -f nohup.out
+
+# Last 50 lines:
+tail -50 apex.log
+
+# Last 100 lines:
+tail -100 apex.log
+
+════════════════════════════════════════════════════════════════════════════════
+🔎 CHECK FOR RECENT TRADES
+════════════════════════════════════════════════════════════════════════════════
+
+# Recent trades:
+grep -i "trade\|signal\|executed" apex.log | tail -20
+
+# Recent profits:
+grep -i "profit\|win\|loss" apex.log | tail -20
+
+# Recent signals:
+grep -i "signal.*confidence" apex.log | tail -20
+
+════════════════════════════════════════════════════════════════════════════════
+❌ CHECK FOR ERRORS
+════════════════════════════════════════════════════════════════════════════════
+
+# Recent errors:
+grep -i "error\|exception\|failed" apex.log | tail -20
+
+# Critical errors:
+grep -iE "critical|fatal|traceback" apex.log | tail -20
+
+# Count errors:
+grep -i "error" apex.log | wc -l
+
+════════════════════════════════════════════════════════════════════════════════
+🗄️ CHECK EVOLUTION DATABASE
+════════════════════════════════════════════════════════════════════════════════
+
+# Check if database exists:
+ls -lh evolution_engine.db
+
+# Count rows:
+sqlite3 evolution_engine.db "SELECT COUNT(*) FROM model_evolution;"
+
+# Get max generation:
+sqlite3 evolution_engine.db "SELECT MAX(generation) FROM model_evolution;"
+
+# Get recent entries:
+sqlite3 evolution_engine.db "SELECT generation, model_type, performance_score FROM model_evolution ORDER BY generation DESC LIMIT 10;"
+
+════════════════════════════════════════════════════════════════════════════════
+🌿 CHECK GIT BRANCH & STATUS
+════════════════════════════════════════════════════════════════════════════════
+
+# Current branch:
+git branch --show-current
+
+# Git status:
+git status
+
+# Recent commits:
+git log --oneline -5
+
+# Check if up to date:
+git fetch && git status
+
+════════════════════════════════════════════════════════════════════════════════
+💾 CHECK SYSTEM RESOURCES
+════════════════════════════════════════════════════════════════════════════════
+
+# Memory usage:
+free -h
+
+# Disk space:
+df -h
+
+# CPU load:
+top -bn1 | head -20
+
+# Uptime:
+uptime
+
+════════════════════════════════════════════════════════════════════════════════
+📦 CHECK PYTHON PACKAGES
+════════════════════════════════════════════════════════════════════════════════
+
+# Check ccxt version:
+pip3 list | grep ccxt
+
+# Check all packages:
+pip3 list
+
+# Check if ccxt.pro available:
+python3 -c "import ccxt.pro; print('✅ ccxt.pro available')" 2>/dev/null || echo "❌ ccxt.pro not available"
+
+════════════════════════════════════════════════════════════════════════════════
+🔄 CHECK IMMORTAL MEMORY BACKUPS
+════════════════════════════════════════════════════════════════════════════════
+
+# Check backup locations:
+ls -lh /root/IMMORTAL_MEMORY/ 2>/dev/null
+ls -lh /root/apex_bot/IMMORTAL_MEMORY/ 2>/dev/null
+ls -lh /tmp/IMMORTAL_MEMORY/ 2>/dev/null
+
+# Find all evolution backups:
+find /root -name "evolution_engine_*.db" -ls 2>/dev/null
+
+════════════════════════════════════════════════════════════════════════════════
+🆕 CHECK IF NEW OPTIMIZATIONS ARE AVAILABLE
+════════════════════════════════════════════════════════════════════════════════
+
+# Check for optimization modules:
+ls -lh WEBSOCKET_DATA_FEED.py SMART_ORDER_MANAGER.py SMART_TRADE_FILTER.py SIGNAL_AGGREGATOR.py DYNAMIC_POSITION_SIZER.py 2>/dev/null
+
+# Count optimization files:
+ls -1 WEBSOCKET_*.py SMART_*.py SIGNAL_*.py DYNAMIC_*.py 2>/dev/null | wc -l
+
+════════════════════════════════════════════════════════════════════════════════
+🛑 STOP BOT (IF NEEDED)
+════════════════════════════════════════════════════════════════════════════════
+
+# Stop orchestrator:
+pkill -f COMPLETE_ULTIMATE_ORCHESTRATOR
+
+# Stop all Python:
+pkill -f python3
+
+# Verify stopped:
+ps aux | grep python | grep -v grep
+
+════════════════════════════════════════════════════════════════════════════════
+🚀 START BOT (IF STOPPED)
+════════════════════════════════════════════════════════════════════════════════
+
+# Start in background:
+nohup python3 COMPLETE_ULTIMATE_ORCHESTRATOR.py > apex.log 2>&1 &
+
+# Verify started:
+ps aux | grep ORCHESTRATOR | grep -v grep
+
+# Watch it start:
+tail -f apex.log
+
+════════════════════════════════════════════════════════════════════════════════
+📥 PULL NEW OPTIMIZATIONS
+════════════════════════════════════════════════════════════════════════════════
+
+# Pull without changing branch:
+cd ~/apex_bot
+git pull origin continue-from-micro-fix
+
+# Check what's new:
+git log --oneline -3
+
+════════════════════════════════════════════════════════════════════════════════
+✅ RECOMMENDED WORKFLOW
+════════════════════════════════════════════════════════════════════════════════
+
+1. Check what's running:
+   ps aux | grep python | grep -v grep
+
+2. Check recent activity:
+   tail -50 apex.log
+
+3. Check evolution data:
+   sqlite3 evolution_engine.db "SELECT COUNT(*), MAX(generation) FROM model_evolution;"
+
+4. Check for errors:
+   grep -i error apex.log | tail -20
+
+5. Check branch:
+   git branch --show-current
+
+6. Pull updates (if ready):
+   git pull origin continue-from-micro-fix
+
+7. Review changes:
+   ls -lh *OPTIMIZATION* *WEBSOCKET* *SMART* *SIGNAL* *DYNAMIC*
+
+════════════════════════════════════════════════════════════════════════════════
+
+💡 TIP: Save this file for quick reference!
+   You can view it anytime with: cat 📋_VPS_COMMANDS_QUICK_REF.txt
+
+════════════════════════════════════════════════════════════════════════════════
