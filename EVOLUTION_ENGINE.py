@@ -1870,6 +1870,8 @@ class ULTIMATE_EVOLUTION_ENGINE:
         """Load existing models from database on startup"""
         import sqlite3
         try:
+            print("🔄 LOADING EXISTING EVOLUTION DATA...")
+            
             # Connect directly to database file (don't use self.evo_db which doesn't exist)
             db = sqlite3.connect('evolution_engine.db')
             cursor = db.cursor()
@@ -1877,15 +1879,13 @@ class ULTIMATE_EVOLUTION_ENGINE:
             # Load all existing models
             cursor.execute("SELECT * FROM model_evolution ORDER BY generation DESC")
             rows = cursor.fetchall()
-            
             db.close()
             
             if rows:
-                print(f"🔄 LOADING EXISTING EVOLUTION DATA...")
                 print(f"   Found {len(rows)} models in database")
                 
                 # Get the highest generation number (index 1, not 4!)
-                max_generation = max(row[1] for row in rows if row[1])  # generation is index 1
+                max_generation = max(row[1] for row in rows if row[1])  # generation is column 1
                 self.evolution_cycle = int(max_generation) if max_generation else 0
                 self.models_spawned = len(rows)
                 

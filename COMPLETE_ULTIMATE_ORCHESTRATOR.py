@@ -682,6 +682,7 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
         # Additional advanced systems
         self.advanced_systems = {}
         self.advanced_orchestrators = {}
+        self.pair_discovery = None  # Initialize for universal pair fetcher
         
         # 🧠 COLLECTIVE SWARM INTELLIGENCE - Self-aware auto-adjusting coordination
         self.collective_swarm = CollectiveSwarmIntelligence(self.data_hub)
