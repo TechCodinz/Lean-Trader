@@ -1,0 +1,66 @@
+cd ~/apex_bot && bash << 'CHECKPAIRS'
+
+echo "╔════════════════════════════════════════════════════════════════╗"
+echo "║         🔍 PAIR DISCOVERY STATUS CHECK 🔍                     ║"
+echo "╚════════════════════════════════════════════════════════════════╝"
+echo ""
+
+# 1. Check if DynamicPairDiscovery is being initialized
+echo "1️⃣  Checking if pair_discovery initializes..."
+grep -A 10 "pair_discovery.*=" COMPLETE_ULTIMATE_ORCHESTRATOR.py | head -15
+echo ""
+
+# 2. Check if it's actually being called
+echo "2️⃣  Checking if discover_pairs() is called..."
+grep -n "discover_pairs\|await.*pair_discovery" COMPLETE_ULTIMATE_ORCHESTRATOR.py | head -10
+echo ""
+
+# 3. Check logs for ANY pair-related activity
+echo "3️⃣  Recent pair-related logs (last 200 lines)..."
+tail -200 apex.log | grep -i "pair\|symbol\|discover" | tail -20
+echo ""
+
+# 4. Check how many pairs the bot actually has
+echo "4️⃣  Checking active trading symbols..."
+python3 << 'PYTEST'
+import sys
+sys.path.insert(0, '.')
+
+try:
+    # Check DynamicPairDiscovery file
+    from DYNAMIC_PAIR_DISCOVERY import DynamicPairDiscovery
+    print("✅ DynamicPairDiscovery imports successfully")
+    
+    # Check if it has the discover method
+    import inspect
+    methods = [m for m in dir(DynamicPairDiscovery) if not m.startswith('_')]
+    print(f"   Available methods: {methods}")
+except Exception as e:
+    print(f"❌ Import error: {e}")
+
+try:
+    # Try to see what pairs are being used
+    import ccxt
+    exchange = ccxt.binance({'enableRateLimit': True})
+    tickers = exchange.fetch_tickers()
+    usdt_pairs = [s for s in tickers.keys() if '/USDT' in s and 'PERP' not in s and ':' not in s]
+    print(f"\n📊 Exchange has {len(usdt_pairs)} USDT pairs available")
+    print(f"   Examples: {usdt_pairs[:10]}")
+except Exception as e:
+    print(f"❌ Exchange check error: {e}")
+PYTEST
+echo ""
+
+# 5. Check what _get_all_pairs returns
+echo "5️⃣  Checking _get_all_pairs implementation..."
+grep -A 30 "async def _get_all_pairs" COMPLETE_ULTIMATE_ORCHESTRATOR.py | head -35
+echo ""
+
+# 6. Check logs for initialization
+echo "6️⃣  Bot initialization logs..."
+grep -E "initialized|Discovery|fetcher|Universal" apex.log | tail -15
+echo ""
+
+echo "✅ CHECK COMPLETE"
+
+CHECKPAIRS
