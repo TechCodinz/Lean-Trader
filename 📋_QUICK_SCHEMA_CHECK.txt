@@ -1,0 +1,20 @@
+cd ~/apex_bot && bash << 'SCHEMACHECK'
+
+echo "═══════════════════════════════════════════════════════════════"
+echo "EVOLUTION DB SCHEMA CHECK"
+echo "═══════════════════════════════════════════════════════════════"
+sqlite3 evolution_engine.db ".schema evolution_data"
+echo ""
+
+echo "═══════════════════════════════════════════════════════════════"
+echo "BACKUP FILES"
+echo "═══════════════════════════════════════════════════════════════"
+ls -lh backups/ 2>/dev/null | tail -10 || echo "No backups/ directory"
+echo ""
+
+echo "═══════════════════════════════════════════════════════════════"
+echo "CURRENT GENERATION"
+echo "═══════════════════════════════════════════════════════════════"
+grep "Generation" apex.log | tail -5
+
+SCHEMACHECK
