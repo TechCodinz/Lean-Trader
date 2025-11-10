@@ -3722,12 +3722,18 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
         if self.pair_discovery:
             try:
                 result = await self.pair_discovery.discover_pairs()
-                discovered_pairs = result.get('hot', []) + result.get('fast', []) + result.get('stable', [])
+                hot = result.get('hot', [])
+                fast = result.get('fast', [])
+                stable = result.get('stable', [])
+                discovered_pairs = hot + fast + stable
+                
                 if discovered_pairs:
-                    logger.info(f"✅ Discovered {len(discovered_pairs)} pairs from DynamicPairDiscovery")
+                    logger.info(f"✅ Discovered {len(discovered_pairs)} pairs (Hot:{len(hot)}, Fast:{len(fast)}, Stable:{len(stable)})")
                     return discovered_pairs[:100]  # Top 100
+                else:
+                    logger.warning("⚠️  Pair discovery returned empty results")
             except Exception as e:
-                logger.debug(f"Pair discovery error: {e}")
+                logger.error(f"❌ Pair discovery error: {e}")
         
         # Try 2: Use Universal Fetcher
         try:
@@ -3736,8 +3742,10 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             if fetcher and fetcher.all_pairs:
                 logger.info(f"✅ Got {len(fetcher.all_pairs)} pairs from Universal Fetcher")
                 return fetcher.top_volume_pairs[:100] if fetcher.top_volume_pairs else fetcher.all_pairs[:100]
+            else:
+                logger.warning("⚠️  Universal Fetcher returned empty")
         except Exception as e:
-            logger.debug(f"Universal fetcher error: {e}")
+            logger.warning(f"⚠️  Universal fetcher error: {e}")
         
         # Try 3: Fetch directly from exchange
         try:
@@ -3760,11 +3768,13 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                 if discovered_pairs:
                     logger.info(f"✅ Fetched {len(discovered_pairs)} pairs directly from exchange")
                     return discovered_pairs
+                else:
+                    logger.warning("⚠️  Exchange returned no pairs")
         except Exception as e:
-            logger.error(f"Direct fetch error: {e}")
+            logger.error(f"❌ Direct fetch error: {e}")
         
         # Only if everything fails, use expanded fallback
-        logger.warning("⚠️  All discovery methods failed, using expanded fallback")
+        logger.warning("🔄 All discovery methods failed, using 30-pair fallback")
         return [
             'BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'SOL/USDT', 'AVAX/USDT',
             'XRP/USDT', 'ADA/USDT', 'DOT/USDT', 'MATIC/USDT', 'LINK/USDT',
