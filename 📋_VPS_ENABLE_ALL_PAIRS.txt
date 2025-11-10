@@ -1,0 +1,42 @@
+cd ~/apex_bot && bash << 'ENABLEPAIRS'
+
+echo "╔════════════════════════════════════════════════════════════════╗"
+echo "║       🔧 ENABLE ALL PAIRS - FIX HARDCODED PAIRS 🔧            ║"
+echo "╚════════════════════════════════════════════════════════════════╝"
+echo ""
+
+# Stop bot
+echo "1️⃣  Stopping bot..."
+pkill -f COMPLETE_ULTIMATE_ORCHESTRATOR
+sleep 3
+echo "✅ Stopped"
+echo ""
+
+# Pull latest
+echo "2️⃣  Pulling fix..."
+git pull origin continue-from-micro-fix
+echo "✅ Pulled"
+echo ""
+
+# Run fix script
+echo "3️⃣  Applying pair discovery fix..."
+python3 🔧_ENABLE_ALL_PAIRS_FIX.py
+echo ""
+
+# Restart
+echo "4️⃣  Restarting bot with ALL pairs..."
+nohup python3 COMPLETE_ULTIMATE_ORCHESTRATOR.py > apex.log 2>&1 &
+sleep 10
+echo ""
+
+# Verify
+echo "5️⃣  VERIFICATION"
+echo "═══════════════════════════════════════════════════════════════"
+ps aux | grep COMPLETE_ULTIMATE_ORCHESTRATOR | grep -v grep
+echo ""
+echo "Checking for pair discovery logs:"
+tail -50 apex.log | grep -i "discover\|pairs\|forex"
+echo ""
+echo "✅ COMPLETE! Bot should now discover 100+ pairs!"
+
+ENABLEPAIRS
