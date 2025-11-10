@@ -5,7 +5,7 @@ Validates trading pairs before execution to avoid "pair not supported" errors
 """
 
 import logging
-from typing import Dict, List, Set, Optional
+from typing import Dict, List, Set, Optional, Tuple
 from datetime import datetime, timedelta
 import asyncio
 
