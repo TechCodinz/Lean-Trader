@@ -1,0 +1,56 @@
+#!/bin/bash
+# 🔥 DEPLOY ALL 159+ DORMANT SYSTEMS TO VPS
+
+cd ~/apex_bot
+
+# Stop current bot
+echo "🛑 Stopping current bot..."
+pkill -f COMPLETE_ULTIMATE_ORCHESTRATOR
+
+# Pull latest changes
+echo "📥 Pulling latest activation..."
+git pull origin continue-from-micro-fix
+
+# Restart with all systems active
+echo "🚀 Starting bot with ALL systems..."
+nohup python3 -u COMPLETE_ULTIMATE_ORCHESTRATOR.py > apex.log 2>&1 &
+
+# Wait for startup
+sleep 10
+
+# Verify activation
+echo ""
+echo "===== VERIFICATION ====="
+echo ""
+
+# Check if bot is running
+echo "1. Bot Process:"
+ps aux | grep COMPLETE_ULTIMATE_ORCHESTRATOR | grep -v grep
+
+echo ""
+echo "2. Multi-Exchange Initialization:"
+tail -200 apex.log | grep -i "exchange.*initialized"
+
+echo ""
+echo "3. Moon Spotters:"
+tail -200 apex.log | grep -i "moon.*started"
+
+echo ""
+echo "4. Dynamic Scanner:"
+tail -200 apex.log | grep -i "dynamic.*scanner"
+
+echo ""
+echo "5. Engine Health Monitor:"
+tail -200 apex.log | grep -i "registered.*engine"
+
+echo ""
+echo "6. Pair Discovery:"
+tail -100 apex.log | grep -i "discovered.*pairs"
+
+echo ""
+echo "7. Cross-Exchange Arbitrage:"
+tail -100 apex.log | grep -i "arbitrage.*started"
+
+echo ""
+echo "===== LIVE TAIL (Ctrl+C to stop) ====="
+tail -f apex.log

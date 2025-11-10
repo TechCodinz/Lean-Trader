@@ -203,6 +203,7 @@ from DEX_ORCHESTRATOR import DEXOrchestrator, DEXConfig
 # ============================================================================
 from BALANCE_TIER_COORDINATOR import BalanceTierCoordinator, initialize_tier_coordinator
 from DYNAMIC_PAIR_DISCOVERY import DynamicPairDiscovery, initialize_pair_discovery
+from DYNAMIC_MARKET_SCANNER import DynamicMarketScanner
 from ENHANCED_AGGRESSIVE_MICRO_SCALPER import EnhancedAggressiveMicroScalper, initialize_micro_scalper
 
 # ============================================================================
@@ -771,6 +772,17 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             self.advanced_systems['ultra_scout'] = None
         
         # ====================================================================
+        # DYNAMIC MARKET SCANNER - Auto-discover trending pairs
+        # ====================================================================
+        try:
+            self.dynamic_scanner = DynamicMarketScanner(self.all_exchanges, self.data_hub)
+            self.advanced_systems['dynamic_scanner'] = self.dynamic_scanner
+            logger.info("✅ 🔍 DYNAMIC MARKET SCANNER - Auto-discovers trending pairs!")
+        except Exception as e:
+            logger.warning(f"⚠️  Dynamic Scanner: {e}")
+            self.dynamic_scanner = None
+        
+        # ====================================================================
         # ALL 20 ULTRA SYSTEMS - COMPLETE INITIALIZATION
         # ====================================================================
         logger.info("\n🌟 Initializing ALL 20 ULTRA SYSTEMS...")
@@ -786,6 +798,73 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             logger.warning(f"⚠️  Ultra Moon: {e}")
             self.ultra_moon_system = None
         
+                # ====================================================================
+        # MULTI-EXCHANGE INITIALIZATION - 7+ EXCHANGES FOR MAXIMUM COVERAGE
+        # ====================================================================
+        logger.info("\n🌐 Initializing MULTI-EXCHANGE system (7+ exchanges)...")
+        
+        import ccxt.async_support as ccxt
+        self.all_exchanges = {}
+        
+        # Exchange configurations
+        exchange_configs = {
+            'binance': {
+                'apiKey': os.getenv('BINANCE_API_KEY', ''),
+                'secret': os.getenv('BINANCE_SECRET', ''),
+                'enableRateLimit': True,
+                'options': {'defaultType': 'spot'}
+            },
+            'kraken': {
+                'apiKey': os.getenv('KRAKEN_API_KEY', ''),
+                'secret': os.getenv('KRAKEN_SECRET', ''),
+                'enableRateLimit': True
+            },
+            'kucoin': {
+                'apiKey': os.getenv('KUCOIN_API_KEY', ''),
+                'secret': os.getenv('KUCOIN_SECRET', ''),
+                'password': os.getenv('KUCOIN_PASSWORD', ''),
+                'enableRateLimit': True
+            },
+            'okx': {
+                'apiKey': os.getenv('OKX_API_KEY', ''),
+                'secret': os.getenv('OKX_SECRET', ''),
+                'password': os.getenv('OKX_PASSWORD', ''),
+                'enableRateLimit': True
+            },
+            'bybit': {
+                'apiKey': os.getenv('BYBIT_API_KEY', ''),
+                'secret': os.getenv('BYBIT_SECRET', ''),
+                'enableRateLimit': True
+            },
+            'mexc': {
+                'apiKey': os.getenv('MEXC_API_KEY', ''),
+                'secret': os.getenv('MEXC_SECRET', ''),
+                'enableRateLimit': True
+            },
+            'gateio': {
+                'apiKey': os.getenv('GATE_API_KEY', ''),
+                'secret': os.getenv('GATE_SECRET', ''),
+                'enableRateLimit': True
+            },
+            'coinbase': {
+                'apiKey': os.getenv('COINBASE_API_KEY', ''),
+                'secret': os.getenv('COINBASE_SECRET', ''),
+                'enableRateLimit': True
+            }
+        }
+        
+        # Initialize exchanges (even without keys for public data)
+        for exchange_name, config in exchange_configs.items():
+            try:
+                exchange_class = getattr(ccxt, exchange_name)
+                exchange = exchange_class(config)
+                self.all_exchanges[exchange_name] = exchange
+                logger.info(f"   ✅ {exchange_name} initialized")
+            except Exception as e:
+                logger.warning(f"   ⚠️  {exchange_name}: {str(e)[:50]}")
+        
+        logger.info(f"✅ {len(self.all_exchanges)} exchanges active: {list(self.all_exchanges.keys())}")
+
         # 3. ULTRA FOREX MASTER - Professional forex trading
         try:
             self.forex_master = UltraForexMaster()
@@ -1400,6 +1479,76 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
     
     async def wire_all_systems(self):
         """Wire ALL systems including advanced ones"""
+        
+        # ====================================================================
+        # START ALL SCANNING ENGINES FIRST - Create async tasks
+        # ====================================================================
+        logger.info("\n🚀 Starting all scanning engines...")
+        
+        # Start Moon Spotters
+        if hasattr(self, 'micro_moon_spotter') and self.micro_moon_spotter:
+            asyncio.create_task(self._run_moon_spotter())
+            logger.info("   🌙 MicroMoonSpotter STARTED")
+        
+        if hasattr(self, 'ultra_moon_system') and self.ultra_moon_system:
+            asyncio.create_task(self._run_ultra_moon_system())
+            logger.info("   🌙 UltraMoonSystem STARTED")
+        
+        # Start Dynamic Scanner
+        if hasattr(self, 'dynamic_scanner') and self.dynamic_scanner:
+            asyncio.create_task(self.dynamic_scanner.run_continuous_scanning())
+            logger.info("   🔍 DynamicMarketScanner STARTED")
+        
+        # Start Cross-Exchange Arbitrage on all exchanges
+        if hasattr(self, 'cross_exchange_arb') and self.cross_exchange_arb:
+            asyncio.create_task(self.cross_exchange_arb.run_arbitrage_scanner())
+            logger.info("   💰 CrossExchangeArbitrage STARTED")
+        
+        # Start Multi-Platform Scanner
+        if hasattr(self, 'multi_platform') and self.multi_platform:
+            asyncio.create_task(self._run_multi_platform_scanner())
+            logger.info("   🔍 MultiPlatformScanner STARTED")
+        
+        logger.info("✅ All scanning engines started!")
+        
+        # ====================================================================
+        # REGISTER ALL ENGINES WITH ENGINE_HEALTH_MONITOR
+        # ====================================================================
+        if hasattr(self, 'engine_monitor') and self.engine_monitor:
+            logger.info("\n🏥 Registering engines with health monitor...")
+            
+            # Register all active engines
+            engines_to_register = []
+            
+            # Core engines
+            if hasattr(self, 'aggressive_scalper'): engines_to_register.append(('aggressive_scalper', self.aggressive_scalper))
+            if hasattr(self, 'micro_wallet_grower'): engines_to_register.append(('micro_wallet_grower', self.micro_wallet_grower))
+            if hasattr(self, 'cross_exchange_arb'): engines_to_register.append(('cross_exchange_arb', self.cross_exchange_arb))
+            if hasattr(self, 'single_arb'): engines_to_register.append(('single_arb', self.single_arb))
+            
+            # Ultra engines
+            if hasattr(self, 'micro_moon_spotter'): engines_to_register.append(('micro_moon_spotter', self.micro_moon_spotter))
+            if hasattr(self, 'ultra_moon_system'): engines_to_register.append(('ultra_moon_system', self.ultra_moon_system))
+            if hasattr(self, 'dynamic_scanner'): engines_to_register.append(('dynamic_scanner', self.dynamic_scanner))
+            if hasattr(self, 'ultra_scalping'): engines_to_register.append(('ultra_scalping', self.ultra_scalping))
+            if hasattr(self, 'ultra_arbitrage'): engines_to_register.append(('ultra_arbitrage', self.ultra_arbitrage))
+            if hasattr(self, 'forex_master'): engines_to_register.append(('forex_master', self.forex_master))
+            
+            # Consciousness engines
+            if hasattr(self, 'brain_system'): engines_to_register.append(('brain_system', self.brain_system))
+            if hasattr(self, 'hivemind'): engines_to_register.append(('hivemind', self.hivemind))
+            if hasattr(self, 'swarm_intelligence'): engines_to_register.append(('swarm_intelligence', self.swarm_intelligence))
+            
+            # Register each engine (if engine_monitor has register method)
+            for name, engine in engines_to_register:
+                try:
+                    if hasattr(self.engine_monitor, 'register_engine'):
+                        self.engine_monitor.register_engine(name, engine)
+                        logger.info(f"   ✅ Registered: {name}")
+                except Exception as e:
+                    logger.debug(f"   Skip {name}: {e}")
+            
+            logger.info(f"✅ {len(engines_to_register)} engines registered with health monitor")
         
         # First do base wiring
         await super().wire_all_systems()
@@ -3810,6 +3959,40 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
         except Exception as e:
             logger.debug(f"Balance fetch error: {e}")
             return 1000.0
+    
+    async def _run_moon_spotter(self):
+        """Run micro moon spotter continuously"""
+        while True:
+            try:
+                gems = await self.micro_moon_spotter.scan_for_new_gems()
+                if gems:
+                    logger.info(f"🌙 Found {len(gems)} potential gems!")
+                await asyncio.sleep(300)  # Every 5 minutes
+            except Exception as e:
+                logger.error(f"Moon spotter error: {e}")
+                await asyncio.sleep(60)
+    
+    async def _run_ultra_moon_system(self):
+        """Run ultra moon system continuously"""
+        while True:
+            try:
+                if hasattr(self.ultra_moon_system, 'run'):
+                    await self.ultra_moon_system.run()
+                await asyncio.sleep(600)  # Every 10 minutes
+            except Exception as e:
+                logger.error(f"Ultra moon error: {e}")
+                await asyncio.sleep(120)
+    
+    async def _run_multi_platform_scanner(self):
+        """Run multi-platform scanner continuously"""
+        while True:
+            try:
+                if hasattr(self.multi_platform, 'scan_all_platforms'):
+                    await self.multi_platform.scan_all_platforms()
+                await asyncio.sleep(900)  # Every 15 minutes
+            except Exception as e:
+                logger.error(f"Multi-platform error: {e}")
+                await asyncio.sleep(180)
     
     async def _emergency_close_all_positions(self):
         """Emergency close ALL positions"""
