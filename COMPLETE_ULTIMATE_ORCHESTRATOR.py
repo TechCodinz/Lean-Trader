@@ -764,42 +764,7 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
         logger.info("🌟 Phase 6: Advanced Systems...")
         logger.info("=" * 80)
         
-        # 1. UltraScout
-        try:
-            self.advanced_systems['ultra_scout'] = UltraScout(max_threads=4)
-            logger.info("✅ UltraScout initialized (news, social, web, on-chain)")
-        except Exception as e:
-            logger.warning(f"UltraScout: {e}")
-            self.advanced_systems['ultra_scout'] = None
-        
         # ====================================================================
-        # DYNAMIC MARKET SCANNER - Auto-discover trending pairs
-        # ====================================================================
-        try:
-            self.dynamic_scanner = DynamicMarketScanner(self.all_exchanges, self.data_hub)
-            self.advanced_systems['dynamic_scanner'] = self.dynamic_scanner
-            logger.info("✅ 🔍 DYNAMIC MARKET SCANNER - Auto-discovers trending pairs!")
-        except Exception as e:
-            logger.warning(f"⚠️  Dynamic Scanner: {e}")
-            self.dynamic_scanner = None
-        
-        # ====================================================================
-        # ALL 20 ULTRA SYSTEMS - COMPLETE INITIALIZATION
-        # ====================================================================
-        logger.info("\n🌟 Initializing ALL 20 ULTRA SYSTEMS...")
-        
-        # 2. ULTRA MOON SPOTTER - Find 1,000,000x micro cap gems
-        try:
-            self.ultra_moon_system = UltraMoonSystem()
-            self.micro_moon_spotter = MicroMoonSpotter()
-            self.advanced_systems['ultra_moon'] = self.ultra_moon_system
-            self.advanced_systems['micro_moon'] = self.micro_moon_spotter
-            logger.info("✅ 🌙 ULTRA MOON SPOTTER - Finds 1,000,000x gems!")
-        except Exception as e:
-            logger.warning(f"⚠️  Ultra Moon: {e}")
-            self.ultra_moon_system = None
-        
-                # ====================================================================
         # MULTI-EXCHANGE INITIALIZATION - 7+ EXCHANGES FOR MAXIMUM COVERAGE
         # ====================================================================
         logger.info("\n🌐 Initializing MULTI-EXCHANGE system (7+ exchanges)...")
@@ -865,7 +830,42 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                 logger.warning(f"   ⚠️  {exchange_name}: {str(e)[:50]}")
         
         logger.info(f"✅ {len(self.all_exchanges)} exchanges active: {list(self.all_exchanges.keys())}")
-
+        
+        # 1. UltraScout
+        try:
+            self.advanced_systems['ultra_scout'] = UltraScout(max_threads=4)
+            logger.info("✅ UltraScout initialized (news, social, web, on-chain)")
+        except Exception as e:
+            logger.warning(f"UltraScout: {e}")
+            self.advanced_systems['ultra_scout'] = None
+        
+        # ====================================================================
+        # DYNAMIC MARKET SCANNER - Auto-discover trending pairs
+        # ====================================================================
+        try:
+            self.dynamic_scanner = DynamicMarketScanner(self.all_exchanges, self.data_hub)
+            self.advanced_systems['dynamic_scanner'] = self.dynamic_scanner
+            logger.info("✅ 🔍 DYNAMIC MARKET SCANNER - Auto-discovers trending pairs!")
+        except Exception as e:
+            logger.warning(f"⚠️  Dynamic Scanner: {e}")
+            self.dynamic_scanner = None
+        
+        # ====================================================================
+        # ALL 20 ULTRA SYSTEMS - COMPLETE INITIALIZATION
+        # ====================================================================
+        logger.info("\n🌟 Initializing ALL 20 ULTRA SYSTEMS...")
+        
+        # 2. ULTRA MOON SPOTTER - Find 1,000,000x micro cap gems
+        try:
+            self.ultra_moon_system = UltraMoonSystem()
+            self.micro_moon_spotter = MicroMoonSpotter()
+            self.advanced_systems['ultra_moon'] = self.ultra_moon_system
+            self.advanced_systems['micro_moon'] = self.micro_moon_spotter
+            logger.info("✅ 🌙 ULTRA MOON SPOTTER - Finds 1,000,000x gems!")
+        except Exception as e:
+            logger.warning(f"⚠️  Ultra Moon: {e}")
+            self.ultra_moon_system = None
+        
         # 3. ULTRA FOREX MASTER - Professional forex trading
         try:
             self.forex_master = UltraForexMaster()
