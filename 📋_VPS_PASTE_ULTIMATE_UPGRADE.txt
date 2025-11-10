@@ -1,0 +1,107 @@
+cd ~/apex_bot && bash << 'ULTIMATE_UPGRADE'
+
+echo "╔════════════════════════════════════════════════════════════════╗"
+echo "║     🚀 ULTIMATE CONSCIOUSNESS UPGRADE - DEPLOYMENT 🚀         ║"
+echo "╚════════════════════════════════════════════════════════════════╝"
+echo ""
+
+# 1. Stop bot
+echo "═══════════════════════════════════════════════════════════════"
+echo "1️⃣  STOPPING BOT"
+echo "═══════════════════════════════════════════════════════════════"
+pkill -f COMPLETE_ULTIMATE_ORCHESTRATOR
+sleep 3
+echo "✅ Bot stopped"
+echo ""
+
+# 2. Pull latest changes
+echo "═══════════════════════════════════════════════════════════════"
+echo "2️⃣  PULLING LATEST ENHANCEMENTS"
+echo "═══════════════════════════════════════════════════════════════"
+git fetch origin continue-from-micro-fix
+git pull origin continue-from-micro-fix
+echo "✅ Latest code pulled"
+echo ""
+
+# 3. Check new files
+echo "═══════════════════════════════════════════════════════════════"
+echo "3️⃣  NEW INTELLIGENCE SYSTEMS"
+echo "═══════════════════════════════════════════════════════════════"
+for file in BALANCE_AWARE_INTELLIGENCE.py EXCHANGE_PAIR_VALIDATOR.py MEMORY_STATION.py MULTI_MODEL_TASK_DISTRIBUTOR.py; do
+    if [ -f "$file" ]; then
+        echo "✅ $file"
+    else
+        echo "❌ $file (MISSING)"
+    fi
+done
+echo ""
+
+# 4. Test imports
+echo "═══════════════════════════════════════════════════════════════"
+echo "4️⃣  TESTING IMPORTS"
+echo "═══════════════════════════════════════════════════════════════"
+python3 << 'PYTEST'
+try:
+    from BALANCE_AWARE_INTELLIGENCE import BalanceAwareIntelligence
+    print("✅ Balance-Aware Intelligence")
+except Exception as e:
+    print(f"❌ Balance Intelligence: {e}")
+
+try:
+    from EXCHANGE_PAIR_VALIDATOR import ExchangePairValidator
+    print("✅ Exchange Pair Validator")
+except Exception as e:
+    print(f"❌ Pair Validator: {e}")
+
+try:
+    from MEMORY_STATION import get_memory_station
+    print("✅ Memory Station")
+except Exception as e:
+    print(f"❌ Memory Station: {e}")
+
+try:
+    from MULTI_MODEL_TASK_DISTRIBUTOR import get_task_distributor
+    print("✅ Multi-Model Task Distributor")
+except Exception as e:
+    print(f"❌ Task Distributor: {e}")
+PYTEST
+echo ""
+
+# 5. Apply integration
+echo "═══════════════════════════════════════════════════════════════"
+echo "5️⃣  APPLYING BRAIN & HIVEMIND WIRING"
+echo "═══════════════════════════════════════════════════════════════"
+
+# Add Brain wiring to COMPLETE_ULTIMATE_ORCHESTRATOR.py
+# This will be done manually in the next step
+
+echo "⚠️  Manual integration required (see integration guide)"
+echo ""
+
+# 6. Restart bot
+echo "═══════════════════════════════════════════════════════════════"
+echo "6️⃣  RESTARTING BOT WITH ALL ENHANCEMENTS"
+echo "═══════════════════════════════════════════════════════════════"
+nohup python3 COMPLETE_ULTIMATE_ORCHESTRATOR.py > apex.log 2>&1 &
+sleep 8
+echo ""
+
+# 7. Verify systems
+echo "═══════════════════════════════════════════════════════════════"
+echo "7️⃣  VERIFYING ALL SYSTEMS"
+echo "═══════════════════════════════════════════════════════════════"
+
+echo ""
+echo "Bot running?"
+ps aux | grep COMPLETE_ULTIMATE_ORCHESTRATOR | grep -v grep
+
+echo ""
+echo "Recent logs:"
+tail -20 apex.log | grep -E "Balance|Pair|Memory|Task|Brain|Hivemind"
+
+echo ""
+echo "═══════════════════════════════════════════════════════════════"
+echo "✅ UPGRADE DEPLOYMENT COMPLETE"
+echo "═══════════════════════════════════════════════════════════════"
+
+ULTIMATE_UPGRADE
