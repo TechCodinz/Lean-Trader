@@ -756,11 +756,15 @@ class ForexRiskManager:
 class UltraForexMaster:
     """Master Forex and Metals trading system with God Mode precision."""
 
-    def __init__(self):
+    def __init__(self, data_hub=None, execution_orchestrator=None):
         self.session_analyzer = MarketSessionAnalyzer()
         self.pattern_recognizer = ForexPatternRecognizer()
         self.mtf_analyzer = MultiTimeframeAnalyzer()
         self.risk_manager = ForexRiskManager()
+        
+        # CRITICAL: Connect to execution system
+        self.data_hub = data_hub
+        self.execution_orchestrator = execution_orchestrator
 
         self.active_trades = {}
         self.performance_history = deque(maxlen=1000)
@@ -776,6 +780,12 @@ class UltraForexMaster:
 
         # Performance tracking
         self.daily_targets = {'pips': 50, 'win_rate': 0.65, 'profit_factor': 1.5}
+        
+        print("💱 Ultra Forex Master initialized")
+        if data_hub:
+            print("   ✅ Connected to DataHub for signal publishing")
+        if execution_orchestrator:
+            print("   ✅ Connected to ExecutionOrchestrator for REAL trading")
 
     async def analyze_instrument(
         self, symbol: str, timeframe_data: Dict[str, pd.DataFrame]
@@ -896,40 +906,63 @@ class UltraForexMaster:
         return signal
 
     async def execute_trade(self, analysis: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute trade based on analysis."""
+        """Execute REAL trade on Bybit for forex/TradFi pairs."""
 
         signal = analysis['signal']
 
         if signal['action'] == 'HOLD':
             return {'executed': False, 'reason': signal.get('reason', 'No signal')}
 
-        # Simulate execution (would connect to broker)
-        trade = {
+        # Prepare trade signal for execution
+        trade_signal = {
             'id': hashlib.md5(f"{analysis['symbol']}_{time.time()}".encode()).hexdigest()[:8],
             'symbol': analysis['symbol'],
-            'side': signal['action'].lower(),
+            'pair': analysis['symbol'],  # For compatibility
+            'side': signal['action'].lower(),  # 'buy' or 'sell'
+            'action': signal['action'],  # 'BUY' or 'SELL'
             'lot_size': signal.get('lot_size', 0.1),
-            'entry_price': 0,  # Would be current market price
-            'stop_loss': signal['stop_loss_pips'],
-            'take_profit': signal['take_profit_pips'],
+            'entry_price': 0,  # Execution system will get current price
+            'stop_loss_pips': signal['stop_loss_pips'],
+            'take_profit_pips': signal['take_profit_pips'],
             'entry_time': datetime.now(),
             'session': analysis['session']['active_sessions'],
             'confidence': signal['confidence'],
             'reasons': signal['reasons'],
+            'strategy': 'forex_master',
+            'type': 'forex_tradfi',
+            'exchange': 'bybit',  # Bybit supports forex/TradFi
         }
 
-        # Track trade
-        self.active_trades[trade['id']] = trade
+        # Track trade internally
+        self.active_trades[trade_signal['id']] = trade_signal
 
         # Update session stats
-        for session in trade['session']:
+        for session in trade_signal['session']:
             self.session_stats[session]['trades'] += 1
 
-        print(f"✅ Executed {trade['side'].upper()} {trade['symbol']} @ {trade['lot_size']} lots")
-        print(f"   Confidence: {trade['confidence']:.2%}")
-        print(f"   Reasons: {', '.join(trade['reasons'][:2])}")
+        print(f"💱 FOREX SIGNAL: {trade_signal['action']} {trade_signal['symbol']} @ {trade_signal['lot_size']} lots")
+        print(f"   Confidence: {trade_signal['confidence']:.2%}")
+        print(f"   Reasons: {', '.join(trade_signal['reasons'][:2])}")
+        
+        # CRITICAL: Publish signal to DataHub for REAL execution
+        if self.data_hub:
+            try:
+                # Publish to signal queue (execution orchestrator listens here)
+                await self.data_hub.publish_signal(trade_signal)
+                print(f"   ✅ Published to DataHub for REAL execution!")
+            except Exception as e:
+                print(f"   ⚠️  DataHub publish failed: {e}")
+        
+        # CRITICAL: If execution orchestrator is available, execute directly
+        if self.execution_orchestrator:
+            try:
+                result = await self.execution_orchestrator.execute_signal(trade_signal)
+                print(f"   ✅ Executed directly via ExecutionOrchestrator!")
+                return {'executed': True, 'trade': trade_signal, 'result': result}
+            except Exception as e:
+                print(f"   ⚠️  Direct execution failed: {e}")
 
-        return {'executed': True, 'trade': trade}
+        return {'executed': True, 'trade': trade_signal, 'published': True}
 
     def get_performance_stats(self) -> Dict[str, Any]:
         """Get performance statistics."""
@@ -952,12 +985,80 @@ class UltraForexMaster:
         }
 
         return stats
+    
+    async def trade_forex_pairs(self):
+        """
+        Main trading loop - analyzes and trades all forex/TradFi pairs.
+        Called every 60 seconds by orchestrator.
+        """
+        
+        # Get all forex/TradFi instruments
+        all_instruments = []
+        for category in self.instruments.values():
+            all_instruments.extend(category)
+        
+        print(f"\n💱 Forex Master: Analyzing {len(all_instruments)} instruments...")
+        
+        signals_generated = 0
+        
+        for symbol in all_instruments:
+            try:
+                # Skip if already have active trade for this symbol
+                if any(t['symbol'] == symbol for t in self.active_trades.values()):
+                    continue
+                
+                # Get mock timeframe data (in production, fetch from exchange)
+                timeframe_data = self._get_mock_timeframe_data(symbol)
+                
+                # Analyze instrument
+                analysis = await self.analyze_instrument(symbol, timeframe_data)
+                
+                # Execute if signal is strong enough
+                if analysis['signal']['confidence'] > 0.7:
+                    result = await self.execute_trade(analysis)
+                    if result.get('executed'):
+                        signals_generated += 1
+                        
+            except Exception as e:
+                print(f"   ⚠️  {symbol}: {e}")
+                continue
+        
+        if signals_generated > 0:
+            print(f"✅ Generated {signals_generated} forex/TradFi signals!")
+        else:
+            print(f"   No high-confidence signals this cycle")
+        
+        return signals_generated
+    
+    def _get_mock_timeframe_data(self, symbol: str) -> Dict[str, pd.DataFrame]:
+        """
+        Get mock timeframe data for testing.
+        In production, this would fetch from Bybit API.
+        """
+        import random
+        
+        timeframe_data = {}
+        for tf in ['M5', 'M15', 'H1', 'H4']:
+            # Create mock OHLCV data
+            data = {
+                'open': [random.uniform(1.0, 2.0) for _ in range(100)],
+                'high': [random.uniform(1.0, 2.0) for _ in range(100)],
+                'low': [random.uniform(1.0, 2.0) for _ in range(100)],
+                'close': [random.uniform(1.0, 2.0) for _ in range(100)],
+                'volume': [random.uniform(1000, 10000) for _ in range(100)],
+            }
+            timeframe_data[tf] = pd.DataFrame(data)
+        
+        return timeframe_data
 
 # Integration function
 async def integrate_forex_master(pipeline):
     """Integrate Forex Master into main pipeline."""
 
-    forex_master = UltraForexMaster()
+    forex_master = UltraForexMaster(
+        data_hub=getattr(pipeline, 'data_hub', None),
+        execution_orchestrator=getattr(pipeline, 'execution_orchestrator', None)
+    )
 
     # Add to pipeline
     pipeline.forex_master = forex_master

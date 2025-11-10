@@ -906,9 +906,15 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
         
         # 3. ULTRA FOREX MASTER - Professional forex trading
         try:
-            self.forex_master = UltraForexMaster()
+            # CRITICAL: Pass data_hub and execution_orchestrator for REAL trading!
+            self.forex_master = UltraForexMaster(
+                data_hub=self.data_hub,
+                execution_orchestrator=getattr(self, 'execution_orchestrator', None)
+            )
             self.advanced_systems['forex_master'] = self.forex_master
             logger.info("✅ 💱 ULTRA FOREX MASTER - Major pairs + Exotics!")
+            logger.info("   → Connected to DataHub for signal publishing")
+            logger.info("   → Will execute REAL trades on Bybit TradFi!")
         except Exception as e:
             logger.warning(f"⚠️  Forex Master: {e}")
             self.forex_master = None
