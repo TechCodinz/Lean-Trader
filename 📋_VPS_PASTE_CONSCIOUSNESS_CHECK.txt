@@ -1,0 +1,123 @@
+cd ~/apex_bot && bash << 'CHECKEND'
+
+echo "╔════════════════════════════════════════════════════════════════╗"
+echo "║     🧠 CONSCIOUSNESS & INTELLIGENCE SYSTEMS AUDIT 🧠           ║"
+echo "╚════════════════════════════════════════════════════════════════╝"
+echo ""
+
+# Bot status
+echo "═══════════════════════════════════════════════════════════════"
+echo "1️⃣  BOT STATUS"
+echo "═══════════════════════════════════════════════════════════════"
+ps aux | grep COMPLETE_ULTIMATE_ORCHESTRATOR | grep -v grep
+echo ""
+
+# File check
+echo "═══════════════════════════════════════════════════════════════"
+echo "2️⃣  CONSCIOUSNESS FILES"
+echo "═══════════════════════════════════════════════════════════════"
+for file in brain.py hivemind.py SENTIENT_TRADING_BRAIN.py COLLECTIVE_SWARM_INTELLIGENCE.py CONSCIOUSNESS_HARMONIZER.py IMMORTAL_MEMORY_SYSTEM.py EVOLUTION_ENGINE.py; do
+    [ -f "$file" ] && echo "✅ $file" || echo "❌ $file (MISSING)"
+done
+echo ""
+
+# Imports check
+echo "═══════════════════════════════════════════════════════════════"
+echo "3️⃣  WHAT'S IMPORTED"
+echo "═══════════════════════════════════════════════════════════════"
+grep -E "from (brain|hivemind|SENTIENT|CONSCIOUSNESS|COLLECTIVE|EVOLUTION|IMMORTAL)" COMPLETE_ULTIMATE_ORCHESTRATOR.py | head -15
+echo ""
+
+# Active systems in logs
+echo "═══════════════════════════════════════════════════════════════"
+echo "4️⃣  ACTIVE SYSTEMS (From Logs)"
+echo "═══════════════════════════════════════════════════════════════"
+
+echo ""
+echo "🧠 BRAIN SYSTEM:"
+grep -i "brain system ready\|brain.*initialized" apex.log | tail -2
+
+echo ""
+echo "🐝 HIVEMIND:"
+grep -i "hivemind ready\|hivemind.*initialized" apex.log | tail -2
+
+echo ""
+echo "🤖 SENTIENT TRADING BRAIN:"
+grep -i "sentient trading brain\|sentient brain" apex.log | tail -2
+
+echo ""
+echo "🐝 COLLECTIVE SWARM:"
+grep -i "collective swarm\|swarm intelligence" apex.log | tail -2
+
+echo ""
+echo "🧬 EVOLUTION ENGINE:"
+grep -i "evolution engine.*active\|generation.*loaded" apex.log | tail -2
+
+echo ""
+echo "🌌 CONSCIOUSNESS HARMONIZER:"
+grep -i "consciousness harmonizer\|harmonizer.*active" apex.log | tail -2
+
+echo ""
+echo "💾 IMMORTAL MEMORY:"
+grep -i "immortal memory\|immortal.*active" apex.log | tail -2
+
+echo ""
+
+# Check if they're USED in trading
+echo "═══════════════════════════════════════════════════════════════"
+echo "5️⃣  ARE THEY USED IN TRADING?"
+echo "═══════════════════════════════════════════════════════════════"
+
+echo ""
+echo "Brain making decisions?"
+grep -i "brain.*decision\|brain.*signal\|regime.*aware" apex.log | tail -2
+
+echo ""
+echo "Hivemind coordinating?"
+grep -i "hivemind.*coordin\|timeframe.*consensus\|multi.*tf" apex.log | tail -2
+
+echo ""
+echo "Swarm sharing signals?"
+grep -i "swarm.*signal\|collective.*vote\|engine.*joined.*swarm" apex.log | tail -2
+
+echo ""
+echo "Sentient brain learning?"
+grep -i "strategy.*validator\|testnet.*result\|dual.*execution" apex.log | tail -2
+
+echo ""
+echo "Evolution learning from trades?"
+grep -i "evolution.*learn\|adaptation.*complete\|generation.*evolved" apex.log | tail -2
+
+echo ""
+
+# Database status
+echo "═══════════════════════════════════════════════════════════════"
+echo "6️⃣  LEARNING DATABASES"
+echo "═══════════════════════════════════════════════════════════════"
+if [ -f "evolution_engine.db" ]; then
+    echo "✅ evolution_engine.db"
+    sqlite3 evolution_engine.db "SELECT COUNT(*) FROM evolution_data;" 2>/dev/null | xargs -I {} echo "   Records: {}"
+    sqlite3 evolution_engine.db "SELECT MAX(generation) FROM evolution_data;" 2>/dev/null | xargs -I {} echo "   Generation: {}"
+else
+    echo "❌ evolution_engine.db MISSING"
+fi
+
+if [ -f "immortal_memory.db" ]; then
+    echo "✅ immortal_memory.db"
+else
+    echo "⚠️  immortal_memory.db not found"
+fi
+echo ""
+
+# Recent consciousness activity
+echo "═══════════════════════════════════════════════════════════════"
+echo "7️⃣  LAST 20 CONSCIOUSNESS EVENTS"
+echo "═══════════════════════════════════════════════════════════════"
+grep -iE "brain|sentient|consciousness|swarm|collective|evolution|hivemind|learn|adapt|aware|memory" apex.log | tail -20
+
+echo ""
+echo "═══════════════════════════════════════════════════════════════"
+echo "✅ AUDIT COMPLETE"
+echo "═══════════════════════════════════════════════════════════════"
+
+CHECKEND
