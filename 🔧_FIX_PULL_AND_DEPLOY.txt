@@ -1,0 +1,112 @@
+cd ~/apex_bot && bash << 'FIXPULL'
+
+echo "╔════════════════════════════════════════════════════════════════╗"
+echo "║        🔧 FIXING GIT PULL & DEPLOYING NEW FILES 🔧           ║"
+echo "╚════════════════════════════════════════════════════════════════╝"
+echo ""
+
+# 1. Stop bot first
+echo "═══════════════════════════════════════════════════════════════"
+echo "1️⃣  STOPPING BOT"
+echo "═══════════════════════════════════════════════════════════════"
+pkill -f COMPLETE_ULTIMATE_ORCHESTRATOR
+sleep 3
+echo "✅ Bot stopped"
+echo ""
+
+# 2. Check what's blocking
+echo "═══════════════════════════════════════════════════════════════"
+echo "2️⃣  CHECKING GIT STATUS"
+echo "═══════════════════════════════════════════════════════════════"
+git status
+echo ""
+
+# 3. Stash any local changes
+echo "═══════════════════════════════════════════════════════════════"
+echo "3️⃣  STASHING LOCAL CHANGES"
+echo "═══════════════════════════════════════════════════════════════"
+git add -A
+git stash
+echo "✅ Local changes stashed"
+echo ""
+
+# 4. Force pull
+echo "═══════════════════════════════════════════════════════════════"
+echo "4️⃣  FORCE PULLING LATEST CODE"
+echo "═══════════════════════════════════════════════════════════════"
+git fetch origin continue-from-micro-fix
+git reset --hard origin/continue-from-micro-fix
+echo "✅ Force pulled"
+echo ""
+
+# 5. Check new files
+echo "═══════════════════════════════════════════════════════════════"
+echo "5️⃣  VERIFYING NEW FILES"
+echo "═══════════════════════════════════════════════════════════════"
+for file in BALANCE_AWARE_INTELLIGENCE.py EXCHANGE_PAIR_VALIDATOR.py MEMORY_STATION.py MULTI_MODEL_TASK_DISTRIBUTOR.py; do
+    if [ -f "$file" ]; then
+        echo "✅ $file"
+        ls -lh "$file"
+    else
+        echo "❌ $file (STILL MISSING)"
+    fi
+done
+echo ""
+
+# 6. Test imports
+echo "═══════════════════════════════════════════════════════════════"
+echo "6️⃣  TESTING NEW SYSTEMS"
+echo "═══════════════════════════════════════════════════════════════"
+python3 << 'PYTEST'
+import sys
+try:
+    from BALANCE_AWARE_INTELLIGENCE import BalanceAwareIntelligence
+    print("✅ Balance-Aware Intelligence imports successfully")
+except Exception as e:
+    print(f"❌ Balance Intelligence: {e}")
+
+try:
+    from EXCHANGE_PAIR_VALIDATOR import ExchangePairValidator
+    print("✅ Exchange Pair Validator imports successfully")
+except Exception as e:
+    print(f"❌ Pair Validator: {e}")
+
+try:
+    from MEMORY_STATION import get_memory_station
+    print("✅ Memory Station imports successfully")
+except Exception as e:
+    print(f"❌ Memory Station: {e}")
+
+try:
+    from MULTI_MODEL_TASK_DISTRIBUTOR import get_task_distributor
+    print("✅ Multi-Model Task Distributor imports successfully")
+except Exception as e:
+    print(f"❌ Task Distributor: {e}")
+PYTEST
+echo ""
+
+# 7. Restart bot
+echo "═══════════════════════════════════════════════════════════════"
+echo "7️⃣  RESTARTING BOT"
+echo "═══════════════════════════════════════════════════════════════"
+nohup python3 COMPLETE_ULTIMATE_ORCHESTRATOR.py > apex.log 2>&1 &
+sleep 10
+echo ""
+
+# 8. Verify
+echo "═══════════════════════════════════════════════════════════════"
+echo "8️⃣  FINAL VERIFICATION"
+echo "═══════════════════════════════════════════════════════════════"
+echo ""
+echo "Bot status:"
+ps aux | grep COMPLETE_ULTIMATE_ORCHESTRATOR | grep -v grep
+echo ""
+echo "Recent initialization logs:"
+tail -30 apex.log | grep -E "Balance|Pair|Memory|Task|Brain|Hivemind|LOADED|READY"
+echo ""
+
+echo "═══════════════════════════════════════════════════════════════"
+echo "✅ FIX & DEPLOYMENT COMPLETE"
+echo "═══════════════════════════════════════════════════════════════"
+
+FIXPULL
