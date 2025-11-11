@@ -514,11 +514,71 @@ class ExecutionOrchestrator:
                 except Exception as e:
                     logger.debug(f"Real profit execution: {e}")
             
-            # Fallback 2: Enhanced bot (Bybit/other exchanges)
-            if not execution_result and 'enhanced' in self.engines:
+            # Fallback 2: Direct exchange execution (Bybit testnet or any exchange)
+            if not execution_result:
                 try:
-                    # Would execute on Bybit or other exchange
-                    # For now, simulate execution
+                    # Get first available exchange
+                    exchange = None
+                    exchange_name = 'unknown'
+                    
+                    if isinstance(self.engines, dict):
+                        for name, eng in self.engines.items():
+                            if eng:
+                                exchange = eng
+                                exchange_name = name
+                                break
+                    
+                    if exchange:
+                        logger.info(f"💱 Placing REAL order on {exchange_name}...")
+                        
+                        # Place REAL market order
+                        order = exchange.create_order(
+                            symbol=symbol,
+                            type='market',
+                            side=side.lower(),
+                            amount=amount
+                        )
+                        
+                        order_id = order.get('id', 'unknown')
+                        filled_price = order.get('price', price)
+                        filled_amount = order.get('filled', amount)
+                        
+                        logger.info(f"   ✅ Order placed: ID {order_id}")
+                        logger.info(f"   📝 Filled: {filled_amount:.6f} {symbol} @ ${filled_price:.4f}")
+                        
+                        execution_result = {
+                            'symbol': symbol,
+                            'side': side,
+                            'amount': filled_amount,
+                            'price': filled_price,
+                            'stop_loss': stop_loss,
+                            'take_profit': take_profit,
+                            'timestamp': datetime.now().isoformat(),
+                            'order_id': order_id,
+                            'exchange': exchange_name,
+                            'simulated': False  # REAL ORDER!
+                        }
+                        
+                        # Update profit tracking
+                        self.total_trades += 1
+                        logger.info(f"   💰 Total trades: {self.total_trades}")
+                    
+                    else:
+                        logger.warning("   ⚠️  No exchange available - simulation only")
+                        execution_result = {
+                            'symbol': symbol,
+                            'side': side,
+                            'amount': amount,
+                            'price': price,
+                            'stop_loss': stop_loss,
+                            'take_profit': take_profit,
+                            'timestamp': datetime.now().isoformat(),
+                            'simulated': True
+                        }
+                
+                except Exception as e:
+                    logger.error(f"Exchange execution error: {e}")
+                    # Still create record for tracking
                     execution_result = {
                         'symbol': symbol,
                         'side': side,
@@ -527,10 +587,9 @@ class ExecutionOrchestrator:
                         'stop_loss': stop_loss,
                         'take_profit': take_profit,
                         'timestamp': datetime.now().isoformat(),
-                        'simulated': True  # Mark as simulated in testnet
+                        'simulated': True,
+                        'error': str(e)
                     }
-                except Exception as e:
-                    logger.debug(f"Enhanced bot execution: {e}")
             
             if execution_result:
                 # Record position with risk manager
@@ -562,16 +621,35 @@ class ExecutionOrchestrator:
                 execution_time = time.time() - start_time
                 self.execution_times.append(execution_time)
                 
+                # Detailed trade information
+                timeframe = signal.get('timeframe', '15m')
+                strategy = signal.get('strategy', 'unknown')
+                data_source = signal.get('source', 'AI_Collective')
+                leverage = signal.get('leverage', 1)
+                
                 logger.info(f"⚡ TRADE EXECUTED:")
-                logger.info(f"   Symbol: {symbol}")
-                logger.info(f"   Side: {side.upper()}")
-                logger.info(f"   Amount: {amount:.6f}")
-                logger.info(f"   Entry: ${price:.4f}")
-                logger.info(f"   Stop Loss: ${stop_loss:.4f}")
-                logger.info(f"   Take Profit: ${take_profit:.4f}")
-                logger.info(f"   Position Size: ${position_size_usd:.2f}")
-                logger.info(f"   Confidence: {confidence:.1%}")
-                logger.info(f"   Execution Time: {execution_time:.2f}s")
+                logger.info(f"   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                logger.info(f"   📊 Symbol: {symbol}")
+                logger.info(f"   📈 Side: {side.upper()}")
+                logger.info(f"   💵 Amount: {amount:.6f}")
+                logger.info(f"   💰 Entry: ${price:.4f}")
+                logger.info(f"   🛑 Stop Loss: ${stop_loss:.4f} (-{stop_loss_pct:.1%})")
+                logger.info(f"   🎯 Take Profit: ${take_profit:.4f} (+{take_profit_pct:.1%})")
+                logger.info(f"   💼 Position Size: ${position_size_usd:.2f}")
+                logger.info(f"   ⚡ Leverage: {leverage}x")
+                logger.info(f"   🎯 Confidence: {confidence:.1%}")
+                logger.info(f"   ⏱️  Timeframe: {timeframe}")
+                logger.info(f"   🧠 Strategy: {strategy}")
+                logger.info(f"   📡 Data Source: {data_source}")
+                logger.info(f"   ⚙️  Execution Time: {execution_time:.2f}s")
+                logger.info(f"   💰 Expected Profit: ${position_size_usd * take_profit_pct:.2f}")
+                logger.info(f"   📊 Risk/Reward: 1:{take_profit_pct/stop_loss_pct:.1f}")
+                
+                if not execution_result.get('simulated'):
+                    logger.info(f"   ✅ Order ID: {execution_result.get('order_id', 'N/A')}")
+                    logger.info(f"   💱 Exchange: {execution_result.get('exchange', 'unknown')}")
+                
+                logger.info(f"   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
                 
                 return execution_result
             
