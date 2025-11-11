@@ -1746,29 +1746,84 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
         logger.info("✅ Deep Learning Orchestrator wired")
         
         # 4. EXECUTION ORCHESTRATOR - THE CRITICAL PIECE!
-        # Give it Gate.io for REAL trading!
+        # Use TESTNET for testing, LIVE for real trading
         execution_exchanges = {}
         actual_balance = 1000.0  # Default
         
-        if hasattr(self, 'micro_wallet_grower') and self.micro_wallet_grower:
-            execution_exchanges['gateio'] = self.micro_wallet_grower.gate
-            # Get ACTUAL balance from Gate.io
+        if self.mode == 'testnet':
+            # ========================================
+            # 🧪 TESTNET MODE - Use Bybit testnet!
+            # ========================================
+            logger.info("   🧪 TESTNET MODE: Initializing Bybit testnet...")
             try:
-                actual_balance = self.micro_wallet_grower.check_gate_balance()
-                logger.info(f"   💰 Gate.io balance: ${actual_balance:.2f}")
-            except:
-                actual_balance = 25.0  # Fallback
-            logger.info("   🔗 Wiring Gate.io to Execution Orchestrator...")
-            
-            # Initialize Universal Pair Fetcher
-            try:
-                logger.info("   🌍 Initializing Universal Pair Fetcher...")
-                from UNIVERSAL_PAIR_FETCHER import initialize_universal_fetcher
-                self.universal_fetcher = initialize_universal_fetcher(self.micro_wallet_grower.gate)
-                asyncio.create_task(self.universal_fetcher.fetch_all_pairs())
-                logger.info("   ✅ Universal Pair Fetcher active - discovering ALL pairs!")
+                import ccxt
+                import os
+                
+                bybit_testnet = ccxt.bybit({
+                    'apiKey': os.getenv('BYBIT_TESTNET_API_KEY'),
+                    'secret': os.getenv('BYBIT_TESTNET_SECRET'),
+                    'options': {'defaultType': 'spot'},
+                    'enableRateLimit': True
+                })
+                bybit_testnet.set_sandbox_mode(True)  # CRITICAL: Enable testnet!
+                
+                # Test connection and get balance
+                balance = bybit_testnet.fetch_balance()
+                actual_balance = balance['USDT']['free']
+                
+                execution_exchanges['bybit_testnet'] = bybit_testnet
+                
+                logger.info(f"   ✅ Bybit TESTNET connected!")
+                logger.info(f"   💰 Testnet balance: ${actual_balance:.2f} USDT")
+                logger.info(f"   🎯 READY TO TRADE WITH FAKE MONEY!")
+                
+                # Universal Pair Fetcher for testnet
+                try:
+                    logger.info("   🌍 Initializing Universal Pair Fetcher (testnet)...")
+                    from UNIVERSAL_PAIR_FETCHER import initialize_universal_fetcher
+                    self.universal_fetcher = initialize_universal_fetcher(bybit_testnet)
+                    asyncio.create_task(self.universal_fetcher.fetch_all_pairs())
+                    logger.info("   ✅ Universal Pair Fetcher active - discovering testnet pairs!")
+                except Exception as e:
+                    logger.warning(f"   ⚠️  Universal Pair Fetcher: {e}")
+                
             except Exception as e:
-                logger.warning(f"   ⚠️  Universal Pair Fetcher: {e}")
+                logger.error(f"   ❌ Bybit testnet error: {e}")
+                logger.warning("   ⚠️  Falling back to simulation mode")
+        
+        else:
+            # ========================================
+            # 💰 LIVE MODE - Use Gate.io for real trading
+            # ========================================
+            if hasattr(self, 'micro_wallet_grower') and self.micro_wallet_grower:
+                execution_exchanges['gateio'] = self.micro_wallet_grower.gate
+                # Get ACTUAL balance from Gate.io
+                try:
+                    actual_balance = self.micro_wallet_grower.check_gate_balance()
+                    logger.info(f"   💰 Gate.io balance: ${actual_balance:.2f}")
+                except:
+                    actual_balance = 25.0  # Fallback
+                logger.info("   🔗 Wiring Gate.io to Execution Orchestrator...")
+                
+                # Initialize Universal Pair Fetcher
+                try:
+                    logger.info("   🌍 Initializing Universal Pair Fetcher...")
+                    from UNIVERSAL_PAIR_FETCHER import initialize_universal_fetcher
+                    self.universal_fetcher = initialize_universal_fetcher(self.micro_wallet_grower.gate)
+                    asyncio.create_task(self.universal_fetcher.fetch_all_pairs())
+                    logger.info("   ✅ Universal Pair Fetcher active - discovering ALL pairs!")
+                except Exception as e:
+                    logger.warning(f"   ⚠️  Universal Pair Fetcher: {e}")
+            else:
+                # Use first available exchange
+                if self.trading_engines:
+                    first_exchange = list(self.trading_engines.values())[0]
+                    execution_exchanges['primary'] = first_exchange
+                    logger.info("   📊 Using first available exchange for execution")
+        
+        if not execution_exchanges:
+            logger.error("   ❌ NO EXCHANGES AVAILABLE FOR EXECUTION!")
+            execution_exchanges = self.trading_engines  # Fallback
         
         self.advanced_orchestrators['execution'] = ExecutionOrchestrator(
             self.data_hub,
@@ -1778,10 +1833,13 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             mode=self.mode
         )
         
-        # Update balance to ACTUAL Gate.io balance
+        # Update balance to ACTUAL balance (testnet or live)
         if hasattr(self.advanced_orchestrators['execution'], 'position_sizer'):
             self.advanced_orchestrators['execution'].position_sizer.balance = actual_balance
-            logger.info(f"   📊 Position sizer balance set to: ${actual_balance:.2f}")
+            if self.mode == 'testnet':
+                logger.info(f"   📊 Position sizer balance set to: ${actual_balance:.2f} (TESTNET)")
+            else:
+                logger.info(f"   📊 Position sizer balance set to: ${actual_balance:.2f} (LIVE)")
         
         logger.info("✅ ⚡ EXECUTION ORCHESTRATOR WIRED - TRADES WILL NOW EXECUTE!")
 
