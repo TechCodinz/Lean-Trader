@@ -228,11 +228,13 @@ except Exception as e:
 
 # Import PERFECT CONSCIOUSNESS SYSTEMS - Surgical AI + Zero-Miss Detection
 try:
+    from MULTI_AI_INTELLIGENCE_LAYER import MultiAIIntelligence
     from AI_COLLECTIVE_CONSCIOUSNESS import AICollectiveConsciousness, integrate_ai_collective
     from AI_SECURITY_LAYER import AISecurityLayer
     from AI_CONSCIOUSNESS_CALIBRATOR import integrate_consciousness_calibrator
     from ZERO_MISS_OPPORTUNITY_DETECTOR import integrate_zero_miss_detector
     logger.info("🧬 PERFECT CONSCIOUSNESS SYSTEMS LOADED!")
+    logger.info("   → Multi-AI Intelligence (6 AIs)")
     logger.info("   → AI Collective (debates)")
     logger.info("   → Security Layer (protection)")
     logger.info("   → Consciousness Calibrator (surgical AI)")
