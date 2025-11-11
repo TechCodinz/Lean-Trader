@@ -503,14 +503,15 @@ async def integrate_ai_collective(data_hub, multi_ai):
                         
                         await data_hub.publish_signal(signal)
                 
-                # Show autonomy progress
-                status = collective.get_bot_autonomy_status()
-                if status['debates_conducted'] % 10 == 0:
-                    logger.info(f"🧠 Autonomy Progress: {status['transcendence_progress']}")
-                    logger.info(f"   Wisdom learned: {status['wisdom_learned']} patterns")
+            # Show autonomy progress
+            status = collective.get_bot_autonomy_status()
+            if status['debates_conducted'] % 10 == 0:
+                logger.info(f"🧠 Autonomy Progress: {status['transcendence_progress']}")
+                logger.info(f"   Wisdom learned: {status['wisdom_learned']} patterns")
+                logger.info(f"   Total pairs analyzed: {cycle_count * len(pair_sets[0])}")
             
-            # Analyze every 10 minutes
-            await asyncio.sleep(600)
+            # Faster cycle for rapid learning across ALL pairs
+            await asyncio.sleep(60)  # 1 minute (covers all 25 pairs in 5 minutes!)
         
         except Exception as e:
             logger.error(f"AI Collective error: {e}")
