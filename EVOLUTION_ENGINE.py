@@ -1383,8 +1383,19 @@ class ULTIMATE_EVOLUTION_ENGINE:
         
         # Minimal fallback only if nothing else works
         if not self.crypto_pairs:
-            print("⚠️ Starting with minimal crypto pairs, will expand dynamically")
-            self.crypto_pairs = ['BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'SOL/USDT', 'ADA/USDT']
+            print("   🌍 Fetching ALL pairs from exchange dynamically...")
+            # Fetch from exchange instead of hardcoding
+            try:
+                if hasattr(self, 'exchange') and self.exchange:
+                    markets = self.exchange.load_markets()
+                    self.crypto_pairs = [s for s in markets.keys() if '/USDT' in s and markets[s].get('active', True)]
+                    print(f"   ✅ Loaded {len(self.crypto_pairs)} crypto pairs from exchange")
+                else:
+                    print("   ⚠️  No exchange connection, pairs will be empty (will retry)")
+                    self.crypto_pairs = []
+            except Exception as e:
+                print(f"   ⚠️  Dynamic pair fetch failed: {e}")
+                self.crypto_pairs = []
 
         # Forex pairs
         self.forex_pairs = [
