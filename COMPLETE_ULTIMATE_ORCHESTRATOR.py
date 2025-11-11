@@ -478,7 +478,7 @@ except (ImportError, AttributeError):
 # ============================================================================
 # MICRO WALLET GROWER & CONTINUOUS ULTRA BOT (THE $1 TO INFINITE ENGINES!)
 # ============================================================================
-from MICRO_TRADING_BOT import MICRO_GATE_BOT
+from ENHANCED_MICRO_WALLET_GROWER import EnhancedMicroWalletGrower as MICRO_GATE_BOT
 from continuous_ultra_bot import ContinuousUltraTradingSystem
 
 # ============================================================================
@@ -1408,9 +1408,12 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
         
         # MICRO_GATE_BOT - Grows ANY wallet from $1 to infinite!
         try:
-            self.micro_wallet_grower = MICRO_GATE_BOT()
+            self.micro_wallet_grower = MICRO_GATE_BOT(self.data_hub)
             self.advanced_systems['micro_wallet_grower'] = self.micro_wallet_grower
-            logger.info("✅ 💎 MICRO WALLET GROWER - Grows from $1 to INFINITE!")
+            logger.info("✅ 💎 ENHANCED MICRO WALLET GROWER - Grows from $1 to INFINITE!")
+            logger.info("   → Connected to Data Hub (receives signals from ALL 116+ systems)")
+            logger.info("   → Dynamic position sizing (balance-aware + confidence-based)")
+            logger.info("   → Revolutionary signal boost (+20% size for ultra strategies)")
             logger.info("   → Auto-detects balance and scales positions")
             logger.info("   → MICRO positions (0.0001 BTC, 50 DOGE)")
             logger.info("   → Aggressive growth strategy")
@@ -2636,6 +2639,68 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             
             tasks.append(asyncio.create_task(run_revolutionary()))
             logger.info("✅ 🎯 REVOLUTIONARY AI ACTIVE - 10 cutting-edge features!")
+        
+        # ====================================================================
+        # ULTIMATE AUTONOMOUS INTELLIGENCE - Start all supreme systems
+        # ====================================================================
+        if hasattr(self, 'central_intelligence') and self.central_intelligence:
+            logger.info("\n🌌 STARTING ULTIMATE AUTONOMOUS INTELLIGENCE...")
+            
+            # Start Central Control Intelligence (4 loops: strategic, optimization, learning, evolution)
+            tasks.append(asyncio.create_task(
+                self.central_intelligence.start_central_intelligence()
+            ))
+            logger.info("   ✅ Central Intelligence started (4 autonomous loops)")
+            
+            # Start Hybrid Coordinator (testnet + live simultaneous trading)
+            if hasattr(self, 'hybrid_coordinator') and self.hybrid_coordinator:
+                tasks.append(asyncio.create_task(
+                    self.hybrid_coordinator.start_hybrid_trading()
+                ))
+                logger.info("   ✅ Hybrid Coordinator started (testnet learning + live execution)")
+            
+            # Start Spawn Manager (model spawning per exchange)
+            if hasattr(self, 'spawn_manager') and self.spawn_manager:
+                # Initialize all exchanges first
+                tasks.append(asyncio.create_task(
+                    self.spawn_manager.initialize_all_exchanges()
+                ))
+                # Start spawn management loop
+                tasks.append(asyncio.create_task(
+                    self.spawn_manager.spawn_management_loop()
+                ))
+                logger.info("   ✅ Spawn Manager started (model lifecycle management)")
+            
+            logger.info("✅ 🌌 ULTIMATE AUTONOMOUS INTELLIGENCE ACTIVE!")
+            logger.info("   → Testnet: Learning & experimentation")
+            logger.info("   → Live: Proven strategies only")
+            logger.info("   → Exchange models: 8 exchanges x 3 models = 24 models")
+            logger.info("   → Central control: Strategic oversight & optimization")
+            logger.info("   → Autonomous: Self-evolving & self-optimizing")
+        
+        # ====================================================================
+        # ENHANCED MICRO WALLET GROWER - Start signal consumption & execution
+        # ====================================================================
+        if hasattr(self, 'micro_wallet_grower') and self.micro_wallet_grower:
+            if hasattr(self.micro_wallet_grower, 'start_enhanced_grower'):
+                logger.info("\n💎 STARTING ENHANCED MICRO WALLET GROWER...")
+                
+                # Start signal consumption loop
+                tasks.append(asyncio.create_task(
+                    self.micro_wallet_grower.consume_signals()
+                ))
+                logger.info("   ✅ Signal consumption started (pulls from Data Hub)")
+                
+                # Start trade execution loop
+                tasks.append(asyncio.create_task(
+                    self.micro_wallet_grower.execute_signals()
+                ))
+                logger.info("   ✅ Trade execution started (processes signal queue)")
+                
+                logger.info("✅ 💎 ENHANCED GROWER ACTIVE!")
+                logger.info("   → Consuming signals from ALL 116+ systems")
+                logger.info("   → Dynamic sizing based on confidence + balance")
+                logger.info("   → Safety limits: max 100 trades/day, 20% daily loss")
         
         # EVOLUTION ENGINE - Spawn strategies every 5 min
         if getattr(self, 'evolution_engine', None):
