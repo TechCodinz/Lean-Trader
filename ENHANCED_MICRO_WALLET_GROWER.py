@@ -110,6 +110,10 @@ class EnhancedMicroWalletGrower:
             print(f"❌ Balance check error: {e}")
             return 0.0
     
+    def check_gate_balance(self):
+        """Alias for compatibility with old code"""
+        return self.check_balance()
+    
     def calculate_position_size(self, symbol, price, signal_confidence, signal_type='standard'):
         """
         Dynamic position sizing based on:

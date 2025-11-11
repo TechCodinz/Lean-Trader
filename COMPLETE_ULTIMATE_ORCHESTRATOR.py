@@ -2339,9 +2339,20 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                             symbols = list(self.market_scanner.active_pairs)[:15]  # Top 15
                         
                         if not symbols:
-                            # Fallback to popular pairs
-                            symbols = ['BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'SOL/USDT', 'AVAX/USDT',
-                                      'MATIC/USDT', 'DOT/USDT', 'LINK/USDT', 'UNI/USDT', 'ATOM/USDT']
+                            # Get ALL pairs from exchange (NO HARDCODED FALLBACK!)
+                            try:
+                                # Fetch ALL available pairs from Gate.io
+                                if hasattr(self, 'micro_wallet_grower') and self.micro_wallet_grower and self.micro_wallet_grower.gate:
+                                    markets = self.micro_wallet_grower.gate.load_markets()
+                                    # Get all USDT pairs sorted by volume
+                                    symbols = [s for s in markets.keys() if '/USDT' in s and markets[s].get('active', True)]
+                                    logger.info(f"   🌍 Fetched {len(symbols)} pairs from exchange (NO HARDCODING!)")
+                                else:
+                                    logger.warning("   ⚠️  No exchange available, skipping this cycle")
+                                    symbols = []
+                            except Exception as e:
+                                logger.warning(f"   ⚠️  Pair fetch failed: {e}")
+                                symbols = []
                         
                         # SCAN FOR SCALPS
                         scalp_signals = await self.aggressive_scalper.scan_for_scalps(symbols)
@@ -2913,7 +2924,22 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                 while True:
                     try:
                         signals = []
-                        for symbol in ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'BNB/USDT']:
+                        
+                        # Get ALL pairs dynamically (NO HARDCODING!)
+                        all_symbols = []
+                        try:
+                            if hasattr(self, 'micro_wallet_grower') and self.micro_wallet_grower and self.micro_wallet_grower.gate:
+                                markets = self.micro_wallet_grower.gate.load_markets()
+                                all_symbols = [s for s in markets.keys() if '/USDT' in s and markets[s].get('active', True)]
+                                logger.debug(f"Brain analyzing {len(all_symbols)} pairs")
+                            elif self.mode in self.trading_engines:
+                                markets = self.trading_engines[self.mode].load_markets()
+                                all_symbols = [s for s in markets.keys() if '/USDT' in s and markets[s].get('active', True)]
+                        except Exception as e:
+                            logger.debug(f"Pair fetch: {e}")
+                            all_symbols = []
+                        
+                        for symbol in all_symbols[:50]:  # Analyze top 50 by volume per cycle
                             try:
                                 order_book = await asyncio.to_thread(self.trading_engines[self.mode].fetch_order_book, symbol, limit=20)
                                 ticker = await asyncio.to_thread(self.trading_engines[self.mode].fetch_ticker, symbol)
