@@ -213,6 +213,19 @@ from SENTIENT_TRADING_BRAIN import SentientTradingBrain
 from COLLECTIVE_SWARM_INTELLIGENCE import CollectiveSwarmIntelligence
 from MONEY_PRINTER_ULTRA_RARE import MoneyPrinterUltraRare
 
+# ============================================================================
+# ULTIMATE AUTONOMOUS INTELLIGENCE SYSTEM - The Supreme Trading Entity
+# ============================================================================
+try:
+    from CENTRAL_CONTROL_INTELLIGENCE import CentralControlIntelligence
+    from HYBRID_INTELLIGENCE_COORDINATOR import HybridIntelligenceCoordinator
+    from EXCHANGE_SPAWN_MANAGER import ExchangeSpawnManager
+    ULTIMATE_INTELLIGENCE_AVAILABLE = True
+    logger.info("🌌 ULTIMATE INTELLIGENCE SYSTEM LOADED - Supreme autonomous trading entity!")
+except Exception as e:
+    logger.error(f"❌ ULTIMATE INTELLIGENCE FAILED TO LOAD: {e}")
+    ULTIMATE_INTELLIGENCE_AVAILABLE = False
+
 # Import REAL PROFIT BOT - 35 pairs smart trading
 from REAL_PROFIT_BOT import REAL_PROFIT_BOT
 
@@ -752,6 +765,11 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
         self.anti_clockwise = None
         self.quantum_time = None
         self.inverse_psychology = None
+        
+        # 🌌 ULTIMATE AUTONOMOUS INTELLIGENCE - Supreme trading entity!
+        self.central_intelligence = None
+        self.hybrid_coordinator = None
+        self.spawn_manager = None
         self.fractal_engine = None
         self.entropy_engine = None
         self.wave_interference = None
