@@ -72,8 +72,9 @@ class MultiAIIntelligence:
                 'enabled': False
             },
             'grok': {
-                'api_key': os.getenv('XAI_API_KEY'),
-                'model': 'grok-1',
+                'api_key': os.getenv('GROK_API_KEY') or os.getenv('XAI_API_KEY'),
+                'api_endpoint': os.getenv('GROK_API_ENDPOINT', 'https://api.x.ai/v1'),
+                'model': 'grok-beta',
                 'enabled': False
             },
             'gemini': {
