@@ -438,15 +438,30 @@ async def integrate_ai_collective(data_hub, multi_ai):
     collective = AICollectiveConsciousness(multi_ai)
     
     logger.info("🧠 AI Collective Consciousness active!")
-    logger.info("   AIs will debate to reach optimal decisions")
+    logger.info("   AIs will debate ALL pairs for collective intelligence")
     logger.info("   Bot will learn and eventually transcend AI dependency")
+    
+    cycle_count = 0
+    
+    # Define pair rotation sets (analyze different pairs each cycle)
+    pair_sets = [
+        ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'BNB/USDT', 'XRP/USDT'],
+        ['DOGE/USDT', 'AVAX/USDT', 'MATIC/USDT', 'DOT/USDT', 'LINK/USDT'],
+        ['UNI/USDT', 'AAVE/USDT', 'ATOM/USDT', 'FIL/USDT', 'NEAR/USDT'],
+        ['ICP/USDT', 'SUI/USDT', 'APT/USDT', 'ARB/USDT', 'OP/USDT'],
+        ['LTC/USDT', 'BCH/USDT', 'ETC/USDT', 'XLM/USDT', 'TRX/USDT']
+    ]
     
     while collective.active:
         try:
-            # Get top pairs to analyze
-            top_pairs = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT']
+            cycle_count += 1
             
-            for pair in top_pairs:
+            # Rotate through different pair sets each cycle
+            current_set = pair_sets[(cycle_count - 1) % len(pair_sets)]
+            
+            logger.info(f"🧠 Cycle {cycle_count}: Analyzing {len(current_set)} pairs")
+            
+            for pair in current_set:
                 market_data = {
                     'symbol': pair,
                     'price': 0,  # From exchange
@@ -488,14 +503,15 @@ async def integrate_ai_collective(data_hub, multi_ai):
                         
                         await data_hub.publish_signal(signal)
                 
-                # Show autonomy progress
-                status = collective.get_bot_autonomy_status()
-                if status['debates_conducted'] % 10 == 0:
-                    logger.info(f"🧠 Autonomy Progress: {status['transcendence_progress']}")
-                    logger.info(f"   Wisdom learned: {status['wisdom_learned']} patterns")
+            # Show autonomy progress
+            status = collective.get_bot_autonomy_status()
+            if status['debates_conducted'] % 10 == 0:
+                logger.info(f"🧠 Autonomy Progress: {status['transcendence_progress']}")
+                logger.info(f"   Wisdom learned: {status['wisdom_learned']} patterns")
+                logger.info(f"   Total pairs analyzed: {cycle_count * len(pair_sets[0])}")
             
-            # Analyze every 10 minutes
-            await asyncio.sleep(600)
+            # Faster cycle for rapid learning across ALL pairs
+            await asyncio.sleep(60)  # 1 minute (covers all 25 pairs in 5 minutes!)
         
         except Exception as e:
             logger.error(f"AI Collective error: {e}")
