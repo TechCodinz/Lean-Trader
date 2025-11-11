@@ -69,7 +69,22 @@ class UltraScalpingEngine:
         self.brain = Brain()
 
         # Trading universe - use passed universe or fallback to 5 pairs
-        self.universe = universe if universe else ['BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'ADA/USDT', 'SOL/USDT']
+        # Get pairs dynamically from exchange if not provided
+        if universe:
+            self.universe = universe
+        else:
+            try:
+                # Try to fetch from exchange
+                if hasattr(self, 'exchange') and self.exchange:
+                    markets = self.exchange.load_markets()
+                    self.universe = [s for s in markets.keys() if '/USDT' in s and markets[s].get('active', True)][:100]
+                    print(f"   🌍 Ultra Scalper loaded {len(self.universe)} dynamic pairs")
+                else:
+                    print("   ⚠️  No universe or exchange provided, scalper will wait for pairs")
+                    self.universe = []
+            except:
+                print("   ⚠️  Failed to load pairs dynamically")
+                self.universe = []
 
         # Scalping configuration
         self.MICRO_PIP_TARGET = 0.5  # 0.5 pip minimum target

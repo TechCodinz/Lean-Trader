@@ -740,7 +740,21 @@ class ULTIMATE_EVOLUTION_ENGINE:
         """Initialize Scalper Engine - Generating crypto signals every 5 seconds"""
         try:
             # USE FULL UNIVERSE - crypto_pairs was already set from universe parameter
-            pairs_to_use = self.crypto_pairs if self.crypto_pairs else ['BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'ADA/USDT', 'SOL/USDT']
+            # Get pairs dynamically from exchange or data hub
+            pairs_to_use = []
+            if self.crypto_pairs:
+                pairs_to_use = self.crypto_pairs
+            elif hasattr(self, 'exchange') and self.exchange:
+                try:
+                    markets = self.exchange.load_markets()
+                    pairs_to_use = [s for s in markets.keys() if '/USDT' in s and markets[s].get('active', True)][:100]
+                    print(f"   🌍 Evolution using {len(pairs_to_use)} dynamic pairs")
+                except:
+                    pairs_to_use = []
+            
+            if not pairs_to_use:
+                print("   ⚠️  No pairs available for evolution this cycle")
+                pairs_to_use = []
             
             scalper_config = {
                 'signal_frequency': 5,  # seconds
