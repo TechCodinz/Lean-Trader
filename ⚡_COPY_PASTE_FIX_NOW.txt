@@ -1,0 +1,53 @@
+═══════════════════════════════════════════════════════════
+⚡ COPY/PASTE TO FIX MERGE AND DEPLOY - DO THIS NOW!
+═══════════════════════════════════════════════════════════
+
+COPY AND PASTE THIS ENTIRE BLOCK:
+
+cd ~/apex_bot && git stash && git pull origin continue-from-micro-fix && bash ⚡_FIX_MERGE_AND_DEPLOY.sh
+
+═══════════════════════════════════════════════════════════
+
+That ONE command will:
+1. Stash your local changes
+2. Pull all updates
+3. Run deployment script
+4. Start bot with intelligent execution
+
+═══════════════════════════════════════════════════════════
+
+OR IF YOU PREFER MANUAL STEPS:
+
+# Step 1: Stash local changes
+git stash
+
+# Step 2: Pull updates
+git pull origin continue-from-micro-fix
+
+# Step 3: Deploy
+bash ⚡_FIX_MERGE_AND_DEPLOY.sh
+
+═══════════════════════════════════════════════════════════
+
+AFTER DEPLOYMENT, CHECK STATUS:
+
+# Verify intelligent execution loaded
+grep "INTELLIGENT EXECUTION ENGINE" apex.log
+
+# Watch it in action
+tail -f apex.log | grep -E "🧠|INTELLIGENT"
+
+═══════════════════════════════════════════════════════════
+
+IF ANYTHING GOES WRONG:
+
+# See what happened
+tail -100 apex.log
+
+# Check bot is running
+ps aux | grep RUN_BOT | grep -v grep
+
+# Restart if needed
+pkill -f RUN_BOT && sleep 3 && nohup python3 RUN_BOT.py > apex.log 2>&1 &
+
+═══════════════════════════════════════════════════════════
