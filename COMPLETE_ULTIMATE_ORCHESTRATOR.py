@@ -1844,33 +1844,7 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             mode=self.mode
         )
         
-        # 🧠 INITIALIZE INTELLIGENT EXCHANGE ROUTER!
-        logger.info("\n🧠 Initializing INTELLIGENT EXCHANGE ROUTER...")
-        try:
-            from INTELLIGENT_EXCHANGE_ROUTER import initialize_intelligent_router
-            from AI_CONSULTATION_SYSTEM import get_ai_consultation
-            
-            # Get AI consultation if available
-            ai_consult = get_ai_consultation()
-            
-            # Initialize router with all exchanges
-            self.intelligent_router = initialize_intelligent_router(arb_exchanges if len(arb_exchanges) > 0 else execution_exchanges, ai_consult)
-            
-            # Discover all pairs immediately
-            logger.info("   🔍 Discovering all pairs (crypto, forex, commodities, indices)...")
-            await self.intelligent_router.discover_all_pairs()
-            
-            # Get stats
-            stats = self.intelligent_router.get_routing_stats()
-            logger.info(f"✅ INTELLIGENT ROUTER active!")
-            logger.info(f"   Total pairs: {stats['total_pairs']}")
-            logger.info(f"   Exchanges: {stats['total_exchanges']}")
-            for market, count in stats['pairs_by_market_type'].items():
-                logger.info(f"   {market}: {count} pairs")
-            
-        except Exception as e:
-            logger.warning(f"⚠️ Intelligent Router failed: {e}")
-            self.intelligent_router = None
+        # Router will be initialized AFTER arb_exchanges is created (line ~2090)
         
         # ✨ WIRE TESTNET EXCHANGE TO EXECUTION ORCHESTRATOR
         if self.mode == 'testnet' and 'bybit_testnet' in execution_exchanges:
@@ -2101,6 +2075,40 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                 if exchange and exchange_name not in arb_exchanges:
                     arb_exchanges[exchange_name] = exchange
                     logger.info(f"   ✅ {exchange_name.upper()} (from engines) added to arbitrage")
+        
+        # 🧠 INITIALIZE INTELLIGENT EXCHANGE ROUTER HERE (after arb_exchanges exists!)
+        logger.info("\n🧠 Initializing INTELLIGENT EXCHANGE ROUTER...")
+        try:
+            from INTELLIGENT_EXCHANGE_ROUTER import initialize_intelligent_router
+            from AI_CONSULTATION_SYSTEM import get_ai_consultation
+            
+            # Get AI consultation if available
+            ai_consult = get_ai_consultation()
+            
+            # Use arb_exchanges (has all configured exchanges)
+            router_exchanges = arb_exchanges if len(arb_exchanges) > 0 else execution_exchanges
+            logger.info(f"   Router will monitor {len(router_exchanges)} exchanges")
+            
+            # Initialize router
+            self.intelligent_router = initialize_intelligent_router(router_exchanges, ai_consult)
+            
+            # Discover all pairs immediately
+            logger.info("   🔍 Discovering all pairs (crypto, forex, commodities, indices)...")
+            await self.intelligent_router.discover_all_pairs()
+            
+            # Get stats
+            stats = self.intelligent_router.get_routing_stats()
+            logger.info(f"✅ INTELLIGENT ROUTER active!")
+            logger.info(f"   Total pairs: {stats['total_pairs']}")
+            logger.info(f"   Exchanges: {stats['total_exchanges']}")
+            for market, count in stats['pairs_by_market_type'].items():
+                logger.info(f"   {market}: {count} pairs")
+            
+        except Exception as e:
+            logger.error(f"❌ Intelligent Router failed: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            self.intelligent_router = None
         
         if len(arb_exchanges) >= 2:
             # Initialize arbitrage engine

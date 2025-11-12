@@ -1,0 +1,38 @@
+⚡ CREATE PROTECTED .ENV - COPY/PASTE THIS!
+═══════════════════════════════════════════════════════════════
+
+cd ~/apex_bot && git pull origin continue-from-micro-fix && bash CREATE_PROTECTED_ENV.sh
+
+═══════════════════════════════════════════════════════════════
+
+This will:
+✅ Create .env with ALL your exchange keys
+✅ Add ALL AI key placeholders (XAI, Claude, OpenAI, Gemini, Grok)
+✅ Protect it (read-only, won't get wiped!)
+
+Then ADD YOUR AI KEYS:
+
+chmod 644 .env
+nano .env
+
+# Replace these lines with your real AI keys:
+# ANTHROPIC_API_KEY=sk-ant-your-claude-key-here
+# OPENAI_API_KEY=sk-your-openai-key-here  
+# XAI_API_KEY=your-xai-key-here
+
+Save, then protect again:
+chmod 444 .env
+
+Then restart:
+pkill -f RUN_BOT && nohup python3 RUN_BOT.py > apex.log 2>&1 &
+
+═══════════════════════════════════════════════════════════════
+
+ROUTER WILL:
+✅ Check Bybit testnet - discover ALL crypto pairs
+✅ Check Bybit TradFi - discover ALL forex pairs  
+✅ Check Gate.io - discover ALL pairs there
+✅ Route each signal to correct exchange
+✅ NO HARDCODING!
+
+═══════════════════════════════════════════════════════════════
