@@ -36,9 +36,10 @@ class AggressiveScalpingEngine:
     This is how you grow $25 to $250 in a week!
     """
     
-    def __init__(self, exchange=None, auto_profit_taker=None):
+    def __init__(self, exchange=None, auto_profit_taker=None, execution_orchestrator=None):
         self.exchange = exchange
         self.profit_taker = auto_profit_taker
+        self.execution_orchestrator = execution_orchestrator  # ✨ NEW: Use orchestrator for tracking
         self.enabled = True
         
         # Fast timeframes for scalping
@@ -295,24 +296,35 @@ class AggressiveScalpingEngine:
     
     async def execute_scalp(self, signal: Dict) -> bool:
         """
-        Execute a scalp trade directly on Gate.io
+        Execute a scalp trade via ExecutionOrchestrator (for proper tracking)
+        OR directly on Gate.io if no orchestrator available
         
         Returns True if successful
         """
-        if not self.exchange:
-            return False
-        
         try:
             symbol = signal['symbol']
             side = signal['side']
             entry = signal['entry']
             profit_target_pct = signal['profit_target_pct'] / 100  # Convert to decimal
             
+            logger.info(f"⚡ AGGRESSIVE EXECUTING: {symbol} {side.upper()}")
+            
+            # ✨ PREFER ExecutionOrchestrator (for proper tracking + position management)
+            if self.execution_orchestrator and hasattr(self.execution_orchestrator, 'execute_signal'):
+                logger.info(f"   → Via ExecutionOrchestrator (tracked)")
+                result = await self.execution_orchestrator.execute_signal(signal)
+                return result
+            
+            # ⚠️ FALLBACK: Direct exchange execution (untracked)
+            if not self.exchange:
+                logger.warning(f"   ❌ No exchange or orchestrator available!")
+                return False
+            
             # Position size: $3.50 (meets Gate.io minimum)
             position_size_usd = 3.5
             quantity = position_size_usd / entry
             
-            logger.info(f"⚡ AGGRESSIVE EXECUTING: {symbol} {side.upper()}")
+            logger.info(f"   → Direct exchange execution (UNTRACKED)")
             logger.info(f"   Entry: ${entry:.4f}")
             logger.info(f"   Target: {profit_target_pct*100:.2f}% profit")
             logger.info(f"   Size: ${position_size_usd:.2f}")

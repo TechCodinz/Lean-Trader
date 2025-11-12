@@ -346,6 +346,49 @@ class ExecutionOrchestrator:
                 logger.error(f"Execution loop error: {e}")
                 await asyncio.sleep(5)
     
+    async def execute_signal(self, signal: Dict[str, Any]):
+        """
+        Execute a trading signal from DataHub
+        THIS IS THE CRITICAL METHOD THAT WAS MISSING!
+        """
+        
+        try:
+            # Extract signal details
+            symbol = signal.get('pair') or signal.get('symbol')
+            side = signal.get('side', 'BUY')
+            confidence = signal.get('confidence', 0.0)
+            
+            if not symbol:
+                return
+            
+            # Convert confidence to 0-1 range if needed
+            if confidence > 1:
+                confidence = confidence / 100
+            
+            # Check confidence threshold
+            if confidence < self.min_confidence:
+                logger.debug(f"   Skipping {symbol}: confidence {confidence:.1%} < {self.min_confidence:.1%}")
+                return
+            
+            # Log the signal
+            logger.info(f"📥 Processing signal: {side} {symbol} ({confidence:.1%})")
+            
+            # Execute the trade!
+            result = await self.execute_trade(
+                symbol=symbol,
+                side=side,
+                confidence=confidence,
+                signal=signal
+            )
+            
+            if result:
+                logger.info(f"✅ Signal executed successfully!")
+            else:
+                logger.warning(f"⚠️  Signal execution failed")
+        
+        except Exception as e:
+            logger.error(f"Execute signal error: {e}")
+    
     async def process_decision(self, decision: Dict[str, Any]):
         """Process AI decision using ADVANCED ACTION LOGIC"""
         
@@ -415,6 +458,66 @@ class ExecutionOrchestrator:
             if not can_trade:
                 logger.info(f"⚠️ Trade blocked: {reason}")
                 return
+    
+    async def execute_signal(self, signal: Dict[str, Any]):
+        """
+        Execute a trading signal using COMPLETE PROFIT SYSTEM
+        
+        This is the CRITICAL method that was missing!
+        """
+        try:
+            symbol = signal.get('symbol')
+            side = signal.get('side', signal.get('action', '')).lower()
+            confidence = signal.get('confidence', 0)
+            
+            # Convert confidence to 0-1 if needed
+            if confidence > 1:
+                confidence = confidence / 100
+            
+            if not symbol or not side:
+                logger.debug(f"Invalid signal: missing symbol or side")
+                return False
+            
+            # Check risk management
+            can_trade, reason = self.risk_manager.can_open_position(symbol, side)
+            if not can_trade:
+                logger.debug(f"Trade blocked: {reason}")
+                return False
+            
+            logger.info(f"⚡ EXECUTING: {side.upper()} {symbol} (confidence: {confidence:.1%})")
+            
+            # Use COMPLETE PROFIT SYSTEM if available
+            if self.profit_system:
+                # Format signal for profit system
+                signal_dict = {
+                    'symbol': symbol,
+                    'side': side,
+                    'confidence': confidence,
+                    'entry': signal.get('entry', signal.get('price', 0)),
+                    'take_profit': signal.get('take_profit'),
+                    'stop_loss': signal.get('stop_loss'),
+                    'strategy': signal.get('strategy', signal.get('type', 'unknown')),
+                    'source': signal.get('source', 'ExecutionOrchestrator'),
+                    'timeframe': signal.get('timeframe', ''),
+                    'profit_target_pct': signal.get('profit_target_pct', 0.3),
+                }
+                
+                execution_result = await self.profit_system.execute_signal(signal_dict)
+                
+                if execution_result:
+                    logger.info(f"✅ Trade executed via COMPLETE PROFIT SYSTEM!")
+                    self.total_trades += 1
+                    return True
+                else:
+                    logger.warning(f"❌ Execution failed")
+                    return False
+            else:
+                logger.warning("⚠️  No profit system available")
+                return False
+                
+        except Exception as e:
+            logger.error(f"execute_signal error: {e}")
+            return False
             
             # EXECUTE THE TRADE!
             logger.info(f"⚡ EXECUTING: {action.upper()} {symbol} (confidence: {confidence:.1%})")
