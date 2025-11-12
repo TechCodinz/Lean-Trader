@@ -136,8 +136,22 @@ class IntelligentExchangeRouter:
         try:
             logger.info(f"   🔍 Discovering {exchange_name}...")
             
+            # Get actual exchange object (might be wrapped in engine)
+            actual_exchange = exchange
+            if hasattr(exchange, 'exchange'):
+                actual_exchange = exchange.exchange
+            elif hasattr(exchange, 'gate'):
+                actual_exchange = exchange.gate
+            elif hasattr(exchange, 'bot'):
+                actual_exchange = exchange.bot
+            
+            # Check if this is a real exchange with load_markets
+            if not hasattr(actual_exchange, 'load_markets'):
+                logger.debug(f"   ⏭️  {exchange_name} is not a ccxt exchange, skipping")
+                return
+            
             # Load markets
-            markets = await asyncio.to_thread(exchange.load_markets)
+            markets = await asyncio.to_thread(actual_exchange.load_markets)
             
             # Categorize by market type
             for symbol, market in markets.items():
