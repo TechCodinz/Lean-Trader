@@ -559,6 +559,22 @@ class ExecutionOrchestrator:
         - Complete trade planning
         """
         try:
+            # 🧠 INTELLIGENT ROUTING: Find best exchange/market for this pair!
+            try:
+                from INTELLIGENT_EXCHANGE_ROUTER import get_intelligent_router
+                router = get_intelligent_router()
+                if router:
+                    route = await router.route_signal(signal)
+                    if route:
+                        logger.info(f"   🧠 Routed to: {route['exchange']} {route['market_type']}")
+                        # If routed to different exchange, would execute there
+                        # For now, continue with testnet if that's what we got
+                    else:
+                        logger.warning(f"   ⚠️  {symbol} not available on any exchange, skipping")
+                        return False
+            except:
+                pass  # Router not available, try anyway
+            
             logger.info(f"   🧪 Executing on BYBIT TESTNET...")
             
             # 🧠 USE INTELLIGENT EXECUTION if available!
