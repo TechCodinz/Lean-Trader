@@ -24,6 +24,15 @@ except Exception as e:
     logger.warning(f"⚠️ COMPLETE PROFIT SYSTEM not available: {e}")
     PROFIT_SYSTEM_AVAILABLE = False
 
+# 🧠 INTELLIGENT EXECUTION ENGINE - Uses ALL engine intelligence!
+try:
+    from INTELLIGENT_EXECUTION_ENGINE import IntelligentExecutionEngine, get_intelligent_execution_engine
+    INTELLIGENT_EXECUTION_AVAILABLE = True
+    logger.info("🧠 INTELLIGENT EXECUTION ENGINE loaded - Multi-timeframe, session-aware trading!")
+except Exception as e:
+    logger.warning(f"⚠️ INTELLIGENT EXECUTION ENGINE not available: {e}")
+    INTELLIGENT_EXECUTION_AVAILABLE = False
+
 
 class SmartPositionSizer:
     """Smart position sizing based on account balance and risk"""
@@ -244,6 +253,9 @@ class ExecutionOrchestrator:
         self.profit_system = None  # For live Gate.io trading
         self.testnet_exchange = None  # For Bybit testnet
         self.active_exchange = None  # The one we're actually using
+        
+        # 🧠 INTELLIGENT EXECUTION ENGINE - THE MISSING PIECE!
+        self.intelligent_engine = None
         
         if mode == "testnet":
             # 🧪 TESTNET MODE - Use Bybit testnet
@@ -470,13 +482,23 @@ class ExecutionOrchestrator:
             if not can_trade:
                 logger.info(f"⚠️ Trade blocked: {reason}")
                 return
+        
+        except Exception as e:
+            logger.error(f"Process decision error: {e}")
     
     def wire_execution_to_testnet(self, testnet_exchange):
         """Wire ExecutionOrchestrator to use Bybit testnet exchange"""
         self.testnet_exchange = testnet_exchange
         self.active_exchange = 'testnet'
+        
+        # 🧠 Initialize INTELLIGENT EXECUTION ENGINE with testnet!
+        if INTELLIGENT_EXECUTION_AVAILABLE and testnet_exchange:
+            self.intelligent_engine = IntelligentExecutionEngine(testnet_exchange, mode='testnet')
+            logger.info("🧠 ✅ INTELLIGENT EXECUTION ENGINE initialized with TESTNET!")
+        
         logger.info("✅ ExecutionOrchestrator wired to Bybit TESTNET!")
         logger.info(f"   Exchange: {type(testnet_exchange).__name__}")
+        logger.info(f"   Intelligent Engine: {'ACTIVE ✨' if self.intelligent_engine else 'Not available'}")
     
     async def execute_signal(self, signal: Dict[str, Any]):
         """
@@ -526,11 +548,55 @@ class ExecutionOrchestrator:
             return False
     
     async def _execute_on_testnet(self, signal: Dict, symbol: str, side: str, confidence: float):
-        """Execute trade on Bybit testnet"""
+        """
+        Execute trade on Bybit testnet using INTELLIGENT EXECUTION ENGINE
+        
+        🧠 USES ALL ENGINE INTELLIGENCE:
+        - Multi-timeframe coordination
+        - Dynamic lot sizing (confidence + volatility + session)
+        - Multi-level take profits
+        - Session-aware execution
+        - Complete trade planning
+        """
         try:
             logger.info(f"   🧪 Executing on BYBIT TESTNET...")
             
-            # Get trade parameters
+            # 🧠 USE INTELLIGENT EXECUTION if available!
+            if self.intelligent_engine:
+                logger.info(f"   🧠 Using INTELLIGENT EXECUTION ENGINE!")
+                
+                # Check if we should open another trade on this pair/timeframe
+                timeframe = signal.get('timeframe', '5m')
+                if not self.intelligent_engine.should_open_new_trade(symbol, timeframe):
+                    logger.info(f"   ⏸️  Skipping: Already have {timeframe} trade on {symbol}")
+                    return False
+                
+                # 1. Create COMPLETE trade plan using ALL intelligence
+                trade_plan = await self.intelligent_engine.create_complete_trade_plan(signal)
+                
+                if not trade_plan:
+                    logger.error("Failed to create intelligent trade plan!")
+                    return False
+                
+                # 2. Execute the intelligent trade
+                result = await self.intelligent_engine.execute_intelligent_trade(trade_plan)
+                
+                if result:
+                    logger.info(f"✅ INTELLIGENT TRADE EXECUTED!")
+                    logger.info(f"   🎯 Strategy: {trade_plan['strategy']}")
+                    logger.info(f"   💰 Size: ${trade_plan['lot_size_usd']:.2f} @ {trade_plan['leverage']}x")
+                    logger.info(f"   📊 {len(trade_plan['take_profit_levels'])} TP levels")
+                    logger.info(f"   🛡️  Stop Loss: ${trade_plan['stop_loss']:.4f}")
+                    logger.info(f"   ⏱️  Max Hold: {trade_plan['max_hold_time_minutes']} min")
+                    logger.info(f"   📈 Active TFs on {symbol}: {len(self.intelligent_engine.active_trades_by_tf[symbol])}")
+                    
+                    self.total_trades += 1
+                    return True
+                else:
+                    return False
+            
+            # FALLBACK: Basic execution if intelligent engine not available
+            logger.warning("⚠️  Intelligent Engine not available - using basic execution")
             entry_price = signal.get('entry', signal.get('price', 0))
             size_usd = 10.0  # Start with $10 positions on testnet
             
@@ -552,7 +618,7 @@ class ExecutionOrchestrator:
                     quantity
                 )
             
-            logger.info(f"✅ TESTNET Trade executed!")
+            logger.info(f"✅ TESTNET Trade executed (basic)!")
             logger.info(f"   Order ID: {order.get('id', 'N/A')}")
             logger.info(f"   Symbol: {symbol}")
             logger.info(f"   Side: {side.upper()}")
