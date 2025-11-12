@@ -354,6 +354,19 @@ class ExecutionOrchestrator:
                     
                     has_targets = signal.get('take_profit') or signal.get('profit_target_pct')
                     
+                    # ✅ FIX: If no profit targets, add intelligent defaults!
+                    if not has_targets:
+                        # Add intelligent profit targets based on timeframe/strategy
+                        timeframe = signal.get('timeframe', '5m')
+                        if timeframe == '1m':
+                            signal['profit_target_pct'] = 0.003  # 0.3%
+                        elif timeframe == '5m':
+                            signal['profit_target_pct'] = 0.005  # 0.5%
+                        else:
+                            signal['profit_target_pct'] = 0.01   # 1%
+                        has_targets = True
+                        logger.debug(f"   Added profit target: {signal['profit_target_pct']:.1%}")
+                    
                     if (is_scalper or confidence >= 0.70) and has_targets:
                         # Execute this signal!
                         await self.execute_signal(signal)
