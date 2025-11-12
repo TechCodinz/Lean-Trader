@@ -506,6 +506,12 @@ class IntelligentExecutionEngine:
             
             # GET ALL AVAILABLE INTELLIGENCE
             entry_price = signal.get('entry', signal.get('price', 0))
+            
+            # ✅ FIX: Prevent division by zero!
+            if entry_price <= 0:
+                logger.warning(f"   ⚠️  Invalid entry price ({entry_price}) for {symbol}, skipping")
+                return None
+            
             volatility = signal.get('volatility', self.volatility_by_pair.get(symbol, 0.02))
             session = self.get_current_session()
             
