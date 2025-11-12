@@ -1772,7 +1772,7 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                 
                 bybit_testnet = ccxt.bybit({
                     'apiKey': os.getenv('BYBIT_TESTNET_API_KEY'),
-                    'secret': os.getenv('BYBIT_TESTNET_SECRET'),
+                    'secret': os.getenv('BYBIT_TESTNET_API_SECRET'),  # ✅ FIXED!
                     'options': {'defaultType': 'spot'},
                     'enableRateLimit': True
                 })

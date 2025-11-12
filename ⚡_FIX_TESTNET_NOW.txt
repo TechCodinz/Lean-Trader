@@ -1,0 +1,45 @@
+═══════════════════════════════════════════════════════════
+⚡ FIX TESTNET CONNECTION - COPY/PASTE NOW!
+═══════════════════════════════════════════════════════════
+
+PROBLEM: "❌ No exchange available! Mode: testnet, Active: None"
+
+CAUSE: Wrong environment variable name in code
+  Using: BYBIT_TESTNET_SECRET ❌
+  Should be: BYBIT_TESTNET_API_SECRET ✅
+
+FIXED! Pull the fix NOW:
+
+═══════════════════════════════════════════════════════════
+COPY/PASTE THIS ONE COMMAND:
+═══════════════════════════════════════════════════════════
+
+cd ~/apex_bot && git pull origin continue-from-micro-fix && pkill -f RUN_BOT && sleep 3 && nohup python3 RUN_BOT.py > apex.log 2>&1 & && sleep 30 && tail -50 apex.log
+
+═══════════════════════════════════════════════════════════
+
+That ONE command will:
+1. Pull the fix
+2. Stop old bot
+3. Start new bot  
+4. Wait for initialization
+5. Show you the results
+
+═══════════════════════════════════════════════════════════
+VERIFY IT WORKED:
+═══════════════════════════════════════════════════════════
+
+# Check testnet connected
+grep "Bybit TESTNET connected" apex.log
+
+# Should see:
+#    ✅ Bybit TESTNET connected!
+#    💰 Testnet balance: $XXXX.XX USDT
+#    🧠 ✅ INTELLIGENT EXECUTION ENGINE initialized with TESTNET!
+
+# Check execution working
+tail -f apex.log | grep -E "EXECUTING|INTELLIGENT TRADE"
+
+# Should see trades executing (not "No exchange available")
+
+═══════════════════════════════════════════════════════════
