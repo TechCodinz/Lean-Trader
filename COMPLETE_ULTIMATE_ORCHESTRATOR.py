@@ -2085,9 +2085,10 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             # Get AI consultation if available
             ai_consult = get_ai_consultation()
             
-            # Use arb_exchanges (has all configured exchanges)
-            router_exchanges = arb_exchanges if len(arb_exchanges) > 0 else execution_exchanges
+            # MERGE both arb_exchanges AND execution_exchanges!
+            router_exchanges = {**execution_exchanges, **arb_exchanges}  # Merge dicts - execution_exchanges first (has testnet!)
             logger.info(f"   Router will monitor {len(router_exchanges)} exchanges")
+            logger.info(f"   Exchanges: {list(router_exchanges.keys())}")
             
             # Initialize router
             self.intelligent_router = initialize_intelligent_router(router_exchanges, ai_consult)
