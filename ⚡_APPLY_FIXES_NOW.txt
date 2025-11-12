@@ -1,0 +1,63 @@
+⚡ APPLY THESE FIXES NOW - COPY/PASTE ON VPS!
+═══════════════════════════════════════════════════════════════
+
+cd ~/apex_bot
+
+# 1. Fix division by zero
+python3 << 'PYTHON_EOF'
+import re
+
+with open('INTELLIGENT_EXECUTION_ENGINE.py', 'r') as f:
+    content = f.read()
+
+# More robust price validation
+old = '''            # ✅ FIX: Prevent division by zero!
+            if entry_price <= 0:
+                logger.warning(f"   ⚠️  Invalid entry price ({entry_price}) for {symbol}, skipping")
+                return None'''
+
+new = '''            # ✅ FIX: Prevent division by zero - ROBUST!
+            if not entry_price or entry_price <= 0 or entry_price == 100.0:
+                # Try signal data
+                if 'data' in signal:
+                    entry_price = signal['data'].get('price', 0)
+                # Still bad? Skip
+                if not entry_price or entry_price <= 0 or entry_price == 100.0:
+                    logger.warning(f"   ⚠️  Invalid price for {symbol}, skipping")
+                    return None'''
+
+if old in content:
+    content = content.replace(old, new)
+    with open('INTELLIGENT_EXECUTION_ENGINE.py', 'w') as f:
+        f.write(content)
+    print("✅ Fixed division by zero!")
+else:
+    print("Already fixed or pattern changed")
+PYTHON_EOF
+
+# 2. Check syntax
+python3 -m py_compile INTELLIGENT_EXECUTION_ENGINE.py
+if [ $? -eq 0 ]; then
+    echo "✅ Syntax OK!"
+else
+    echo "❌ Syntax error!"
+    exit 1
+fi
+
+# 3. Restart bot
+pkill -f RUN_BOT
+sleep 2
+nohup python3 RUN_BOT.py > apex.log 2>&1 &
+echo "✅ Bot restarted!"
+
+# 4. Wait and check
+sleep 60
+echo ""
+echo "Checking for router..."
+grep -i "INTELLIGENT.*ROUTER" apex.log | tail -5
+
+echo ""
+echo "Checking for errors..."
+tail -50 apex.log | grep -E "ERROR|division"
+
+═══════════════════════════════════════════════════════════════
