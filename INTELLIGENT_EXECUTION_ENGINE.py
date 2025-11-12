@@ -68,6 +68,22 @@ except Exception as e:
     MOON_SPOTTER_AVAILABLE = False
     logger.warning(f"⚠️ MOON SPOTTER not available: {e}")
 
+try:
+    from ADAPTIVE_EXCHANGE_INTELLIGENCE import AdaptiveExchangeIntelligence
+    ADAPTIVE_INTELLIGENCE_AVAILABLE = True
+    logger.info("✅ ADAPTIVE EXCHANGE INTELLIGENCE available (multi-exchange awareness)")
+except Exception as e:
+    ADAPTIVE_INTELLIGENCE_AVAILABLE = False
+    logger.warning(f"⚠️ ADAPTIVE EXCHANGE INTELLIGENCE not available: {e}")
+
+try:
+    from AI_CONSULTATION_SYSTEM import AIConsultationSystem
+    AI_CONSULTATION_AVAILABLE = True
+    logger.info("✅ AI CONSULTATION SYSTEM available (Claude, GPT-4, Gemini)")
+except Exception as e:
+    AI_CONSULTATION_AVAILABLE = False
+    logger.warning(f"⚠️ AI CONSULTATION SYSTEM not available: {e}")
+
 
 class IntelligentExecutionEngine:
     """
@@ -147,6 +163,24 @@ class IntelligentExecutionEngine:
             except Exception as e:
                 logger.warning(f"⚠️ Moon spotter init failed: {e}")
         
+        # 🧠 ADAPTIVE EXCHANGE INTELLIGENCE - Knows all exchanges
+        self.adaptive_intelligence = None
+        if ADAPTIVE_INTELLIGENCE_AVAILABLE:
+            try:
+                # Will initialize after we have all exchange instances
+                logger.info("✅ ADAPTIVE EXCHANGE INTELLIGENCE ready (multi-exchange awareness)")
+            except Exception as e:
+                logger.warning(f"⚠️ Adaptive intelligence init failed: {e}")
+        
+        # 🤖 AI CONSULTATION - Queries Claude, GPT-4, Gemini
+        self.ai_consultation = None
+        if AI_CONSULTATION_AVAILABLE:
+            try:
+                self.ai_consultation = AIConsultationSystem()
+                logger.info("✅ AI CONSULTATION initialized (Claude, GPT-4, Gemini)")
+            except Exception as e:
+                logger.warning(f"⚠️ AI consultation init failed: {e}")
+        
         # Multi-exchange configuration from .env
         self.exchanges = self._load_exchange_configs()
         
@@ -162,6 +196,9 @@ class IntelligentExecutionEngine:
         logger.info("   → Intelligent leverage")
         logger.info("   → Trailing stops")
         logger.info("   → Future trade planning")
+        logger.info("   → ADAPTIVE exchange intelligence")
+        logger.info("   → AI CONSULTATION (Claude, GPT-4, Gemini)")
+        logger.info("   → Pattern learning from AI")
         logger.info("   → ALL 116+ engines in harmony!")
     
     def _load_exchange_configs(self) -> Dict[str, Dict]:
@@ -594,18 +631,34 @@ class IntelligentExecutionEngine:
         
         return base_leverage
     
-    def _get_optimal_exchange_and_market(self, symbol: str, confidence: float, timeframe: str) -> Dict[str, str]:
+    def _get_optimal_exchange_and_market(self, symbol: str, confidence: float, timeframe: str, required_balance: float = 10.0) -> Dict[str, str]:
         """
         Choose optimal exchange and market type for this trade
         
-        🔥 USES OMNISCIENT ENGINE if available!
+        🧠 USES ADAPTIVE INTELLIGENCE if available - knows which exchanges have this pair AND balance!
+        🔥 USES OMNISCIENT ENGINE for market type selection!
         
         Returns: {
             'exchange': 'bybit' or 'gateio' or 'binance',
             'market_type': 'spot' or 'futures' or 'perpetual' or 'dex'
         }
         """
-        # Use OMNISCIENT ENGINE to choose if available
+        # 🧠 USE ADAPTIVE INTELLIGENCE to choose exchange
+        if self.adaptive_intelligence:
+            optimal_exchange = self.adaptive_intelligence.get_optimal_exchange(symbol, required_balance)
+            
+            if optimal_exchange:
+                # Determine market type
+                market_type = 'spot'  # Default
+                if self.omniscient_engine:
+                    market_type = self.omniscient_engine.get_optimal_market_type(symbol, confidence, timeframe)
+                
+                logger.info(f"   🧠 ADAPTIVE: Selected {optimal_exchange} (has pair + balance)")
+                return {'exchange': optimal_exchange, 'market_type': market_type}
+            else:
+                logger.warning(f"   ⚠️ No exchange has {symbol} with sufficient balance!")
+        
+        # Use OMNISCIENT ENGINE to choose if available (fallback)
         if self.omniscient_engine:
             market_type = self.omniscient_engine.get_optimal_market_type(symbol, confidence, timeframe)
             
@@ -854,8 +907,40 @@ class IntelligentExecutionEngine:
             logger.info(f"   Size: ${lot_size:.2f} @ {trade_plan['leverage']}x")
             logger.info(f"   TP Levels: {len(trade_plan['take_profit_levels'])}")
             
+            # 🤖 CONSULT AI for high-confidence trades
+            ai_insights = None
+            if self.ai_consultation and confidence >= 0.75:
+                logger.info(f"   🤖 HIGH CONFIDENCE ({confidence:.0%}) - Consulting AI...")
+                ai_context = {
+                    'symbol': symbol,
+                    'signal': side,
+                    'confidence': confidence,
+                    'timeframe': timeframe,
+                    'current_price': entry_price,
+                    'market_data': {
+                        'strategy': trade_plan['strategy'],
+                        'session': trade_plan['session'],
+                        'volatility': trade_plan.get('volatility', 0),
+                        'leverage': trade_plan['leverage']
+                    }
+                }
+                ai_insights = await self.ai_consultation.consult_strategy(ai_context)
+                
+                if ai_insights and ai_insights.get('ai_consensus') == 'bearish' and side == 'buy':
+                    logger.warning(f"   ⚠️ AI CONSENSUS: BEARISH (conflicts with BUY signal!)")
+                    logger.warning(f"   🤖 Consider reducing size or skipping trade")
+                    # Reduce size by 30% if AI disagrees
+                    lot_size = lot_size * 0.7
+                    logger.info(f"   📉 Size reduced to ${lot_size:.2f} due to AI caution")
+                elif ai_insights and ai_insights.get('ai_consensus') == 'bullish':
+                    logger.info(f"   ✅ AI CONSENSUS: BULLISH (confirms signal!)")
+                    # Can boost size by 10-20% if AI strongly agrees
+                    if ai_insights.get('unanimous'):
+                        lot_size = lot_size * 1.15
+                        logger.info(f"   📈 Size boosted to ${lot_size:.2f} (AI unanimous!)")
+            
             # 🔥 CHOOSE OPTIMAL EXCHANGE AND MARKET TYPE
-            optimal = self._get_optimal_exchange_and_market(symbol, confidence, timeframe)
+            optimal = self._get_optimal_exchange_and_market(symbol, confidence, timeframe, lot_size)
             logger.info(f"   📊 Exchange: {optimal['exchange']} | Market: {optimal['market_type']}")
             
             # 🎯 WAIT FOR PERFECT ENTRY if enabled
@@ -917,6 +1002,11 @@ class IntelligentExecutionEngine:
             logger.info(f"   🛡️  Stop Loss: ${trade_plan['stop_loss']:.4f}")
             logger.info(f"   ⏱️  Max Hold: {trade_plan['max_hold_time_minutes']} minutes")
             logger.info(f"   📊 Active trades on {symbol}: {len(self.active_trades_by_tf[symbol])} timeframes")
+            
+            if ai_insights:
+                logger.info(f"   🤖 AI insights applied: {ai_insights.get('ai_consensus', 'N/A').upper()}")
+                if ai_insights.get('unanimous'):
+                    logger.info(f"   🌟 AI UNANIMOUS agreement!")
             
             return trade_record
             
