@@ -96,3 +96,4 @@ temp/
 # Keep example/template files
 !example_*.csv
 !template_*.csv
+.env
