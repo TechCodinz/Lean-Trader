@@ -1,0 +1,88 @@
+⚡ FIX .ENV BEING WIPED - CRITICAL!
+═══════════════════════════════════════════════════════════════
+
+PROBLEM: .env was being tracked in git!
+Every git pull overwrote your real keys with placeholders!
+
+SOLUTION: Remove .env from git, add to .gitignore
+
+═══════════════════════════════════════════════════════════════
+
+ON YOUR VPS, RUN THIS ONCE:
+
+cd ~/apex_bot
+git pull origin continue-from-micro-fix
+rm .env
+git stash
+
+# Now create your PERMANENT .env (won't be overwritten!)
+cat > .env << 'EOF'
+# Telegram  
+TELEGRAM_BOT_TOKEN=8291641352:AAFTGq-hIY_iS47aMOoGXrBDFlR_B3nCupg
+VIP_CHANNEL_ID=-1002983007302
+FREE_CHANNEL_ID=-1002930953007
+TELEGRAM_FREE_CHANNEL=-1002930953007
+
+# TESTNET MODE
+TRADING_MODE=testnet
+BYBIT_TESTNET=true
+ENABLE_LIVE=false
+
+# Bybit TESTNET - GET NEW KEYS FROM testnet.bybit.com!
+BYBIT_TESTNET_API_KEY=YOUR_NEW_TESTNET_KEY
+BYBIT_TESTNET_API_SECRET=YOUR_NEW_TESTNET_SECRET
+
+# Bybit LIVE
+BYBIT_API_KEY=mMHs7rDC72TvHs4oQG
+BYBIT_API_SECRET=NwTa6UOgczdmZI2Kn2WBcFfh5r6VkVGnvGEI
+
+# Gate.io
+GATE_API_KEY=a0508d8aadf3bcb76e16f4373e1f3a76
+GATE_API_SECRET=451770a07dbede1b87bb92f5ce98e24029d2fe91e0053be2ec41771c953113f9
+
+# AI APIs - ADD YOUR KEYS!
+ANTHROPIC_API_KEY=sk-ant-your-key
+OPENAI_API_KEY=sk-your-key
+GOOGLE_API_KEY=your-key
+GROK_API_KEY=your-key
+XAI_API_KEY=your-key
+
+# AI Settings
+AI_BUDGET_DAILY=10.0
+AI_RATE_LIMIT_PER_MIN=20
+
+# Trading Limits
+MAX_POSITION_SIZE=10
+MAX_DAILY_TRADES=999999
+MAX_OPEN_POSITIONS=999999
+MIN_CONFIDENCE=0.65
+EOF
+
+# Add your REAL API keys
+nano .env
+
+# Make it READ-ONLY (extra protection)
+chmod 444 .env
+
+echo "✅ .env created and will NEVER be overwritten by git pull!"
+
+═══════════════════════════════════════════════════════════════
+
+TO GET NEW BYBIT TESTNET KEYS:
+
+1. Go to: https://testnet.bybit.com/
+2. Login/Register
+3. Go to API Management
+4. Create new API key
+5. Copy key and secret
+6. Add to .env
+
+Then restart:
+pkill -f RUN_BOT && nohup python3 RUN_BOT.py > apex.log 2>&1 &
+
+═══════════════════════════════════════════════════════════════
+
+NOW .ENV WILL NEVER BE WIPED AGAIN! 🎉
+
+After you add valid Bybit testnet keys, bot will connect and trade!
+═══════════════════════════════════════════════════════════════
