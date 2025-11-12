@@ -2194,10 +2194,12 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             try:
                 gate_ex = self.micro_wallet_grower.gate if hasattr(self, 'micro_wallet_grower') else None
                 profit_tk = self.auto_profit_taker if hasattr(self, 'auto_profit_taker') else None
+                exec_orch = self.advanced_orchestrators.get('execution')  # ✨ Get ExecutionOrchestrator
                 
                 self.aggressive_scalper = AggressiveScalpingEngine(
                     exchange=gate_ex,
-                    auto_profit_taker=profit_tk
+                    auto_profit_taker=profit_tk,
+                    execution_orchestrator=exec_orch  # ✨ Wire for proper tracking!
                 )
                 self.scalping_coordinator = ScalpingCoordinator(max_concurrent=5)
                 self.advanced_orchestrators['aggressive_scalper'] = self.aggressive_scalper
