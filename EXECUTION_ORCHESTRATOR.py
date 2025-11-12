@@ -559,6 +559,15 @@ class ExecutionOrchestrator:
         - Complete trade planning
         """
         try:
+            # ✅ CHECK IF PAIR EXISTS ON TESTNET!
+            try:
+                from BYBIT_TESTNET_PAIRS_FILTER import is_testnet_pair
+                if not is_testnet_pair(symbol):
+                    logger.debug(f"   ⚠️  {symbol} not available on Bybit testnet, skipping")
+                    return False
+            except:
+                pass  # Filter not available, try anyway
+            
             logger.info(f"   🧪 Executing on BYBIT TESTNET...")
             
             # 🧠 USE INTELLIGENT EXECUTION if available!
