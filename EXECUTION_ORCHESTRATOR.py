@@ -566,14 +566,18 @@ class ExecutionOrchestrator:
                 if router:
                     route = await router.route_signal(signal)
                     if route:
-                        logger.info(f"   🧠 Routed to: {route['exchange']} {route['market_type']}")
-                        # If routed to different exchange, would execute there
-                        # For now, continue with testnet if that's what we got
+                        logger.info(f"   🧠 ROUTER: {symbol} routed to {route['exchange']} {route['market_type']}")
+                        # If pair not on this exchange, skip
+                        if route['exchange'] != 'bybit_testnet' and self.mode == 'testnet':
+                            logger.info(f"   ⏭️  {symbol} not on testnet, skipping")
+                            return False
                     else:
-                        logger.warning(f"   ⚠️  {symbol} not available on any exchange, skipping")
+                        logger.info(f"   ⏭️  {symbol} not available anywhere, skipping")
                         return False
-            except:
-                pass  # Router not available, try anyway
+                else:
+                    logger.debug("   Router not available (not initialized yet)")
+            except Exception as e:
+                logger.debug(f"   Router check failed: {e}")
             
             logger.info(f"   🧪 Executing on BYBIT TESTNET...")
             
