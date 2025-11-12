@@ -140,6 +140,12 @@ class AIConsultationSystem:
         """
         Consult AI for trading strategy
         
+        THROTTLED to prevent token burnout!
+        Only consults on:
+        - Very high confidence (85%+)
+        - Important pairs (BTC, ETH, etc)
+        - Once per pair per 5 minutes
+        
         Args:
             context: {
                 'symbol': 'BTC/USDT',
@@ -154,7 +160,7 @@ class AIConsultationSystem:
             AI recommendations and insights
         """
         if not self.clients:
-            logger.warning("⚠️ No AI clients available, skipping consultation")
+            logger.debug("No AI clients available, skipping consultation")
             return {'ai_available': False}
         
         # Check budget
@@ -162,10 +168,25 @@ class AIConsultationSystem:
             logger.warning(f"⚠️ Daily AI budget exceeded: ${self.cost_today:.2f}/${self.daily_budget}")
             return {'budget_exceeded': True}
         
+        # THROTTLE: Only consult on very high confidence (85%+)
+        confidence = context.get('confidence', 0)
+        if confidence < 0.85:
+            logger.debug(f"   Confidence {confidence:.0%} below 85% threshold, skipping AI")
+            return {'skipped': 'confidence_too_low'}
+        
+        # THROTTLE: Check if we consulted this pair recently (5 min cooldown)
+        symbol = context.get('symbol', '')
+        now = datetime.now()
+        if symbol in self.consultations:
+            last_consult = self.consultations[-1]['timestamp']
+            if (now - datetime.fromisoformat(last_consult)).seconds < 300:  # 5 minutes
+                logger.debug(f"   {symbol} consulted recently, skipping (cooldown)")
+                return {'skipped': 'cooldown_active'}
+        
         # Check rate limit
         if not self._check_rate_limit():
-            logger.warning("⚠️ AI rate limit reached, waiting...")
-            await asyncio.sleep(5)
+            logger.warning("⚠️ AI rate limit reached, skipping...")
+            return {'skipped': 'rate_limit'}
         
         logger.info(f"🤖 Consulting AI about {context.get('symbol')} {context.get('signal', 'unknown').upper()}")
         

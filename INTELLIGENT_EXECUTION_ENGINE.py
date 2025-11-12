@@ -679,6 +679,7 @@ class IntelligentExecutionEngine:
         
         # Fallback: Use current exchange (testnet or live)
         if self.mode == 'testnet':
+            logger.info(f"   🧪 TESTNET MODE: Forcing Bybit testnet (not {optimal.get('exchange', 'unknown')})")
             return {'exchange': 'bybit_testnet', 'market_type': 'spot'}
         else:
             return {'exchange': 'gateio', 'market_type': 'spot'}
@@ -907,10 +908,10 @@ class IntelligentExecutionEngine:
             logger.info(f"   Size: ${lot_size:.2f} @ {trade_plan['leverage']}x")
             logger.info(f"   TP Levels: {len(trade_plan['take_profit_levels'])}")
             
-            # 🤖 CONSULT AI for high-confidence trades
+            # 🤖 CONSULT AI for very high-confidence trades (THROTTLED!)
             ai_insights = None
-            if self.ai_consultation and confidence >= 0.75:
-                logger.info(f"   🤖 HIGH CONFIDENCE ({confidence:.0%}) - Consulting AI...")
+            if self.ai_consultation and confidence >= 0.88:  # ✅ Changed from 75% to 88% to reduce queries!
+                logger.info(f"   🤖 VERY HIGH CONFIDENCE ({confidence:.0%}) - Consulting AI...")
                 ai_context = {
                     'symbol': symbol,
                     'signal': side,
@@ -941,6 +942,12 @@ class IntelligentExecutionEngine:
             
             # 🔥 CHOOSE OPTIMAL EXCHANGE AND MARKET TYPE
             optimal = self._get_optimal_exchange_and_market(symbol, confidence, timeframe, lot_size)
+            
+            # ✅ IN TESTNET MODE: FORCE TESTNET EXCHANGE!
+            if self.mode == 'testnet':
+                optimal = {'exchange': 'bybit_testnet', 'market_type': 'spot'}
+                logger.info(f"   🧪 TESTNET MODE: Using Bybit testnet")
+            
             logger.info(f"   📊 Exchange: {optimal['exchange']} | Market: {optimal['market_type']}")
             
             # 🎯 WAIT FOR PERFECT ENTRY if enabled
