@@ -405,10 +405,13 @@ _intelligent_router = None
 
 def get_intelligent_router():
     """Get intelligent router instance"""
+    global _intelligent_router
     return _intelligent_router
 
 def initialize_intelligent_router(exchanges: Dict[str, Any], ai_consultation=None):
     """Initialize intelligent router"""
     global _intelligent_router
-    _intelligent_router = IntelligentExchangeRouter(exchanges, ai_consultation)
+    if _intelligent_router is None:
+        _intelligent_router = IntelligentExchangeRouter(exchanges, ai_consultation)
+        logger.info(f"✅ Intelligent Router singleton created with {len(exchanges)} exchanges")
     return _intelligent_router
