@@ -346,6 +346,49 @@ class ExecutionOrchestrator:
                 logger.error(f"Execution loop error: {e}")
                 await asyncio.sleep(5)
     
+    async def execute_signal(self, signal: Dict[str, Any]):
+        """
+        Execute a trading signal from DataHub
+        THIS IS THE CRITICAL METHOD THAT WAS MISSING!
+        """
+        
+        try:
+            # Extract signal details
+            symbol = signal.get('pair') or signal.get('symbol')
+            side = signal.get('side', 'BUY')
+            confidence = signal.get('confidence', 0.0)
+            
+            if not symbol:
+                return
+            
+            # Convert confidence to 0-1 range if needed
+            if confidence > 1:
+                confidence = confidence / 100
+            
+            # Check confidence threshold
+            if confidence < self.min_confidence:
+                logger.debug(f"   Skipping {symbol}: confidence {confidence:.1%} < {self.min_confidence:.1%}")
+                return
+            
+            # Log the signal
+            logger.info(f"📥 Processing signal: {side} {symbol} ({confidence:.1%})")
+            
+            # Execute the trade!
+            result = await self.execute_trade(
+                symbol=symbol,
+                side=side,
+                confidence=confidence,
+                signal=signal
+            )
+            
+            if result:
+                logger.info(f"✅ Signal executed successfully!")
+            else:
+                logger.warning(f"⚠️  Signal execution failed")
+        
+        except Exception as e:
+            logger.error(f"Execute signal error: {e}")
+    
     async def process_decision(self, decision: Dict[str, Any]):
         """Process AI decision using ADVANCED ACTION LOGIC"""
         
