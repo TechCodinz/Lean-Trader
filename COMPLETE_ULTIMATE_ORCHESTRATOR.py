@@ -1844,9 +1844,37 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             mode=self.mode
         )
         
+        # 🧠 INITIALIZE INTELLIGENT EXCHANGE ROUTER!
+        logger.info("\n🧠 Initializing INTELLIGENT EXCHANGE ROUTER...")
+        try:
+            from INTELLIGENT_EXCHANGE_ROUTER import initialize_intelligent_router
+            from AI_CONSULTATION_SYSTEM import get_ai_consultation
+            
+            # Get AI consultation if available
+            ai_consult = get_ai_consultation()
+            
+            # Initialize router with all exchanges
+            self.intelligent_router = initialize_intelligent_router(arb_exchanges if len(arb_exchanges) > 0 else execution_exchanges, ai_consult)
+            
+            # Discover all pairs immediately
+            logger.info("   🔍 Discovering all pairs (crypto, forex, commodities, indices)...")
+            await self.intelligent_router.discover_all_pairs()
+            
+            # Get stats
+            stats = self.intelligent_router.get_routing_stats()
+            logger.info(f"✅ INTELLIGENT ROUTER active!")
+            logger.info(f"   Total pairs: {stats['total_pairs']}")
+            logger.info(f"   Exchanges: {stats['total_exchanges']}")
+            for market, count in stats['pairs_by_market_type'].items():
+                logger.info(f"   {market}: {count} pairs")
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Intelligent Router failed: {e}")
+            self.intelligent_router = None
+        
         # ✨ WIRE TESTNET EXCHANGE TO EXECUTION ORCHESTRATOR
         if self.mode == 'testnet' and 'bybit_testnet' in execution_exchanges:
-            logger.info("🔗 Wiring Bybit testnet to ExecutionOrchestrator...")
+            logger.info("\n🔗 Wiring Bybit testnet to ExecutionOrchestrator...")
             self.advanced_orchestrators['execution'].wire_execution_to_testnet(
                 execution_exchanges['bybit_testnet']
             )
