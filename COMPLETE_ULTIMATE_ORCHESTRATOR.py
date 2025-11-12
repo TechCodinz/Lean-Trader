@@ -1844,6 +1844,14 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             mode=self.mode
         )
         
+        # ✨ WIRE TESTNET EXCHANGE TO EXECUTION ORCHESTRATOR
+        if self.mode == 'testnet' and 'bybit_testnet' in execution_exchanges:
+            logger.info("🔗 Wiring Bybit testnet to ExecutionOrchestrator...")
+            self.advanced_orchestrators['execution'].wire_execution_to_testnet(
+                execution_exchanges['bybit_testnet']
+            )
+            logger.info("✅ ExecutionOrchestrator can now trade on TESTNET with $8K+ balance!")
+        
         # Update balance to ACTUAL balance (testnet or live)
         if hasattr(self.advanced_orchestrators['execution'], 'position_sizer'):
             self.advanced_orchestrators['execution'].position_sizer.balance = actual_balance

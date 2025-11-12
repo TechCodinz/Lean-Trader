@@ -240,17 +240,29 @@ class ExecutionOrchestrator:
         self.position_sizer = SmartPositionSizer(initial_balance=1000.0)
         self.risk_manager = SmartRiskManager()
         
-        # COMPLETE PROFIT SYSTEM - Direct Gate.io execution
-        self.profit_system = None
-        if PROFIT_SYSTEM_AVAILABLE:
-            try:
-                import os
-                api_key = os.getenv('GATE_API_KEY', 'a0508d8aadf3bcb76e16f4373e1f3a76')
-                api_secret = os.getenv('GATE_API_SECRET', '451770a07dbede1b87bb92f5ce98e24029d2fe91e0053be2ec41771c953113f9')
-                self.profit_system = CompleteProfitSystem(api_key, api_secret)
-                logger.info("✅ COMPLETE PROFIT SYSTEM initialized - Direct Gate.io execution!")
-            except Exception as e:
-                logger.error(f"Failed to init profit system: {e}")
+        # ✨ MULTI-EXCHANGE SUPPORT - Testnet OR Live!
+        self.profit_system = None  # For live Gate.io trading
+        self.testnet_exchange = None  # For Bybit testnet
+        self.active_exchange = None  # The one we're actually using
+        
+        if mode == "testnet":
+            # 🧪 TESTNET MODE - Use Bybit testnet
+            logger.info("🧪 Setting up TESTNET execution via Bybit...")
+            # Will be set by orchestrator with actual testnet exchange
+            self.active_exchange = None  # Set later by wire_execution_to_testnet()
+            logger.info("   Waiting for testnet exchange from orchestrator...")
+        else:
+            # 💰 LIVE MODE - Use Gate.io via COMPLETE PROFIT SYSTEM
+            if PROFIT_SYSTEM_AVAILABLE:
+                try:
+                    import os
+                    api_key = os.getenv('GATE_API_KEY', 'a0508d8aadf3bcb76e16f4373e1f3a76')
+                    api_secret = os.getenv('GATE_API_SECRET', '451770a07dbede1b87bb92f5ce98e24029d2fe91e0053be2ec41771c953113f9')
+                    self.profit_system = CompleteProfitSystem(api_key, api_secret)
+                    self.active_exchange = 'profit_system'
+                    logger.info("✅ COMPLETE PROFIT SYSTEM initialized - Direct Gate.io execution!")
+                except Exception as e:
+                    logger.error(f"Failed to init profit system: {e}")
         
         # ADVANCED COMPONENTS (wired externally)
         self.action_decider = None  # AdvancedActionDecider
@@ -459,9 +471,19 @@ class ExecutionOrchestrator:
                 logger.info(f"⚠️ Trade blocked: {reason}")
                 return
     
+    def wire_execution_to_testnet(self, testnet_exchange):
+        """Wire ExecutionOrchestrator to use Bybit testnet exchange"""
+        self.testnet_exchange = testnet_exchange
+        self.active_exchange = 'testnet'
+        logger.info("✅ ExecutionOrchestrator wired to Bybit TESTNET!")
+        logger.info(f"   Exchange: {type(testnet_exchange).__name__}")
+    
     async def execute_signal(self, signal: Dict[str, Any]):
         """
-        Execute a trading signal using COMPLETE PROFIT SYSTEM
+        Execute a trading signal using appropriate exchange
+        
+        - TESTNET mode: Uses Bybit testnet
+        - LIVE mode: Uses COMPLETE PROFIT SYSTEM (Gate.io)
         
         This is the CRITICAL method that was missing!
         """
@@ -485,38 +507,95 @@ class ExecutionOrchestrator:
                 return False
             
             logger.info(f"⚡ EXECUTING: {side.upper()} {symbol} (confidence: {confidence:.1%})")
+            logger.info(f"   Mode: {self.mode} | Exchange: {self.active_exchange}")
             
-            # Use COMPLETE PROFIT SYSTEM if available
-            if self.profit_system:
-                # Format signal for profit system
-                signal_dict = {
-                    'symbol': symbol,
-                    'side': side,
-                    'confidence': confidence,
-                    'entry': signal.get('entry', signal.get('price', 0)),
-                    'take_profit': signal.get('take_profit'),
-                    'stop_loss': signal.get('stop_loss'),
-                    'strategy': signal.get('strategy', signal.get('type', 'unknown')),
-                    'source': signal.get('source', 'ExecutionOrchestrator'),
-                    'timeframe': signal.get('timeframe', ''),
-                    'profit_target_pct': signal.get('profit_target_pct', 0.3),
-                }
-                
-                execution_result = await self.profit_system.execute_signal(signal_dict)
-                
-                if execution_result:
-                    logger.info(f"✅ Trade executed via COMPLETE PROFIT SYSTEM!")
-                    self.total_trades += 1
-                    return True
-                else:
-                    logger.warning(f"❌ Execution failed")
-                    return False
+            # ✨ TESTNET EXECUTION (Bybit testnet)
+            if self.mode == "testnet" and self.testnet_exchange:
+                return await self._execute_on_testnet(signal, symbol, side, confidence)
+            
+            # 💰 LIVE EXECUTION (Gate.io via COMPLETE PROFIT SYSTEM)
+            elif self.profit_system:
+                return await self._execute_via_profit_system(signal, symbol, side, confidence)
+            
             else:
-                logger.warning("⚠️  No profit system available")
+                logger.error(f"❌ No exchange available! Mode: {self.mode}, Active: {self.active_exchange}")
                 return False
                 
         except Exception as e:
             logger.error(f"execute_signal error: {e}")
+            return False
+    
+    async def _execute_on_testnet(self, signal: Dict, symbol: str, side: str, confidence: float):
+        """Execute trade on Bybit testnet"""
+        try:
+            logger.info(f"   🧪 Executing on BYBIT TESTNET...")
+            
+            # Get trade parameters
+            entry_price = signal.get('entry', signal.get('price', 0))
+            size_usd = 10.0  # Start with $10 positions on testnet
+            
+            # Create order via ccxt
+            if side == 'buy':
+                params = {'createMarketBuyOrderRequiresPrice': False}
+                order = await asyncio.to_thread(
+                    self.testnet_exchange.create_market_buy_order,
+                    symbol,
+                    size_usd,
+                    params
+                )
+            else:  # sell
+                # Calculate quantity
+                quantity = size_usd / entry_price if entry_price > 0 else 0.01
+                order = await asyncio.to_thread(
+                    self.testnet_exchange.create_market_sell_order,
+                    symbol,
+                    quantity
+                )
+            
+            logger.info(f"✅ TESTNET Trade executed!")
+            logger.info(f"   Order ID: {order.get('id', 'N/A')}")
+            logger.info(f"   Symbol: {symbol}")
+            logger.info(f"   Side: {side.upper()}")
+            logger.info(f"   Size: ${size_usd}")
+            
+            self.total_trades += 1
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Testnet execution failed: {e}")
+            return False
+    
+    async def _execute_via_profit_system(self, signal: Dict, symbol: str, side: str, confidence: float):
+        """Execute trade via COMPLETE PROFIT SYSTEM (Gate.io live)"""
+        try:
+            logger.info(f"   💰 Executing via COMPLETE PROFIT SYSTEM (Gate.io)...")
+            
+            # Format signal for profit system
+            signal_dict = {
+                'symbol': symbol,
+                'side': side,
+                'confidence': confidence,
+                'entry': signal.get('entry', signal.get('price', 0)),
+                'take_profit': signal.get('take_profit'),
+                'stop_loss': signal.get('stop_loss'),
+                'strategy': signal.get('strategy', signal.get('type', 'unknown')),
+                'source': signal.get('source', 'ExecutionOrchestrator'),
+                'timeframe': signal.get('timeframe', ''),
+                'profit_target_pct': signal.get('profit_target_pct', 0.3),
+            }
+            
+            execution_result = await self.profit_system.execute_signal(signal_dict)
+            
+            if execution_result:
+                logger.info(f"✅ Trade executed via COMPLETE PROFIT SYSTEM!")
+                self.total_trades += 1
+                return True
+            else:
+                logger.warning(f"❌ Execution failed")
+                return False
+                
+        except Exception as e:
+            logger.error(f"❌ Profit system execution failed: {e}")
             return False
             
             # EXECUTE THE TRADE!
