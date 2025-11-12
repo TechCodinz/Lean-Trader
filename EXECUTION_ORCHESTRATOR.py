@@ -375,12 +375,20 @@ class ExecutionOrchestrator:
                         await asyncio.sleep(1)
                 
                 # Monitor open positions (close at profit targets!)
-                await self.monitor_positions()
+                try:
+                    await asyncio.wait_for(self.monitor_positions(), timeout=3.0)
+                except asyncio.TimeoutError:
+                    logger.warning("⚠️  Position monitoring timed out (3s), continuing...")
+                except Exception as e:
+                    logger.error(f"Position monitoring error: {e}")
                 
+                logger.info("💤 Sleeping 5 seconds before next iteration...")
                 await asyncio.sleep(5)  # Check every 5 seconds
                 
             except Exception as e:
-                logger.error(f"Execution loop error: {e}")
+                logger.error(f"❌ Execution loop error: {e}")
+                import traceback
+                logger.error(traceback.format_exc())
                 await asyncio.sleep(5)
     
     async def execute_signal(self, signal: Dict[str, Any]):
