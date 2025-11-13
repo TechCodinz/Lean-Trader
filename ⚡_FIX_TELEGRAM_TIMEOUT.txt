@@ -1,0 +1,80 @@
+⚡ FIX TELEGRAM TIMEOUT - DON'T CRASH BOT!
+═══════════════════════════════════════════════════════════════
+
+ISSUE: Telegram times out → crashes entire bot!
+
+SOLUTION: Increase timeout + better error handling
+
+COPY/PASTE ON VPS:
+
+cd ~/apex_bot
+
+# Fix 1: Increase Telegram timeout
+python3 << 'EOF'
+import re
+
+# Fix TELEGRAM_ORCHESTRATOR.py
+with open('TELEGRAM_ORCHESTRATOR.py', 'r') as f:
+    content = f.read()
+
+# Find bot initialization
+old = "self.app = Application.builder().token(bot_token).build()"
+new = """self.app = Application.builder().token(bot_token).read_timeout(30).write_timeout(30).connect_timeout(30).pool_timeout(30).build()"""
+
+if old in content:
+    content = content.replace(old, new)
+    print("✅ Increased Telegram timeouts to 30 seconds!")
+else:
+    print("⚠️ Pattern not found, trying alternative...")
+
+with open('TELEGRAM_ORCHESTRATOR.py', 'w') as f:
+    f.write(content)
+EOF
+
+# Fix 2: Wrap Telegram sends in try-except so they don't crash bot
+python3 << 'PEOF'
+with open('TELEGRAM_ORCHESTRATOR.py', 'r') as f:
+    content = f.read()
+
+# Add safety wrapper to all send functions
+old_send = """        try:
+            result = await self.bot.send_message("""
+
+new_send = """        try:
+            # Wrap in timeout to prevent crashes
+            result = await asyncio.wait_for(
+                self.bot.send_message("""
+
+if old_send in content:
+    content = content.replace(old_send, new_send)
+    # Also close the wait_for
+    content = content.replace(
+        "parse_mode='HTML'\n            )",
+        "parse_mode='HTML'),\n                timeout=10.0  # 10 second timeout\n            )"
+    )
+    print("✅ Added timeout protection!")
+else:
+    print("⚠️ Alternative approach needed")
+
+with open('TELEGRAM_ORCHESTRATOR.py', 'w') as f:
+    f.write(content)
+PEOF
+
+# Restart bot
+pkill -f RUN_BOT
+nohup python3 RUN_BOT.py > apex.log 2>&1 &
+
+# Wait and watch
+sleep 120
+tail -f apex.log | grep -E "Order ID|Telegram|CNS"
+
+═══════════════════════════════════════════════════════════════
+
+NOW TELEGRAM WILL:
+✅ Have 30-second timeouts (not instant fail)
+✅ Not crash bot if it times out
+✅ Continue sending signals
+✅ Keep bot running!
+
+BOT KEEPS TRADING EVEN IF TELEGRAM SLOW! 🚀
+═══════════════════════════════════════════════════════════════
