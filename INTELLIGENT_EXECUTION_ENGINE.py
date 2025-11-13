@@ -338,8 +338,8 @@ class IntelligentExecutionEngine:
             # Get volatility for this pair
             volatility = self.volatility_by_pair.get(symbol, 0.02)  # Default 2%
             
-            # Base position size (USD)
-            base_size = 10.0  # Start with $10 for testnet
+            # Base position size (USD) - SMALLER for testnet!
+            base_size = 5.0  # Start with $5 for testnet (conservative!)
             
             # 1. CONFIDENCE MULTIPLIER (50-150%)
             confidence_mult = 0.5 + (confidence * 1.0)  # 0.5x to 1.5x
@@ -400,8 +400,8 @@ class IntelligentExecutionEngine:
                 strategy_mult
             )
             
-            # Apply limits (testnet: $5-50 per trade)
-            final_size = max(5.0, min(final_size, 50.0))
+            # Apply limits (testnet: $3-20 per trade to avoid balance issues!)
+            final_size = max(3.0, min(final_size, 20.0))
             
             logger.info(f"🧠 INTELLIGENT LOT SIZING: {symbol} {timeframe}")
             logger.info(f"   Confidence: {confidence:.1%} → {confidence_mult:.2f}x")
