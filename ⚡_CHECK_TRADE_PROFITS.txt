@@ -1,0 +1,30 @@
+⚡ CHECK TRADE PROFITS - RUN ON VPS!
+═══════════════════════════════════════════════════════════════
+
+# See all trades with details
+grep -E "Order ID:|Size:|TP Levels:|Stop Loss:" apex.log | tail -40
+
+# Check for closed positions
+grep -E "POSITION CLOSED|closed.*profit|P&L:" apex.log | tail -20
+
+# See actual profit/loss
+grep -E "profit.*\$|loss.*\$|Balance.*\$" apex.log | tail -20
+
+# Check timeframes being traded
+grep "EXECUTING.*TRADE" apex.log | grep -oE "1m|5m|15m|1h|4h" | sort | uniq -c
+
+# See which strategies
+grep "Strategy:" apex.log | tail -20
+
+# Check if positions are being monitored
+grep "monitor.*position|Monitoring position" apex.log | tail -10
+
+═══════════════════════════════════════════════════════════════
+
+RUN THESE AND SHOW ME!
+
+I need to see:
+1. If trades closed with profit
+2. What timeframes are trading
+3. What strategies are active
+═══════════════════════════════════════════════════════════════
