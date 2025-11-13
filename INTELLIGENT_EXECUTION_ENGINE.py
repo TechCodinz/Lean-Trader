@@ -497,7 +497,27 @@ class IntelligentExecutionEngine:
         try:
             symbol = signal.get('symbol', '')
             timeframe = signal.get('timeframe', '5m')
-            strategy = signal.get('strategy', 'unknown')
+            strategy = signal.get('strategy', '')
+            
+            # ✅ INTELLIGENT STRATEGY DETECTION
+            if not strategy or strategy == 'unknown':
+                # Detect strategy from signal characteristics
+                source = signal.get('source', '').lower()
+                
+                if 'scalp' in source:
+                    strategy = 'SCALPING'
+                elif 'momentum' in source or 'breakout' in source:
+                    strategy = 'MOMENTUM_BREAKOUT'
+                elif 'arbitrage' in source or 'arb' in source:
+                    strategy = 'ARBITRAGE'
+                elif 'news' in source:
+                    strategy = 'NEWS_TRADING'
+                elif 'fx' in source or 'forex' in source:
+                    strategy = 'FOREX_SWING'
+                else:
+                    # Query AI for strategy recommendation
+                    strategy = 'MULTI_ENGINE_CONFLUENCE'
+                    logger.info(f"   🧠 Auto-detected strategy: {strategy}")
             side = signal.get('side', 'buy').lower()
             confidence = signal.get('confidence', 0.5)
             

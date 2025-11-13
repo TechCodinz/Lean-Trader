@@ -1,0 +1,42 @@
+✅ STRATEGY FIX READY - DEPLOY NOW!
+═══════════════════════════════════════════════════════════════
+
+WHAT I FIXED:
+
+1. ✅ Strategy: unknown → AUTO-DETECTION
+   - Scalping (from scalper engines)
+   - Momentum/Breakout (from breakout engines)
+   - Arbitrage (from arb engines)
+   - News Trading (from news engine)
+   - Forex Swing (from FX engines)
+   - Multi-Engine Confluence (default)
+
+2. ✅ AI STRATEGY LEARNER
+   - Learns from successful trades
+   - Tracks win rate per strategy
+   - Queries AI for insights
+   - Adapts continuously
+
+═══════════════════════════════════════════════════════════════
+
+DEPLOY:
+
+cd ~/apex_bot && git pull origin continue-from-micro-fix && pkill -f RUN_BOT && nohup python3 RUN_BOT.py > apex.log 2>&1 &
+
+WAIT 2 MIN THEN CHECK:
+
+sleep 120
+tail -f apex.log | grep -E "Strategy:|Auto-detected strategy"
+
+═══════════════════════════════════════════════════════════════
+
+YOU'LL NOW SEE:
+
+Strategy: SCALPING
+Strategy: MOMENTUM_BREAKOUT
+Strategy: ARBITRAGE
+Strategy: NEWS_TRADING
+
+NOT "unknown" anymore!
+
+═══════════════════════════════════════════════════════════════
