@@ -2289,6 +2289,21 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             logger.error(f"❌ Fluid Mechanics failed to wire: {e}")
             self.fluid_mechanics = None
         
+        # 🧠 INITIALIZE CENTRAL NERVOUS SYSTEM (THE BRAIN!)
+        logger.info("\n🧠 Initializing CENTRAL NERVOUS SYSTEM...")
+        try:
+            from CENTRAL_NERVOUS_SYSTEM import initialize_cns
+            self.cns = initialize_cns()
+            
+            # Register connected exchanges
+            self.cns.register_exchange('bybit_testnet', has_connection=True)
+            
+            logger.info("✅ 🧠 CENTRAL NERVOUS SYSTEM ONLINE!")
+            logger.info("   THE BRAIN IS CONTROLLING ALL SYSTEMS!")
+        except Exception as e:
+            logger.error(f"❌ CNS initialization failed: {e}")
+            self.cns = None
+        
         # 💎 INITIALIZE PREMIUM SYSTEMS FOR MONETIZATION
         logger.info("\n💎 Initializing PREMIUM MONETIZATION SYSTEMS...")
         try:
@@ -2323,10 +2338,30 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             logger.info("✅ 💎 ALL PREMIUM SYSTEMS ACTIVE!")
             logger.info("   Ready for: VIP subscriptions, managed trading, profit sharing!")
             
+            # 🧠 REGISTER PREMIUM SYSTEMS WITH CNS
+            if hasattr(self, 'cns') and self.cns:
+                self.cns.register_system('payment_processor', self.payment_processor)
+                self.cns.register_system('managed_trading', self.managed_trading)
+                self.cns.register_system('ultimate_analytics', self.ultimate_analytics)
+                logger.info("✅ Premium systems registered with CNS!")
+            
         except Exception as e:
             logger.error(f"❌ Premium systems failed: {e}")
             import traceback
             logger.error(traceback.format_exc())
+        
+        # 🧠 UPDATE CNS WITH DISCOVERED PAIRS
+        if hasattr(self, 'intelligent_router') and self.intelligent_router and hasattr(self, 'cns') and self.cns:
+            logger.info("\n🧠 CNS: Coordinating discovered pairs...")
+            for exchange, markets in self.intelligent_router.exchange_pairs.items():
+                total_pairs = sum(len(pairs) for pairs in markets.values())
+                if total_pairs > 0:
+                    all_pairs = []
+                    for market_type, pairs in markets.items():
+                        all_pairs.extend(list(pairs))
+                    
+                    self.cns.coordinate_pair_discovery(exchange, all_pairs)
+                    logger.info(f"   ✅ CNS coordinated {exchange}: {len(all_pairs)} pairs")
         
         logger.info("\n" + "=" * 80)
         logger.info("✅ ALL ADVANCED SYSTEMS WIRED!")
