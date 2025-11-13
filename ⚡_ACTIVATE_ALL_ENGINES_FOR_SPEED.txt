@@ -1,0 +1,38 @@
+⚡ WHY BOT TRADING SLOW? DIAGNOSTIC!
+═══════════════════════════════════════════════════════════════
+
+RUN ON VPS:
+
+# Check if aggressive scalper is running
+grep "AGGRESSIVE SCALPING" apex.log | tail -10
+
+# Check execution loop iterations
+grep "🔄 EXEC LOOP" apex.log | wc -l
+
+# See how many signals are being generated
+tail -500 apex.log | grep "generated.*signals" | tail -20
+
+# Check if signals have profit targets
+tail -200 apex.log | grep "profit_target\|take_profit"
+
+# See what timeframes are active
+grep -E "1m|5m|15m|1h" apex.log | grep "Trading\|Executing" | tail -20
+
+# Check if micro wallet grower is trading
+grep "MICRO.*TRADE\|micro.*executing" apex.log | tail -10
+
+═══════════════════════════════════════════════════════════════
+
+SHOW ME ALL THESE OUTPUTS!
+
+The bot has:
+- Aggressive scalper (should trade every 10 seconds!)
+- Micro wallet grower
+- Smart scalping  
+- Sentient scalping
+- Multiple timeframes (1m, 5m, 15m, 1h, 4h)
+
+ALL should be trading simultaneously!
+
+If they're not active, I'll fix it immediately!
+═══════════════════════════════════════════════════════════════
