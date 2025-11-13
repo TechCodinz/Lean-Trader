@@ -49,7 +49,14 @@ class USDTPaymentProcessor:
         self.payments = []
         
         # VIP subscriptions
-        self.subscriptions = {}  # {user_id: {'expires': datetime, 'plan': 'monthly'}}
+        self.subscriptions = {}  # {user_id: {'expires': datetime, 'plan': 'signals_only' or 'managed_trading'}}
+        
+        # Managed trading users (bot trades on their account)
+        self.managed_users = {}  # {user_id: {'exchange': 'bybit', 'api_key': ..., 'profit_share': 0.10}}
+        
+        # Business wallet (accumulated profit shares)
+        self.business_wallet_balance = 0.0
+        self.profit_shares_collected = []
         
         logger.info("💰 USDT PAYMENT PROCESSOR initialized!")
     
@@ -156,29 +163,68 @@ class USDTPaymentProcessor:
         """
         Activate VIP subscription
         
+        Plans:
+        - signals_only: $99.99/month - Just premium signals
+        - managed_trading: $999.99/month - Bot trades for you + 10% profit share
+        
         Returns: Expiry date
         """
-        durations = {
-            'monthly': timedelta(days=30),
-            'quarterly': timedelta(days=90),
-            'yearly': timedelta(days=365)
-        }
-        
-        duration = durations.get(plan, timedelta(days=30))
+        # All plans are monthly
+        duration = timedelta(days=30)
         expiry = datetime.now() + duration
         
         self.subscriptions[user_id] = {
             'plan': plan,
             'activated': datetime.now(),
             'expires': expiry,
-            'status': 'active'
+            'status': 'active',
+            'monthly_fee': 99.99 if plan == 'signals_only' else 999.99
         }
         
         logger.info(f"✅ VIP activated for user {user_id}")
         logger.info(f"   Plan: {plan}")
+        logger.info(f"   Monthly fee: ${self.subscriptions[user_id]['monthly_fee']}")
         logger.info(f"   Expires: {expiry.strftime('%Y-%m-%d')}")
         
+        if plan == 'managed_trading':
+            logger.info(f"   💰 Managed trading enabled - 10% profit share active")
+        
         return expiry
+    
+    def record_profit_share(self, user_id: int, trade_profit: float):
+        """
+        Record profit share from managed trading user
+        
+        Takes 10% of profit and adds to business wallet
+        """
+        if user_id not in self.subscriptions:
+            return
+        
+        if self.subscriptions[user_id]['plan'] != 'managed_trading':
+            return
+        
+        # Calculate 10% share
+        profit_share = trade_profit * 0.10
+        
+        # Add to business wallet
+        self.business_wallet_balance += profit_share
+        
+        # Record transaction
+        self.profit_shares_collected.append({
+            'user_id': user_id,
+            'trade_profit': trade_profit,
+            'profit_share': profit_share,
+            'timestamp': datetime.now(),
+            'business_wallet_total': self.business_wallet_balance
+        })
+        
+        logger.info(f"💰 PROFIT SHARE COLLECTED:")
+        logger.info(f"   User: {user_id}")
+        logger.info(f"   Trade profit: ${trade_profit:.2f}")
+        logger.info(f"   10% share: ${profit_share:.2f}")
+        logger.info(f"   Business wallet: ${self.business_wallet_balance:.2f}")
+        
+        return profit_share
     
     def is_vip(self, user_id: int) -> bool:
         """Check if user is VIP"""

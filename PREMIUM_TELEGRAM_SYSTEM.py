@@ -54,10 +54,13 @@ class PremiumTelegramSystem:
         
         # VIP pricing
         self.vip_prices = {
-            'monthly': 50,   # $50/month
-            'quarterly': 120,  # $120/3 months (save $30)
-            'yearly': 400    # $400/year (save $200)
+            'signals_only': 99.99,      # $99.99/month - Signals only
+            'managed_trading': 999.99,  # $999.99/month - Bot trades for you + 10% profit share
         }
+        
+        # Profit sharing for managed trading users
+        self.profit_share_pct = 0.10  # 10% of profits go to business wallet
+        self.business_wallet = {}  # Accumulated profit shares
         
         # VIP subscribers (would use database in production)
         self.vip_subscribers = set()
@@ -269,12 +272,52 @@ Valid until: {expiry.strftime('%B %d, %Y')}
     def create_vip_keyboard(self) -> InlineKeyboardMarkup:
         """Create VIP upgrade keyboard"""
         keyboard = [
-            [InlineKeyboardButton("💎 Monthly ($50)", callback_data='vip_monthly')],
-            [InlineKeyboardButton("💎 Quarterly ($120)", callback_data='vip_quarterly')],
-            [InlineKeyboardButton("💎 Yearly ($400)", callback_data='vip_yearly')],
-            [InlineKeyboardButton("ℹ️ VIP Benefits", callback_data='vip_info')]
+            [InlineKeyboardButton("📊 Signals Only - $99.99/month", callback_data='vip_signals')],
+            [InlineKeyboardButton("🤖 Managed Trading - $999.99/month + 10%", callback_data='vip_managed')],
+            [InlineKeyboardButton("ℹ️ Compare Plans", callback_data='vip_compare')],
+            [InlineKeyboardButton("💰 Payment Methods", callback_data='payment_methods')]
         ]
         return InlineKeyboardMarkup(keyboard)
+    
+    def format_plan_comparison(self) -> str:
+        """Format VIP plan comparison"""
+        return """
+💎 **VIP MEMBERSHIP PLANS** 💎
+
+📊 **SIGNALS ONLY - $99.99/month**
+✅ Premium signals with full analytics
+✅ Live charts with trend analysis
+✅ News context for each trade
+✅ Multi-timeframe confluence
+✅ Risk/reward calculations
+✅ Entry/exit recommendations
+❌ You trade manually on your exchange
+
+🤖 **MANAGED TRADING - $999.99/month**
+✅ Everything in Signals Only, PLUS:
+✅ Bot trades automatically on YOUR account
+✅ Uses YOUR exchange (you control funds!)
+✅ You keep 90% of all profits
+✅ We take 10% profit share only
+✅ No profit = No extra fees!
+✅ Full transparency and reporting
+✅ Stop anytime, withdraw your funds
+
+💰 **Example - Managed Trading:**
+Month 1: Bot makes $5,000 profit
+• You keep: $4,500 (90%)
+• Service fee: $500 (10%)
+• Your net: $4,500 - $999.99 = $3,500.01 profit!
+
+Month 2: Bot makes $10,000 profit
+• You keep: $9,000 (90%)
+• Service fee: $1,000 (10%)
+• Your net: $9,000 - $999.99 = $8,000.01 profit!
+
+🚀 **The more bot makes, the more YOU make!**
+
+Payment: USDT (TRC20/ERC20/BEP20)
+"""
     
     def create_exchange_keyboard(self) -> InlineKeyboardMarkup:
         """Create exchange connection keyboard"""
