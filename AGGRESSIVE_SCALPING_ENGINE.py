@@ -242,7 +242,21 @@ class AggressiveScalpingEngine:
             logger.debug(f"Volatility detection error: {e}")
             return None
     
-    async def scan_for_scalps(self, symbols: List[str]) -> List[Dict]:
+    async def scan_for_scalps(self, symbols: List[str] = None) -> List[Dict]:
+        # 🧠 GET PAIRS FROM CNS IF NOT PROVIDED
+        if symbols is None:
+            try:
+                from CENTRAL_NERVOUS_SYSTEM import get_cns
+                cns = get_cns()
+                if cns:
+                    symbols = cns.get_tradeable_pairs()
+                    logger.info(f"🧠 CNS provided {len(symbols)} tradeable pairs")
+            except:
+                pass
+        
+        # Fallback to safe pairs if still None
+        if not symbols:
+            symbols = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'AVAX/USDT', 'MATIC/USDT']
         """
         AGGRESSIVE SCAN - Find fast scalping opportunities
         
