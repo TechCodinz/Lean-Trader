@@ -1773,7 +1773,10 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                 bybit_testnet = ccxt.bybit({
                     'apiKey': os.getenv('BYBIT_TESTNET_API_KEY'),
                     'secret': os.getenv('BYBIT_TESTNET_API_SECRET'),  # ✅ FIXED!
-                    'options': {'defaultType': 'spot'},
+                    'options': {
+                        'defaultType': 'spot',
+                        'accountType': 'UNIFIED'  # ✅ USE UNIFIED ACCOUNT!
+                    },
                     'enableRateLimit': True
                 })
                 bybit_testnet.set_sandbox_mode(True)  # CRITICAL: Enable testnet!
