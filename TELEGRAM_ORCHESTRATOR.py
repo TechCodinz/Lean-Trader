@@ -1003,9 +1003,12 @@ Bot will start trading in 15-60 minutes!
             premium_tg = get_premium_telegram()
             
             if premium_tg:
-                await premium_tg.send_premium_signal(signal, 'free')
-                logger.info("✅ Sent signal to FREE channel!")
-                return
+                try:
+                    await premium_tg.send_premium_signal(signal, 'free')
+                    logger.info("✅ Sent signal to FREE channel!")
+                    return
+                except Exception as e:
+                    logger.warning(f"⚠️ Premium send failed: {e}")
         except Exception as e:
             logger.warning(f"⚠️ Premium formatting failed, using basic: {e}")
         
@@ -1133,8 +1136,8 @@ Bot will start trading in 15-60 minutes!
             if premium_tg and analytics:
                 # Generate forensic analysis
                 analysis = await analytics.generate_ultimate_analysis(signal)
-                # Send with premium formatting
-                await premium_tg.send_premium_signal(signal, 'vip', analysis)
+                # Send with premium formatting (only 2 args!)
+                await premium_tg.send_premium_signal(signal, 'vip')
                 logger.info("✅ Sent PREMIUM signal to VIP!")
                 return
         except Exception as e:
