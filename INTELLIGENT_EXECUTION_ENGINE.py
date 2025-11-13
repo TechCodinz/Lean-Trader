@@ -733,14 +733,14 @@ class IntelligentExecutionEngine:
         """
         tp_levels = []
         
-        # Base targets from timeframe
+        # Base targets from timeframe (OPTIMIZED FOR FAST PROFITS!)
         tf_targets = {
-            '1m': [0.003, 0.005, 0.008],  # 0.3%, 0.5%, 0.8%
-            '5m': [0.005, 0.010, 0.015],  # 0.5%, 1%, 1.5%
-            '15m': [0.008, 0.015, 0.025], # 0.8%, 1.5%, 2.5%
-            '1h': [0.015, 0.030, 0.050],  # 1.5%, 3%, 5%
-            '4h': [0.030, 0.060, 0.100],  # 3%, 6%, 10%
-            '1d': [0.050, 0.100, 0.200],  # 5%, 10%, 20%
+            '1m': [0.002, 0.003, 0.005],  # 0.2%, 0.3%, 0.5% - QUICK SCALP!
+            '5m': [0.003, 0.005, 0.008],  # 0.3%, 0.5%, 0.8% - FAST SCALP!
+            '15m': [0.005, 0.010, 0.015], # 0.5%, 1%, 1.5%
+            '1h': [0.010, 0.020, 0.030],  # 1%, 2%, 3%
+            '4h': [0.020, 0.040, 0.060],  # 2%, 4%, 6%
+            '1d': [0.030, 0.060, 0.100],  # 3%, 6%, 10%
         }
         
         targets = tf_targets.get(timeframe, [0.005, 0.010, 0.020])
@@ -870,9 +870,9 @@ class IntelligentExecutionEngine:
         
         base_hold = tf_holds.get(timeframe, 60)
         
-        # Scalps = shorter hold
+        # Scalps = MUCH shorter hold (1-5 min for fast profits!)
         if 'scalp' in strategy.lower():
-            base_hold = base_hold // 2
+            base_hold = min(5, base_hold // 3)  # Max 5 minutes for scalps!
         
         # Swings = longer hold
         if 'swing' in strategy.lower():
