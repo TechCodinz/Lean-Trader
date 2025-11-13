@@ -989,10 +989,27 @@ Bot will start trading in 15-60 minutes!
             logger.warning("❌ Telegram not enabled - returning early")
             return
         
-        if not self.free_chat_id or self.free_chat_id == '@your_free_channel':
-            logger.error(f"❌ FREE channel not configured! Current: {self.free_chat_id}")
-            logger.error(f"   Check .env has: TELEGRAM_FREE_CHANNEL=-1002930953007")
+        # Use FREE_CHANNEL_ID or TELEGRAM_FREE_CHANNEL
+        free_id = self.free_chat_id or os.getenv('FREE_CHANNEL_ID', '') or os.getenv('TELEGRAM_FREE_CHANNEL', '')
+        
+        if not free_id or free_id == '@your_free_channel':
+            logger.error(f"❌ FREE channel not configured! Current: {free_id}")
+            logger.error(f"   Check .env has: FREE_CHANNEL_ID=-1002930953007")
             return
+        
+        # Use premium formatting if available
+        try:
+            from PREMIUM_TELEGRAM_SYSTEM import get_premium_telegram
+            premium_tg = get_premium_telegram()
+            
+            if premium_tg:
+                await premium_tg.send_premium_signal(signal, 'free')
+                logger.info("✅ Sent signal to FREE channel!")
+                return
+        except Exception as e:
+            logger.warning(f"⚠️ Premium formatting failed, using basic: {e}")
+        
+        # Fallback to basic formatting (existing code)
         
         # Extract signal data (handle nested structure)
         symbol = signal.get('symbol') or signal.get('pair') or 'UNKNOWN'
@@ -1089,7 +1106,7 @@ Bot will start trading in 15-60 minutes!
             logger.error(f"❌ Free channel send failed: {e}")
     
     async def send_signal_to_vip(self, signal: Dict):
-        """Send premium signal to VIP channel with TP1/TP2/TP3, cross-timeframe analysis, and interactive buttons"""
+        """Send premium signal to VIP channel with FORENSIC analytics"""
         
         logger.info(f"🔵 send_signal_to_vip called! enabled={self.enabled}, vip_chat_id={self.vip_chat_id}")
         
@@ -1097,10 +1114,33 @@ Bot will start trading in 15-60 minutes!
             logger.warning("❌ Telegram not enabled - returning early")
             return
         
-        if not self.vip_chat_id or self.vip_chat_id == '@your_vip_channel':
-            logger.error(f"❌ VIP channel not configured! Current: {self.vip_chat_id}")
-            logger.error(f"   Check .env has: TELEGRAM_VIP_CHANNEL=-1002983007302")
+        # Use VIP_CHANNEL_ID (not TELEGRAM_VIP_CHANNEL)
+        vip_id = self.vip_chat_id or os.getenv('VIP_CHANNEL_ID', '')
+        
+        if not vip_id or vip_id == '@your_vip_channel':
+            logger.error(f"❌ VIP channel not configured! Current: {vip_id}")
+            logger.error(f"   Check .env has: VIP_CHANNEL_ID=-1002983007302")
             return
+        
+        # Format with PREMIUM analytics
+        try:
+            from PREMIUM_TELEGRAM_SYSTEM import get_premium_telegram
+            from ULTIMATE_ANALYTICS_ENGINE import get_ultimate_analytics
+            
+            premium_tg = get_premium_telegram()
+            analytics = get_ultimate_analytics()
+            
+            if premium_tg and analytics:
+                # Generate forensic analysis
+                analysis = await analytics.generate_ultimate_analysis(signal)
+                # Send with premium formatting
+                await premium_tg.send_premium_signal(signal, 'vip', analysis)
+                logger.info("✅ Sent PREMIUM signal to VIP!")
+                return
+        except Exception as e:
+            logger.warning(f"⚠️ Premium formatting failed, using basic: {e}")
+        
+        # Fallback to basic formatting (existing code)
         
         # Extract signal data (handle nested structure)
         symbol = signal.get('symbol') or signal.get('pair') or 'BTC/USDT'
