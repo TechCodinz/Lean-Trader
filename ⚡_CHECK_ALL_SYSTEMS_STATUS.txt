@@ -1,0 +1,73 @@
+⚡ CHECK ALL SYSTEMS STATUS - COMPREHENSIVE DIAGNOSTIC
+═══════════════════════════════════════════════════════════════
+
+COPY/PASTE ON VPS:
+
+cd ~/apex_bot
+
+echo "═══════════════════════════════════════════════════════"
+echo "🔍 CHECKING ALL SYSTEMS STATUS"
+echo "═══════════════════════════════════════════════════════"
+echo ""
+
+# 1. Check core systems
+echo "=== CORE SYSTEMS ==="
+grep -E "INTELLIGENT.*ROUTER|EXECUTION.*ENGINE|PROFIT.*MONITORING" apex.log | grep -E "initialized|active|loaded" | tail -10
+echo ""
+
+# 2. Check quantum systems
+echo "=== QUANTUM SYSTEMS ==="
+grep -E "Quantum|VQE|QHBESE" apex.log | grep -E "initialized|active|ready" | tail -10
+echo ""
+
+# 3. Check premium systems
+echo "=== PREMIUM SYSTEMS ==="
+grep -E "PREMIUM|Payment.*Processor|Managed.*Trading|Ultimate.*Analytics" apex.log | grep -E "initialized|active" | tail -10
+echo ""
+
+# 4. Check risk systems
+echo "=== RISK SYSTEMS ==="
+grep -E "Risk.*Guardian|VaR|Kelly|Sharpe|Liquidity.*Engine|TCA" apex.log | grep -E "initialized|active" | tail -10
+echo ""
+
+# 5. Check HFT systems
+echo "=== HFT SYSTEMS ==="
+grep -E "HFT|Market.*Maker|Regulatory|Compliance" apex.log | grep -E "initialized|active" | tail -10
+echo ""
+
+# 6. Check hedging systems
+echo "=== HEDGING SYSTEMS ==="
+grep -E "Gamma|Vanna|Charm|Vomma|Speed.*Hedg" apex.log | grep -E "initialized|active" | tail -10
+echo ""
+
+# 7. Check if systems are actually running
+echo "=== ACTIVE SYSTEMS COUNT ==="
+echo "Router: $(grep 'INTELLIGENT.*ROUTER.*initialized' apex.log | wc -l)"
+echo "Quantum: $(grep 'Quantum.*initialized' apex.log | wc -l)"
+echo "Premium: $(grep 'PREMIUM.*initialized' apex.log | wc -l)"
+echo "Risk: $(grep -E 'Risk|VaR|Kelly' apex.log | grep initialized | wc -l)"
+echo "HFT: $(grep 'HFT.*initialized' apex.log | wc -l)"
+echo "Hedging: $(grep -E 'Gamma|Vanna|Charm' apex.log | grep initialized | wc -l)"
+echo ""
+
+# 8. Check for import errors
+echo "=== IMPORT ERRORS ==="
+grep -E "ImportError|ModuleNotFoundError|cannot import" apex.log | tail -10
+echo ""
+
+# 9. Check current trading activity
+echo "=== TRADING ACTIVITY ==="
+echo "Total trades: $(grep 'Order ID:' apex.log | wc -l)"
+echo "Router routing: $(grep '✅ Will execute on' apex.log | wc -l)"
+echo "Execution attempts: $(grep 'EXECUTING:' apex.log | wc -l)"
+echo ""
+
+# 10. Check if files exist
+echo "=== FILES CHECK ==="
+ls -la | grep -E "QUANTUM|PREMIUM|VQE|QHBESE|TCA|LIQUIDITY|HFT|GAMMA|MICRO_GROWTH" | wc -l
+echo "Advanced system files found"
+echo ""
+
+echo "═══════════════════════════════════════════════════════"
+echo "DIAGNOSTIC COMPLETE!"
+echo "═══════════════════════════════════════════════════════"

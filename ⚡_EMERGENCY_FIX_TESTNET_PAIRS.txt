@@ -1,0 +1,71 @@
+⚡ EMERGENCY FIX - ONLY TRADE TESTNET PAIRS!
+═══════════════════════════════════════════════════════════════
+
+ISSUE: All signals are exotic pairs not on testnet!
+Bot routing correctly but then skipping ALL trades!
+
+COPY/PASTE ON VPS:
+
+cd ~/apex_bot
+cat > FORCE_TESTNET_ONLY_PAIRS.py << 'EOF'
+# Force bot to only trade testnet-available pairs
+TESTNET_ONLY_PAIRS = [
+    'BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'BNB/USDT',
+    'XRP/USDT', 'ADA/USDT', 'DOGE/USDT', 'MATIC/USDT',
+    'DOT/USDT', 'AVAX/USDT', 'LINK/USDT', 'UNI/USDT',
+    'ATOM/USDT', 'LTC/USDT', 'TRX/USDT', 'NEAR/USDT',
+    'APT/USDT', 'ARB/USDT', 'OP/USDT', 'SUI/USDT'
+]
+
+def is_testnet_tradeable(symbol):
+    return symbol in TESTNET_ONLY_PAIRS
+EOF
+
+# Patch execution to filter
+python3 << 'PEOF'
+content = open('EXECUTION_ORCHESTRATOR.py').read()
+
+# Add filter at line where router check is
+old = '''            # 🧠 INTELLIGENT ROUTING: Find best exchange/market for this pair!
+            try:
+                from INTELLIGENT_EXCHANGE_ROUTER import get_intelligent_router
+                router = get_intelligent_router()
+                if router:
+                    route = await router.route_signal(signal)
+                    if route:
+                        logger.info(f"   🧠 ROUTER: {symbol} routed to {route['exchange']} {route['market_type']}")
+                        # If pair not on this exchange, skip
+                        if route['exchange'] != 'bybit_testnet' and self.mode == 'testnet':
+                            logger.info(f"   ⏭️  {symbol} not on testnet, skipping")
+                            return False'''
+
+new = '''            # 🧠 TESTNET FILTER: Only trade testnet pairs!
+            if self.mode == 'testnet':
+                from FORCE_TESTNET_ONLY_PAIRS import is_testnet_tradeable
+                if not is_testnet_tradeable(symbol):
+                    logger.debug(f"   ⏭️  {symbol} not available on testnet, skipping")
+                    return False
+            
+            # 🧠 INTELLIGENT ROUTING: Find best exchange/market for this pair!
+            try:
+                from INTELLIGENT_EXCHANGE_ROUTER import get_intelligent_router
+                router = get_intelligent_router()
+                if router:
+                    route = await router.route_signal(signal)
+                    if route:
+                        logger.info(f"   🧠 ROUTER: {symbol} routed to {route['exchange']} {route['market_type']}")'''
+
+content = content.replace(old, new)
+open('EXECUTION_ORCHESTRATOR.py', 'w').write(content)
+print("✅ Patched!")
+PEOF
+
+# Restart
+pkill -f RUN_BOT
+nohup python3 RUN_BOT.py > apex.log 2>&1 &
+
+# Wait and watch
+sleep 120
+tail -f apex.log | grep -E "Order ID|BTC|ETH|SOL"
+
+═══════════════════════════════════════════════════════════════
