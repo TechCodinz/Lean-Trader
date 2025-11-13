@@ -507,10 +507,23 @@ class IntelligentExecutionEngine:
             # GET ALL AVAILABLE INTELLIGENCE
             entry_price = signal.get('entry', signal.get('price', 0))
             
-            # ✅ FIX: Prevent division by zero!
-            if entry_price <= 0:
-                logger.warning(f"   ⚠️  Invalid entry price ({entry_price}) for {symbol}, skipping")
-                return None
+            # ✅ FIX: If price missing, FETCH IT from exchange!
+            if not entry_price or entry_price <= 0 or entry_price == 100.0:
+                logger.info(f"   💰 Fetching live price for {symbol}...")
+                
+                # Fetch from current exchange
+                if self.exchange:
+                    try:
+                        ticker = await asyncio.to_thread(self.exchange.fetch_ticker, symbol)
+                        entry_price = ticker.get('last', ticker.get('close', 0))
+                        logger.info(f"   ✅ Got live price: ${entry_price:.6f}")
+                    except Exception as e:
+                        logger.warning(f"   ⚠️  Fetch failed: {str(e)[:50]}")
+                
+                # Still invalid? Skip
+                if not entry_price or entry_price <= 0:
+                    logger.warning(f"   ❌ No valid price for {symbol}, skipping")
+                    return None
             
             volatility = signal.get('volatility', self.volatility_by_pair.get(symbol, 0.02))
             session = self.get_current_session()
