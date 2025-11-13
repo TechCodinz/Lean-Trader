@@ -1,0 +1,38 @@
+🔍 DIAGNOSE TRADING SLOWDOWN - RUN ON VPS!
+═══════════════════════════════════════════════════════════════
+
+ON YOUR VPS:
+
+# Check execution loop iterations
+grep "🔄 EXEC LOOP" apex.log | wc -l
+
+# See if loop is still running
+tail -200 apex.log | grep "🔄 EXEC LOOP"
+
+# Check how many signals in last 20 min
+tail -1000 apex.log | grep "Published.*signals" | tail -20
+
+# See if execution is processing them
+tail -500 apex.log | grep "EXECUTING:" | tail -20
+
+# Check for errors blocking trades
+tail -500 apex.log | grep -E "ERROR|Failed|skipping" | tail -20
+
+# See multi-timeframe activity
+grep -E "1m|5m|15m|1h" apex.log | grep "EXECUTING" | tail -20
+
+# Check if engines are still generating signals
+tail -300 apex.log | grep -E "Scalper generated|FX Engine|generated.*signals"
+
+═══════════════════════════════════════════════════════════════
+
+SHOW ME THE OUTPUTS!
+
+Possible issues:
+1. Execution loop stopped iterating
+2. Signals not being generated
+3. Router filtering everything out
+4. Balance locked after trades
+
+I'll fix immediately once I see the diagnostics!
+═══════════════════════════════════════════════════════════════
