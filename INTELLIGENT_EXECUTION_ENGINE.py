@@ -1041,6 +1041,13 @@ class IntelligentExecutionEngine:
             
             self.active_trades_by_tf[symbol].append(trade_record)
             
+            # 💰 START PROFIT MONITORING IMMEDIATELY!
+            try:
+                from PROFIT_MONITORING_SYSTEM import monitor_trade_for_profit
+                asyncio.create_task(monitor_trade_for_profit(self.exchange, trade_record))
+            except Exception as e:
+                logger.warning(f"⚠️ Profit monitoring not started: {e}")
+            
             logger.info(f"✅ INTELLIGENT TRADE EXECUTED!")
             logger.info(f"   📋 Order ID: {order.get('id')}")
             logger.info(f"   💰 Size: ${lot_size:.2f}")
@@ -1048,6 +1055,7 @@ class IntelligentExecutionEngine:
             logger.info(f"   🛡️  Stop Loss: ${trade_plan['stop_loss']:.4f}")
             logger.info(f"   ⏱️  Max Hold: {trade_plan['max_hold_time_minutes']} minutes")
             logger.info(f"   📊 Active trades on {symbol}: {len(self.active_trades_by_tf[symbol])} timeframes")
+            logger.info(f"   ⏰ Profit monitoring started!")
             
             if ai_insights:
                 logger.info(f"   🤖 AI insights applied: {ai_insights.get('ai_consensus', 'N/A').upper()}")
