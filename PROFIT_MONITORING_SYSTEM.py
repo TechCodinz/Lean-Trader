@@ -53,7 +53,14 @@ async def monitor_trade_for_profit(exchange, trade_plan: Dict):
             
             if elapsed_min > max_hold_min:
                 logger.info(f"⏰ Max hold time reached for {symbol}, closing at market")
-                await close_position_at_market(exchange, symbol, entry_price, side)
+                # Get final P&L
+                ticker = await asyncio.to_thread(exchange.fetch_ticker, symbol)
+                current_price = ticker['last']
+                if side == 'buy':
+                    final_pnl = (current_price - entry_price) / entry_price
+                else:
+                    final_pnl = (entry_price - current_price) / entry_price
+                await close_position_at_market(exchange, symbol, entry_price, side, final_pnl)
                 break
             
             # Get current price
