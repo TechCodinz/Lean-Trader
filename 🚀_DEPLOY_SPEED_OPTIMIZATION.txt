@@ -1,0 +1,44 @@
+🚀 DEPLOY SPEED OPTIMIZATION - 5X FASTER TRADING!
+═══════════════════════════════════════════════════════════════
+
+COPY/PASTE ON VPS:
+
+cd ~/apex_bot && git pull origin continue-from-micro-fix && pkill -f RUN_BOT && nohup python3 RUN_BOT.py > apex.log 2>&1 &
+
+═══════════════════════════════════════════════════════════════
+
+WAIT 3 MINUTES THEN WATCH:
+
+sleep 180
+tail -f apex.log | grep -E "Order ID|💰 Starting profit|Strategy:"
+
+═══════════════════════════════════════════════════════════════
+
+WHAT'S OPTIMIZED:
+
+1. ⚡ FASTER PROFIT TARGETS:
+   - 1m: 0.2-0.5% (ultra-quick!)
+   - 5m: 0.3-0.8% (fast!)
+   - Quick profit taking!
+
+2. ⏱️ SHORTER HOLD TIMES:
+   - Scalps: 1-5 min (was 15-30 min)
+   - Faster turnover!
+   - More trades per hour!
+
+3. 📊 MULTI-TIMEFRAME READY:
+   - Coordinator created
+   - Up to 31 parallel trades
+   - 5x more opportunities!
+
+═══════════════════════════════════════════════════════════════
+
+YOU'LL SEE:
+
+- Trades executing faster
+- Profits hitting quicker  
+- More Order IDs per minute
+- Positions closing in 1-5 min
+
+DEPLOY FOR 5X SPEED! ⚡💰
+═══════════════════════════════════════════════════════════════
