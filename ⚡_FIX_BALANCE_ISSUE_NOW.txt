@@ -1,0 +1,59 @@
+⚡ FIX INSUFFICIENT BALANCE - COPY/PASTE ON VPS!
+═══════════════════════════════════════════════════════════════
+
+THE ISSUE:
+- Testnet shows $8,799 balance
+- But orders get "Insufficient balance" error
+- Balance might be locked or wrong account type
+
+═══════════════════════════════════════════════════════════════
+
+QUICK FIX - Test manually first:
+
+cd ~/apex_bot
+python3 << 'EOF'
+import ccxt
+import os
+
+# Connect to Bybit testnet
+ex = ccxt.bybit({
+    'apiKey': os.getenv('BYBIT_TESTNET_API_KEY'),
+    'secret': os.getenv('BYBIT_TESTNET_API_SECRET'),
+    'options': {'defaultType': 'spot'},
+})
+ex.set_sandbox_mode(True)
+
+# Check balance
+bal = ex.fetch_balance()
+print(f"\n=== BYBIT TESTNET BALANCE ===")
+print(f"Total USDT: ${bal['USDT']['total']:.2f}")
+print(f"Free USDT: ${bal['USDT']['free']:.2f}")
+print(f"Used USDT: ${bal['USDT']['used']:.2f}")
+
+# Try tiny test order
+try:
+    print(f"\n=== TESTING TINY ORDER ===")
+    # Try to buy $1 worth of BTC
+    order = ex.create_market_buy_order('BTC/USDT', 1.0)  # $1 worth
+    print(f"✅ ORDER SUCCESS!")
+    print(f"Order ID: {order['id']}")
+except Exception as e:
+    print(f"❌ ORDER FAILED: {e}")
+    print(f"\nTry switching to unified account:")
+    print("1. Go to testnet.bybit.com")
+    print("2. Transfer funds to Unified Trading Account")
+    print("3. Then bot can trade!")
+
+ex.close()
+EOF
+
+═══════════════════════════════════════════════════════════════
+
+RUN THIS AND SHOW ME THE OUTPUT!
+
+This will tell us:
+1. Actual free balance
+2. If test order works
+3. What account type we need
+
+═══════════════════════════════════════════════════════════════
