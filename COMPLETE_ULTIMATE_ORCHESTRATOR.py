@@ -2289,10 +2289,50 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             logger.error(f"❌ Fluid Mechanics failed to wire: {e}")
             self.fluid_mechanics = None
         
+        # 💎 INITIALIZE PREMIUM SYSTEMS FOR MONETIZATION
+        logger.info("\n💎 Initializing PREMIUM MONETIZATION SYSTEMS...")
+        try:
+            from PREMIUM_TELEGRAM_SYSTEM import initialize_premium_telegram
+            from USDT_PAYMENT_PROCESSOR import initialize_payment_processor
+            from MANAGED_TRADING_ENGINE import initialize_managed_trading_engine
+            from ULTIMATE_ANALYTICS_ENGINE import initialize_ultimate_analytics
+            from TELEGRAM_EXCHANGE_CONNECTION import initialize_telegram_exchange_connection
+            
+            # Initialize payment processor
+            self.payment_processor = initialize_payment_processor()
+            logger.info("   ✅ USDT Payment Processor initialized")
+            
+            # Initialize managed trading
+            self.managed_trading = initialize_managed_trading_engine(self.payment_processor)
+            logger.info("   ✅ Managed Trading Engine initialized")
+            
+            # Initialize ultimate analytics
+            from AI_CONSULTATION_SYSTEM import get_ai_consultation
+            ai_consult = get_ai_consultation()
+            self.ultimate_analytics = initialize_ultimate_analytics(ai_consult, None)
+            logger.info("   ✅ Ultimate Analytics Engine initialized (6-layer forensic!)")
+            
+            # Initialize premium telegram
+            self.premium_telegram = initialize_premium_telegram(os.getenv('TELEGRAM_BOT_TOKEN'))
+            logger.info("   ✅ Premium Telegram System initialized")
+            
+            # Initialize exchange connection
+            self.telegram_exchange = initialize_telegram_exchange_connection(self.managed_trading)
+            logger.info("   ✅ Telegram Exchange Connection initialized")
+            
+            logger.info("✅ 💎 ALL PREMIUM SYSTEMS ACTIVE!")
+            logger.info("   Ready for: VIP subscriptions, managed trading, profit sharing!")
+            
+        except Exception as e:
+            logger.error(f"❌ Premium systems failed: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+        
         logger.info("\n" + "=" * 80)
         logger.info("✅ ALL ADVANCED SYSTEMS WIRED!")
         logger.info("   🎯 Core: 26 orchestrators")
         logger.info("   ⚡ Execution + Telegram + Quantum + Utilities + DEX")
+        logger.info("   💎 PREMIUM: Payment + Managed Trading + Analytics")
         if CRITICAL_FEATURES_AVAILABLE:
             logger.info("   💰 CRITICAL PROFIT FEATURES: Active (+50-100% boost)")
         if ULTRA_FEATURES_AVAILABLE:
