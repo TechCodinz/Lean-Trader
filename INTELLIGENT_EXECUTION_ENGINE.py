@@ -441,7 +441,7 @@ class IntelligentExecutionEngine:
         
         return True
     
-    async def create_complete_trade_plan(self, signal: Dict) -> Dict:
+    async def create_complete_trade_plan(self, signal: Dict, timeframe: str = None) -> Dict:
         """
         Create COMPLETE trade plan using ALL engine intelligence
         
@@ -496,7 +496,27 @@ class IntelligentExecutionEngine:
         """
         try:
             symbol = signal.get('symbol', '')
-            timeframe = signal.get('timeframe', '5m')
+            
+            # 📊 MULTI-TIMEFRAME: Use provided or determine from confidence
+            if timeframe:
+                # Explicit timeframe provided
+                pass
+            elif signal.get('timeframe'):
+                timeframe = signal.get('timeframe')
+            else:
+                # Determine based on confidence
+                confidence = signal.get('confidence', 0.5)
+                if confidence > 1:
+                    confidence = confidence / 100
+                
+                # High confidence = trade multiple timeframes!
+                if confidence >= 0.85:
+                    timeframe = '1m'  # Ultra-fast for high confidence
+                elif confidence >= 0.75:
+                    timeframe = '5m'  # Fast
+                else:
+                    timeframe = '15m'  # Standard
+            
             strategy = signal.get('strategy', '')
             
             # ✅ INTELLIGENT STRATEGY DETECTION
