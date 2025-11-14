@@ -1775,16 +1775,46 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                     'secret': os.getenv('BYBIT_TESTNET_API_SECRET'),  # ✅ FIXED!
                     'options': {
                         'defaultType': 'spot',
-                        'accountType': 'UNIFIED',  # ✅ USE UNIFIED ACCOUNT!
                         'recvWindow': 30000  # ✅ FIX TIME SYNC!
                     },
                     'enableRateLimit': True
                 })
                 bybit_testnet.set_sandbox_mode(True)  # CRITICAL: Enable testnet!
                 
-                # Test connection and get balance
-                balance = bybit_testnet.fetch_balance()
-                actual_balance = balance['USDT']['free']
+                # 🔍 INTELLIGENT BALANCE DETECTION - Find which wallet has funds!
+                logger.info("   🔍 Checking ALL Bybit testnet wallets for funds...")
+                actual_balance = 0
+                best_wallet = 'spot'
+                
+                # Try different account types to find funds
+                account_types = ['UNIFIED', 'SPOT', 'CONTRACT', None]
+                for acc_type in account_types:
+                    try:
+                        # Configure account type
+                        if acc_type:
+                            bybit_testnet.options['accountType'] = acc_type
+                        else:
+                            bybit_testnet.options.pop('accountType', None)
+                        
+                        # Fetch balance
+                        balance = bybit_testnet.fetch_balance()
+                        usdt_balance = balance.get('USDT', {}).get('free', 0) or 0
+                        
+                        logger.info(f"      {acc_type or 'DEFAULT'}: ${usdt_balance:.2f} USDT")
+                        
+                        if usdt_balance > actual_balance:
+                            actual_balance = usdt_balance
+                            best_wallet = acc_type or 'spot'
+                    except Exception as e:
+                        logger.debug(f"      {acc_type}: {str(e)[:50]}")
+                
+                # Use the wallet with most funds
+                if best_wallet:
+                    if best_wallet != 'spot':
+                        bybit_testnet.options['accountType'] = best_wallet
+                    logger.info(f"   ✅ Using {best_wallet} wallet with ${actual_balance:.2f}")
+                else:
+                    logger.warning(f"   ⚠️  No funds found in any wallet!")
                 
                 execution_exchanges['bybit_testnet'] = bybit_testnet
                 self.testnet_bybit = bybit_testnet  # ✅ CRITICAL: Store in self!
