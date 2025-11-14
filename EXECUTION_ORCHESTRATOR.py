@@ -507,15 +507,21 @@ class ExecutionOrchestrator:
         except Exception as e:
             logger.error(f"Process decision error: {e}")
     
-    def wire_execution_to_testnet(self, testnet_exchange):
+    def wire_execution_to_testnet(self, testnet_exchange, all_exchanges=None):
         """Wire ExecutionOrchestrator to use Bybit testnet exchange"""
         self.testnet_exchange = testnet_exchange
         self.active_exchange = 'testnet'
         
-        # 🧠 Initialize INTELLIGENT EXECUTION ENGINE with testnet!
+        # 🧠 Initialize INTELLIGENT EXECUTION ENGINE with testnet AND all exchanges!
         if INTELLIGENT_EXECUTION_AVAILABLE and testnet_exchange:
-            self.intelligent_engine = IntelligentExecutionEngine(testnet_exchange, mode='testnet')
+            self.intelligent_engine = IntelligentExecutionEngine(
+                testnet_exchange, 
+                mode='testnet',
+                exchanges=all_exchanges or {}  # ✅ Pass all exchanges for router!
+            )
             logger.info("🧠 ✅ INTELLIGENT EXECUTION ENGINE initialized with TESTNET!")
+            if all_exchanges:
+                logger.info(f"   🎯 Has access to {len(all_exchanges)} exchanges for routing")
         
         logger.info("✅ ExecutionOrchestrator wired to Bybit TESTNET!")
         logger.info(f"   Exchange: {type(testnet_exchange).__name__}")
@@ -611,6 +617,11 @@ class ExecutionOrchestrator:
                 if not self.intelligent_engine.should_open_new_trade(symbol, timeframe):
                     logger.info(f"   ⏸️  Skipping: Already have {timeframe} trade on {symbol}")
                     return False
+                
+                # ✅ PASS ROUTE INFO TO EXECUTION ENGINE!
+                if route:
+                    signal['route_exchange'] = route['exchange']  # bybit_testnet
+                    signal['route_market_type'] = route['market_type']  # spot/swap
                 
                 # 1. Create COMPLETE trade plan using ALL intelligence
                 trade_plan = await self.intelligent_engine.create_complete_trade_plan(signal)

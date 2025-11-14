@@ -1854,8 +1854,11 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
         # ✨ WIRE TESTNET EXCHANGE TO EXECUTION ORCHESTRATOR
         if self.mode == 'testnet' and hasattr(self, 'testnet_bybit'):
             logger.info("\n🔗 Wiring Bybit testnet to ExecutionOrchestrator...")
+            # ✅ PASS ALL EXCHANGES so router can work!
+            all_exchanges = getattr(self, 'arb_exchanges', {})  # Router's exchanges
             self.advanced_orchestrators['execution'].wire_execution_to_testnet(
-                self.testnet_bybit  # ✅ Use stored reference!
+                self.testnet_bybit,  # ✅ Use stored reference!
+                all_exchanges  # ✅ Pass all exchanges for router!
             )
             logger.info("✅ ExecutionOrchestrator can now trade on TESTNET with $8K+ balance!")
         elif self.mode == 'testnet':
