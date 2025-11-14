@@ -1786,6 +1786,7 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                 actual_balance = balance['USDT']['free']
                 
                 execution_exchanges['bybit_testnet'] = bybit_testnet
+                self.testnet_bybit = bybit_testnet  # ✅ CRITICAL: Store in self!
                 
                 logger.info(f"   ✅ Bybit TESTNET connected!")
                 logger.info(f"   💰 Testnet balance: ${actual_balance:.2f} USDT")
@@ -1850,12 +1851,14 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
         # Router will be initialized AFTER arb_exchanges is created (line ~2090)
         
         # ✨ WIRE TESTNET EXCHANGE TO EXECUTION ORCHESTRATOR
-        if self.mode == 'testnet' and 'bybit_testnet' in execution_exchanges:
+        if self.mode == 'testnet' and hasattr(self, 'testnet_bybit'):
             logger.info("\n🔗 Wiring Bybit testnet to ExecutionOrchestrator...")
             self.advanced_orchestrators['execution'].wire_execution_to_testnet(
-                execution_exchanges['bybit_testnet']
+                self.testnet_bybit  # ✅ Use stored reference!
             )
             logger.info("✅ ExecutionOrchestrator can now trade on TESTNET with $8K+ balance!")
+        elif self.mode == 'testnet':
+            logger.error("❌ CRITICAL: Testnet mode but no testnet exchange!")
         
         # Update balance to ACTUAL balance (testnet or live)
         if hasattr(self.advanced_orchestrators['execution'], 'position_sizer'):
