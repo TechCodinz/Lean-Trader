@@ -1,0 +1,71 @@
+📊 OPTIMIZATION DIAGNOSTIC - Check All Systems!
+═══════════════════════════════════════════════════════════════
+
+COPY/PASTE ON VPS:
+
+cd ~/apex_bot
+
+echo "═══════════════════════════════════════════════════════"
+echo "🔍 COMPREHENSIVE SYSTEM ANALYSIS"
+echo "═══════════════════════════════════════════════════════"
+echo ""
+
+echo "1. TIMEFRAMES BEING TRADED:"
+grep "TRADE.*CREATED\|Max Hold:" apex.log | grep -oE "1m|5m|15m|1h|4h" | sort | uniq -c
+echo ""
+
+echo "2. STRATEGIES BEING USED:"
+grep "Strategy:" apex.log | grep -v "unknown\|1.00x" | tail -30 | grep -oE "Strategy: [A-Z_]+" | sort | uniq -c
+echo ""
+
+echo "3. TRADES PER MINUTE:"
+TRADES=$(grep "Order ID:" apex.log | wc -l)
+MINUTES=$(echo "scale=1; ($(date +%s) - $(stat -c %Y apex.log)) / 60" | bc)
+echo "   Total trades: $TRADES"
+echo "   Minutes running: $MINUTES"
+echo "   Trades/min: $(echo "scale=2; $TRADES / $MINUTES" | bc)"
+echo ""
+
+echo "4. PROFIT CLOSES:"
+echo "   Total: $(grep 'POSITION CLOSED' apex.log | wc -l)"
+echo "   Profitable: $(grep 'WINNING TRADE' apex.log | wc -l)"
+echo "   Losses: $(grep 'Losing trade' apex.log | wc -l)"
+echo ""
+
+echo "5. NEW SYSTEMS ACTIVE:"
+echo "   CNS: $(grep 'CENTRAL NERVOUS.*initialized' apex.log | wc -l)"
+echo "   Coordination Hub: $(grep 'COORDINATION.*HUB.*initialized' apex.log | wc -l)"
+echo "   Micro Growth: $(grep 'MICRO.*GROWTH.*initialized' apex.log | wc -l)"
+echo "   Multi-TF Coord: $(grep 'MULTI.*TIMEFRAME.*initialized' apex.log | wc -l)"
+echo ""
+
+echo "6. SYSTEM COORDINATION:"
+echo "   Consciousness: $(grep 'Consciousness.*Harmonizer' apex.log | wc -l)"
+echo "   Harmony tuning: $(grep '🎵 Tuned' apex.log | wc -l)"
+echo "   Systems in sync: $(grep 'sync\|synchron' apex.log | tail -1)"
+echo ""
+
+echo "7. EXECUTION SPEED:"
+echo "   Exec loop iterations: $(grep '💤 Sleeping\|EXEC LOOP' apex.log | wc -l)"
+echo "   Execution attempts: $(grep 'EXECUTING:' apex.log | wc -l)"
+echo "   Success rate: $(echo "scale=1; $(grep 'Order ID:' apex.log | wc -l) * 100 / $(grep 'EXECUTING:' apex.log | wc -l)" | bc)%"
+echo ""
+
+echo "8. SIGNAL SOURCES:"
+grep "AGGRESSIVE.*EXECUTING\|Scalper generated\|FX Engine generated" apex.log | tail -30 | head -20
+echo ""
+
+echo "9. COORDINATION STATUS:"
+echo "   Router discovered: $(grep 'Discovered.*pairs' apex.log | tail -1)"
+echo "   Generators using: $(grep 'AGGRESSIVE.*EXECUTING' apex.log | grep -oE "[A-Z]+/USDT" | head -10 | tr '\n' ',' | head -c 50)"
+echo ""
+
+echo "10. BOTTLENECKS:"
+echo "   Balance errors: $(grep 'Insufficient balance' apex.log | wc -l)"
+echo "   Timeout errors: $(grep 'Timed out' apex.log | wc -l)"
+echo "   Router skips: $(grep 'not on testnet, skipping' apex.log | wc -l)"
+echo ""
+
+echo "═══════════════════════════════════════════════════════"
+echo "ANALYSIS COMPLETE!"
+echo "═══════════════════════════════════════════════════════"
