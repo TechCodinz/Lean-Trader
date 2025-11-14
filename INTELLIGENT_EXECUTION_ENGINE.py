@@ -509,11 +509,11 @@ class IntelligentExecutionEngine:
                 if confidence > 1:
                     confidence = confidence / 100
                 
-                # High confidence = trade multiple timeframes!
-                if confidence >= 0.85:
-                    timeframe = '1m'  # Ultra-fast for high confidence
+                # High confidence = faster timeframes (but not TOO fast!)
+                if confidence >= 0.90:
+                    timeframe = '5m'  # Changed from 1m - better movement!
                 elif confidence >= 0.75:
-                    timeframe = '5m'  # Fast
+                    timeframe = '5m'  # Keep 5m for most trades
                 else:
                     timeframe = '15m'  # Standard
             
@@ -547,8 +547,8 @@ class IntelligentExecutionEngine:
             # GET ALL AVAILABLE INTELLIGENCE
             entry_price = signal.get('entry', signal.get('price', 0))
             
-            # ✅ FIX: If price missing, FETCH IT from exchange!
-            if not entry_price or entry_price <= 0 or entry_price == 100.0:
+            # ✅ FIX: If price missing or PLACEHOLDER, SKIP!
+            if not entry_price or entry_price <= 0 or entry_price in [100.0, 7.0, 300.0, 10.0, 1.0]:
                 logger.info(f"   💰 Fetching live price for {symbol}...")
                 
                 # Fetch from current exchange
@@ -557,6 +557,12 @@ class IntelligentExecutionEngine:
                         ticker = await asyncio.to_thread(self.exchange.fetch_ticker, symbol)
                         entry_price = ticker.get('last', ticker.get('close', 0))
                         logger.info(f"   ✅ Got live price: ${entry_price:.6f}")
+                        
+                        # Validate it's a REAL price (not placeholder)
+                        if entry_price in [100.0, 7.0, 300.0, 10.0, 1.0, 65.0, 32.0]:
+                            logger.warning(f"   ❌ Placeholder price detected: ${entry_price:.2f}, SKIPPING!")
+                            return None
+                            
                     except Exception as e:
                         logger.warning(f"   ⚠️  Fetch failed: {str(e)[:50]}")
                 
@@ -753,14 +759,14 @@ class IntelligentExecutionEngine:
         """
         tp_levels = []
         
-        # Base targets from timeframe (OPTIMIZED FOR FAST PROFITS!)
+        # Base targets from timeframe (OPTIMIZED FOR REAL MOVEMENT!)
         tf_targets = {
-            '1m': [0.002, 0.003, 0.005],  # 0.2%, 0.3%, 0.5% - QUICK SCALP!
-            '5m': [0.003, 0.005, 0.008],  # 0.3%, 0.5%, 0.8% - FAST SCALP!
-            '15m': [0.005, 0.010, 0.015], # 0.5%, 1%, 1.5%
-            '1h': [0.010, 0.020, 0.030],  # 1%, 2%, 3%
-            '4h': [0.020, 0.040, 0.060],  # 2%, 4%, 6%
-            '1d': [0.030, 0.060, 0.100],  # 3%, 6%, 10%
+            '1m': [0.005, 0.008, 0.012],  # 0.5%, 0.8%, 1.2% - Wider for 1m!
+            '5m': [0.005, 0.010, 0.015],  # 0.5%, 1%, 1.5% - Keep these!
+            '15m': [0.008, 0.015, 0.025], # 0.8%, 1.5%, 2.5%
+            '1h': [0.015, 0.030, 0.050],  # 1.5%, 3%, 5%
+            '4h': [0.030, 0.060, 0.100],  # 3%, 6%, 10%
+            '1d': [0.050, 0.100, 0.200],  # 5%, 10%, 20%
         }
         
         targets = tf_targets.get(timeframe, [0.005, 0.010, 0.020])
