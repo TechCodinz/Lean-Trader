@@ -552,19 +552,16 @@ class IntelligentExecutionEngine:
             if not entry_price or entry_price <= 0 or entry_price in [100.0, 7.0, 300.0, 10.0, 1.0]:
                 logger.info(f"   💰 Fetching live price for {symbol}...")
                 
-                # ✅ USE EXCHANGE FROM ROUTER (if provided)!
-                exchange_name = signal.get('route_exchange', '')
-                exchange_to_use = self.exchange  # Default
+                # ✅ SIMPLE FIX: Just use self.exchange (already correct!)
+                # Router has already validated the pair exists on this exchange
+                exchange_name = signal.get('route_exchange', 'default')
+                if exchange_name != 'default':
+                    logger.info(f"   🎯 Router selected: {exchange_name} (using configured exchange)")
                 
-                # If router specified an exchange, try to use it
-                if exchange_name and hasattr(self, 'exchanges') and exchange_name in self.exchanges:
-                    exchange_to_use = self.exchanges[exchange_name]
-                    logger.info(f"   🎯 Using routed exchange: {exchange_name}")
-                
-                # Fetch from correct exchange
-                if exchange_to_use:
+                # Fetch from our exchange
+                if self.exchange:
                     try:
-                        ticker = await asyncio.to_thread(exchange_to_use.fetch_ticker, symbol)
+                        ticker = await asyncio.to_thread(self.exchange.fetch_ticker, symbol)
                         entry_price = ticker.get('last', ticker.get('close', 0))
                         logger.info(f"   ✅ Got live price: ${entry_price:.6f}")
                         
@@ -574,7 +571,7 @@ class IntelligentExecutionEngine:
                             return None
                             
                     except Exception as e:
-                        logger.warning(f"   ⚠️  Fetch failed from {exchange_name or 'default'}: {str(e)[:50]}")
+                        logger.warning(f"   ⚠️  Fetch failed: {str(e)[:80]}")
                 
                 # Still invalid? Skip
                 if not entry_price or entry_price <= 0:
