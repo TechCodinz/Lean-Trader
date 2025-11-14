@@ -2592,6 +2592,26 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             )
             logger.info("✅ 📰 NEWS TRADING ENGINE STARTED - Monitoring trending & sentiment!")
         
+        # 🚨 START POSITION MONITORING LOOP - CRITICAL FOR CLOSING TRADES! 🚨
+        if getattr(self, 'advanced_orchestrators', {}).get('execution'):
+            async def monitor_positions_continuously():
+                """Monitor all open positions and close at TP/SL"""
+                logger.info("🔄 POSITION MONITORING LOOP STARTED")
+                logger.info("   Checking every 10 seconds for TP/SL triggers...")
+                
+                while self.is_running:
+                    try:
+                        await self.advanced_orchestrators['execution'].monitor_positions()
+                        await asyncio.sleep(10)  # Check every 10 seconds
+                    except Exception as e:
+                        logger.error(f"❌ Position monitoring error: {e}")
+                        await asyncio.sleep(30)  # Wait before retry
+            
+            tasks.append(asyncio.create_task(monitor_positions_continuously()))
+            logger.info("✅ 💰 POSITION MONITORING ACTIVE - Will close trades at TP/SL!")
+        else:
+            logger.warning("⚠️  No execution orchestrator for position monitoring!")
+        
         # START HEDGE FUND ARSENAL - Professional strategies!
         if getattr(self, 'hedge_fund', None):
             tasks.append(
