@@ -1047,6 +1047,16 @@ class IntelligentExecutionEngine:
                 logger.error("No exchange available!")
                 return None
             
+            # 🔍 DEBUG: Check balance BEFORE placing order
+            try:
+                current_balance = await asyncio.to_thread(self.exchange.fetch_balance)
+                usdt_free = current_balance.get('USDT', {}).get('free', 0)
+                usdt_total = current_balance.get('USDT', {}).get('total', 0)
+                logger.info(f"   💰 Current balance: ${usdt_free:.2f} free / ${usdt_total:.2f} total")
+                logger.info(f"   📊 Attempting order: ${lot_size:.2f} on {optimal['market_type']}")
+            except Exception as e:
+                logger.warning(f"   ⚠️  Could not check balance: {e}")
+            
             if side == 'buy':
                 params = {'createMarketBuyOrderRequiresPrice': False}
                 order = await asyncio.to_thread(
