@@ -2097,8 +2097,8 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             logger.info(f"   Router will monitor {len(router_exchanges)} exchanges")
             logger.info(f"   Exchanges: {list(router_exchanges.keys())}")
             
-            # Initialize router
-            self.intelligent_router = initialize_intelligent_router(router_exchanges, ai_consult)
+            # Initialize router (with mode awareness!)
+            self.intelligent_router = initialize_intelligent_router(router_exchanges, ai_consult, self.mode)
             
             # Discover all pairs immediately
             logger.info("   🔍 Discovering all pairs (crypto, forex, commodities, indices)...")
