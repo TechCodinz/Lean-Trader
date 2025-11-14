@@ -2112,6 +2112,11 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             for market, count in stats['pairs_by_market_type'].items():
                 logger.info(f"   {market}: {count} pairs")
             
+            # Start continuous monitoring loop for new listings
+            logger.info("   🔄 Starting new listing monitoring loop...")
+            asyncio.create_task(self.intelligent_router.start_monitoring_loop())
+            logger.info("   ✅ Monitoring loop started!")
+            
         except Exception as e:
             logger.error(f"❌ Intelligent Router failed: {e}")
             import traceback
