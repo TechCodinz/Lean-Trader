@@ -37,16 +37,20 @@ class IntelligentExchangeRouter:
     THE BOT FINDS THE RIGHT EXCHANGE FOR EVERY PAIR!
     """
     
-    def __init__(self, exchanges: Dict[str, Any], ai_consultation=None):
+    def __init__(self, exchanges: Dict[str, Any], ai_consultation=None, mode='live'):
         """
         Initialize intelligent router
         
         Args:
             exchanges: Dict of exchange instances {'bybit': exchange_obj, ...}
             ai_consultation: AI system for querying exchange capabilities
+            mode: Trading mode ('testnet' or 'live')
         """
         self.exchanges = exchanges
         self.ai_consultation = ai_consultation
+        self.mode = mode  # Track if we're in testnet or live mode
+        
+        logger.info(f"🧠 Router initialized in {mode.upper()} mode")
         
         # Discovered pairs per exchange per market type
         self.exchange_pairs = defaultdict(lambda: defaultdict(set))
@@ -267,6 +271,11 @@ class IntelligentExchangeRouter:
         # Choose best route (prefer testnet if available, then by market type priority)
         best_route = self._choose_best_route(available_routes, signal)
         
+        # If no suitable route (e.g., testnet mode but pair not on testnet)
+        if not best_route:
+            logger.info(f"   ⏭️  {symbol} not available on suitable exchange (mode: {self.mode})")
+            return None
+        
         # Get adapted pattern for this market type
         pattern = self._get_adapted_pattern(best_route['market_type'], signal)
         
@@ -280,6 +289,17 @@ class IntelligentExchangeRouter:
     
     def _choose_best_route(self, routes: List[Dict], signal: Dict) -> Dict:
         """Choose best exchange/market for this signal"""
+        # 🧪 TESTNET MODE: ONLY allow testnet exchanges!
+        if self.mode == 'testnet':
+            testnet_routes = [r for r in routes if 'testnet' in r['exchange'].lower()]
+            if testnet_routes:
+                routes = testnet_routes
+                logger.debug(f"   🧪 Testnet mode: Filtered to {len(testnet_routes)} testnet routes")
+            else:
+                # No testnet routes available - return None so execution skips
+                logger.debug(f"   🧪 Testnet mode: No testnet routes available for this pair")
+                return None
+        
         # Priority order
         priority = {
             'testnet': 100,  # Prefer testnet if in testnet mode
@@ -447,10 +467,10 @@ def get_intelligent_router():
     global _intelligent_router
     return _intelligent_router
 
-def initialize_intelligent_router(exchanges: Dict[str, Any], ai_consultation=None):
+def initialize_intelligent_router(exchanges: Dict[str, Any], ai_consultation=None, mode='live'):
     """Initialize intelligent router"""
     global _intelligent_router
     if _intelligent_router is None:
-        _intelligent_router = IntelligentExchangeRouter(exchanges, ai_consultation)
-        logger.info(f"✅ Intelligent Router singleton created with {len(exchanges)} exchanges")
+        _intelligent_router = IntelligentExchangeRouter(exchanges, ai_consultation, mode)
+        logger.info(f"✅ Intelligent Router singleton created with {len(exchanges)} exchanges ({mode.upper()} mode)")
     return _intelligent_router
