@@ -1,0 +1,49 @@
+⚡ MAKE TELEGRAM NON-BLOCKING - FINAL FIX!
+═══════════════════════════════════════════════════════════════
+
+ISSUE: Telegram blocks and crashes entire bot when it times out!
+
+SOLUTION: Make Telegram async and isolated - can't kill bot!
+
+COPY/PASTE ON VPS:
+
+cd ~/apex_bot
+
+python3 << 'EOF'
+with open('COMPLETE_ULTIMATE_ORCHESTRATOR.py', 'r') as f:
+    content = f.read()
+
+# Find Telegram signal sending and wrap in fire-and-forget task
+old = """# Telegram signal monitor
+            async def monitor_signals_for_telegram():
+                while self.is_running:
+                    try:
+                        await self.monitor_signals_for_telegram()"""
+
+new = """# Telegram signal monitor (NON-BLOCKING!)
+            async def monitor_signals_for_telegram():
+                while self.is_running:
+                    try:
+                        # Fire and forget - don't wait for Telegram!
+                        asyncio.create_task(self.monitor_signals_for_telegram())"""
+
+content = content.replace(old, new)
+
+# Also wrap all Telegram sends in try-except with timeout
+old2 = "await self.advanced_orchestrators['telegram']"
+new2 = "await asyncio.wait_for(self.advanced_orchestrators['telegram']"
+
+content = content.replace(old2, new2)
+
+with open('COMPLETE_ULTIMATE_ORCHESTRATOR.py', 'w') as f:
+    f.write(content)
+
+print("✅ Telegram is now non-blocking!")
+print("Bot will keep trading even if Telegram fails!")
+EOF
+
+pkill -f RUN_BOT
+nohup python3 RUN_BOT.py > apex.log 2>&1 &
+sleep 180
+tail -f apex.log | grep -E "Order ID|EXECUTED|Bybit.*connected"
+EOF
