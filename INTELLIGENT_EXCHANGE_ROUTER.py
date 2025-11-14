@@ -74,14 +74,37 @@ class IntelligentExchangeRouter:
         
         # Pattern adaptations per market type
         self.market_patterns_config = {
-            'forex': {
+            'tradfi': {  # Bybit TradFi forex (GBPAUD, EURAUD, USDJPY, etc.)
                 'lot_size_multiplier': 1.0,
                 'leverage_max': 100,
                 'stop_loss_pct': 0.005,  # 0.5% (forex moves slower)
                 'take_profit_pct': 0.015,  # 1.5%
-                'session_awareness': True  # Critical for forex!
+                'session_awareness': True,  # Critical for forex!
+                'quick_scalp': True,  # Enable quick scalping
+                'timeframe_preference': ['1m', '5m', '15m']  # Fast timeframes
+            },
+            'forex': {  # Standard forex
+                'lot_size_multiplier': 1.0,
+                'leverage_max': 100,
+                'stop_loss_pct': 0.005,  # 0.5%
+                'take_profit_pct': 0.015,  # 1.5%
+                'session_awareness': True
             },
             'crypto': {
+                'lot_size_multiplier': 1.0,
+                'leverage_max': 10,
+                'stop_loss_pct': 0.02,  # 2%
+                'take_profit_pct': 0.04,  # 4%
+                'session_awareness': False
+            },
+            'spot': {  # Crypto spot markets
+                'lot_size_multiplier': 1.0,
+                'leverage_max': 1,  # No leverage on spot
+                'stop_loss_pct': 0.015,  # 1.5%
+                'take_profit_pct': 0.03,  # 3%
+                'session_awareness': False
+            },
+            'swap': {  # Perpetual swaps
                 'lot_size_multiplier': 1.0,
                 'leverage_max': 10,
                 'stop_loss_pct': 0.02,  # 2%
@@ -203,6 +226,7 @@ class IntelligentExchangeRouter:
         Returns: 'spot', 'futures', 'perpetual', 'tradfi', 'forex', 'commodities', 'indices'
         """
         symbol_upper = symbol.upper()
+        clean_symbol = symbol.split(':')[0]  # Remove :USDT suffix if present
         
         # Check market info first
         if market.get('type'):
@@ -210,14 +234,26 @@ class IntelligentExchangeRouter:
             if mtype in ['spot', 'futures', 'swap', 'perpetual']:
                 return mtype
         
-        # Detect forex (currency pairs)
-        for curr in self.market_patterns['forex']:
-            if curr in symbol_upper and '/' not in symbol_upper:
-                return 'forex'
-            # Also check pairs like EUR/USD, GBP/USD
-            if symbol.count('/') == 1:
-                base, quote = symbol.split('/')
-                if base in self.market_patterns['forex'] and quote in self.market_patterns['forex']:
+        # Detect BYBIT TRADFI forex pairs (CRITICAL!)
+        # TradFi pairs: GBPAUD, EURAUD, EURUSD, GBPUSD, USDJPY, NZDJPY, AUDUSD, etc.
+        # Format: 6 characters, NO separators (/, :)
+        forex_currencies = self.market_patterns['forex']
+        
+        # Check for pure 6-char forex pairs (TradFi format)
+        if '/' not in clean_symbol and len(clean_symbol) == 6:
+            first_3 = clean_symbol[:3].upper()
+            last_3 = clean_symbol[3:].upper()
+            if first_3 in forex_currencies and last_3 in forex_currencies:
+                logger.debug(f"   🏦 Detected TradFi forex: {symbol}")
+                return 'tradfi'  # Bybit TradFi forex!
+        
+        # Detect standard forex (with / separator)
+        if '/' in clean_symbol:
+            parts = clean_symbol.split('/')
+            if len(parts) == 2:
+                base, quote = parts[0].upper(), parts[1].upper()
+                if base in forex_currencies and quote in forex_currencies:
+                    logger.debug(f"   💱 Detected standard forex: {symbol}")
                     return 'forex'
         
         # Detect commodities
@@ -267,7 +303,32 @@ class IntelligentExchangeRouter:
         
         for exchange_name, markets in self.exchange_pairs.items():
             for market_type, pairs in markets.items():
-                if symbol in pairs or symbol.replace('/', '') in pairs:
+                # FLEXIBLE MATCHING: Handle different symbol formats
+                # Signal: ETH/USDT
+                # Testnet may have: ETH/USDT:USDT, ETH/USDT, ETHUSDT, etc.
+                matched = False
+                
+                # Direct match
+                if symbol in pairs:
+                    matched = True
+                # Match with :USDT suffix (Bybit testnet format)
+                elif f"{symbol}:USDT" in pairs:
+                    matched = True
+                # Match base (remove /)
+                elif symbol.replace('/', '') in pairs:
+                    matched = True
+                # Match base with :USDT
+                elif f"{symbol.replace('/', '')}:USDT" in pairs:
+                    matched = True
+                # Check if any pair starts with our symbol
+                else:
+                    base_symbol = symbol.split('/')[0] if '/' in symbol else symbol
+                    for pair in pairs:
+                        if pair.startswith(base_symbol + '/') or pair.startswith(base_symbol + ':'):
+                            matched = True
+                            break
+                
+                if matched:
                     available_routes.append({
                         'exchange': exchange_name,
                         'market_type': market_type,
