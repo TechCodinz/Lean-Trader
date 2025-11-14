@@ -142,7 +142,7 @@ class AIConsultationSystem:
         
         THROTTLED to prevent token burnout!
         Only consults on:
-        - Very high confidence (85%+)
+        - Very high confidence (88%+)
         - Important pairs (BTC, ETH, etc)
         - Once per pair per 5 minutes
         
@@ -168,10 +168,10 @@ class AIConsultationSystem:
             logger.warning(f"⚠️ Daily AI budget exceeded: ${self.cost_today:.2f}/${self.daily_budget}")
             return {'budget_exceeded': True}
         
-        # THROTTLE: Only consult on very high confidence (85%+)
+        # THROTTLE: Only consult on very high confidence (88%+)
         confidence = context.get('confidence', 0)
-        if confidence < 0.85:
-            logger.debug(f"   Confidence {confidence:.0%} below 85% threshold, skipping AI")
+        if confidence < 0.88:
+            logger.debug(f"   Confidence {confidence:.0%} below 88% threshold, skipping AI")
             return {'skipped': 'confidence_too_low'}
         
         # THROTTLE: Check if we consulted this pair recently (5 min cooldown)

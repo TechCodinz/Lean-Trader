@@ -1,127 +1,165 @@
 #!/bin/bash
+# 🔍 VPS STATUS CHECK - Find out what's actually running
+# Run this on your VPS to see current state
 
-echo "================================================================================"
-echo "🔍 APEX BOT VPS STATUS CHECK"
-echo "================================================================================"
+echo "═══════════════════════════════════════════════════════════════"
+echo "🔍 VPS STATUS CHECK"
+echo "═══════════════════════════════════════════════════════════════"
 echo ""
 
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "1️⃣  RUNNING PROCESSES"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-ps aux | grep -E "python|ORCHESTRATOR|EVOLUTION|apex" | grep -v grep
+cd ~/apex_bot
+
+echo "1️⃣  CURRENT BRANCH & RECENT COMMITS:"
+echo "───────────────────────────────────────────────────────────────"
+git log --oneline -10
 echo ""
 
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "2️⃣  GIT STATUS"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "Current Directory: $(pwd)"
-echo "Current Branch:"
-git branch --show-current 2>/dev/null || echo "  Not in a git repo"
-echo ""
-echo "Git Status:"
-git status -s 2>/dev/null || echo "  Not in a git repo"
-echo ""
-
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "3️⃣  RECENT LOG OUTPUT (Last 30 lines)"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-if [ -f "apex.log" ]; then
-    tail -30 apex.log
-elif [ -f "nohup.out" ]; then
-    tail -30 nohup.out
+echo "2️⃣  BOT RUNNING STATUS:"
+echo "───────────────────────────────────────────────────────────────"
+ps aux | grep -E "RUN_BOT|ORCHESTRATOR" | grep -v grep
+if [ $? -eq 0 ]; then
+    echo "✅ Bot IS running"
 else
-    echo "  No log file found (apex.log or nohup.out)"
+    echo "❌ Bot NOT running"
 fi
 echo ""
 
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "4️⃣  EVOLUTION DATABASE STATUS"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-if [ -f "evolution_engine.db" ]; then
-    echo "Database exists: evolution_engine.db"
-    echo "Database size: $(du -h evolution_engine.db | cut -f1)"
-    echo ""
-    echo "Database contents:"
-    sqlite3 evolution_engine.db "SELECT COUNT(*) as total_rows FROM model_evolution;" 2>/dev/null || echo "  Could not read database"
-    sqlite3 evolution_engine.db "SELECT MAX(generation) as max_generation FROM model_evolution;" 2>/dev/null || echo "  Could not get generation"
+echo "3️⃣  MONITORING LOOP IN CODE (checking if fix exists):"
+echo "───────────────────────────────────────────────────────────────"
+if grep -q "monitor_positions_continuously" COMPLETE_ULTIMATE_ORCHESTRATOR.py; then
+    echo "✅ Monitoring loop code EXISTS in file"
+    grep -n "def monitor_positions_continuously" COMPLETE_ULTIMATE_ORCHESTRATOR.py | head -1
 else
-    echo "  evolution_engine.db NOT FOUND!"
+    echo "❌ Monitoring loop code NOT FOUND - needs fix!"
 fi
 echo ""
 
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "5️⃣  RECENT ERRORS (Last 10)"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-if [ -f "apex.log" ]; then
-    grep -i "error\|exception\|failed\|traceback" apex.log | tail -10
-elif [ -f "nohup.out" ]; then
-    grep -i "error\|exception\|failed\|traceback" nohup.out | tail -10
+echo "4️⃣  MONITORING LOOP ACTIVE IN LOGS:"
+echo "───────────────────────────────────────────────────────────────"
+if grep -q "POSITION MONITORING LOOP STARTED" apex.log; then
+    echo "✅ Monitoring loop IS running:"
+    grep "POSITION MONITORING LOOP STARTED" apex.log | tail -1
 else
-    echo "  No log file to check"
+    echo "❌ Monitoring loop NOT started - critical issue!"
 fi
 echo ""
 
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "6️⃣  RECENT TRADES (Last 10)"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-if [ -f "apex.log" ]; then
-    grep -iE "trade|signal|executed|buy|sell|profit" apex.log | tail -10
-elif [ -f "nohup.out" ]; then
-    grep -iE "trade|signal|executed|buy|sell|profit" nohup.out | tail -10
+echo "5️⃣  ROUTER MODE:"
+echo "───────────────────────────────────────────────────────────────"
+if grep -q "Router initialized in" apex.log; then
+    grep "Router initialized in" apex.log | tail -1
 else
-    echo "  No log file to check"
+    echo "⚠️  Router mode not found in logs"
 fi
 echo ""
 
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "7️⃣  SYSTEM RESOURCES"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "Memory Usage:"
-free -h
-echo ""
-echo "Disk Usage:"
-df -h | grep -E "Filesystem|/$|/root"
-echo ""
-echo "CPU Load:"
-uptime
+echo "6️⃣  ROUTER TESTNET FILTERING:"
+echo "───────────────────────────────────────────────────────────────"
+if grep -q "Testnet mode: Found on testnet" apex.log; then
+    echo "✅ Router IS filtering for testnet:"
+    grep "Testnet mode: Found on testnet" apex.log | tail -3
+else
+    echo "❌ No testnet filtering found - router may route to wrong exchanges"
+fi
 echo ""
 
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "8️⃣  INSTALLED OPTIMIZATIONS"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "Checking for new optimization modules..."
-for file in WEBSOCKET_DATA_FEED.py SMART_ORDER_MANAGER.py SMART_TRADE_FILTER.py SIGNAL_AGGREGATOR.py DYNAMIC_POSITION_SIZER.py; do
-    if [ -f "$file" ]; then
-        echo "  ✅ $file"
-    else
-        echo "  ❌ $file (not installed)"
-    fi
-done
+echo "7️⃣  TRADES EXECUTED:"
+echo "───────────────────────────────────────────────────────────────"
+executed_count=$(grep -c "EXECUTED\|Order ID:" apex.log)
+echo "Total trades: $executed_count"
+if [ $executed_count -gt 0 ]; then
+    echo "Recent trades:"
+    grep -E "EXECUTED|Order ID:" apex.log | tail -5
+else
+    echo "❌ NO TRADES EXECUTED"
+fi
 echo ""
 
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "9️⃣  PYTHON PACKAGES (ccxt)"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-pip3 list | grep ccxt
+echo "8️⃣  POSITIONS CLOSED:"
+echo "───────────────────────────────────────────────────────────────"
+closed_count=$(grep -c "POSITION CLOSED\|Take profit\|Stop loss" apex.log)
+echo "Total closures: $closed_count"
+if [ $closed_count -gt 0 ]; then
+    echo "Recent closures:"
+    grep -E "POSITION CLOSED|Take profit|Stop loss" apex.log | tail -5
+else
+    echo "❌ NO POSITIONS CLOSED - monitoring loop issue!"
+fi
 echo ""
 
-echo "================================================================================"
-echo "✅ STATUS CHECK COMPLETE"
-echo "================================================================================"
+echo "9️⃣  GIT STATUS:"
+echo "───────────────────────────────────────────────────────────────"
+git status -sb
 echo ""
-echo "📋 SUMMARY:"
-echo "   Check the sections above to see:"
-echo "   - What's currently running"
-echo "   - Which branch you're on"
-echo "   - Recent bot activity"
-echo "   - Evolution data status"
-echo "   - Any errors"
-echo "   - Available optimizations"
+
+echo "🔟 LATEST ACTIVITY (last 30 lines):"
+echo "───────────────────────────────────────────────────────────────"
+tail -30 apex.log
 echo ""
-echo "💡 NEXT STEPS:"
-echo "   1. Review the output above"
-echo "   2. Make note of current state"
-echo "   3. Decide if you want to pull new optimizations"
-echo "   4. Or continue monitoring current setup"
+
+echo "═══════════════════════════════════════════════════════════════"
+echo "📊 SUMMARY:"
+echo "═══════════════════════════════════════════════════════════════"
 echo ""
-echo "================================================================================"
+
+# Summary checks
+monitoring_in_code=0
+monitoring_running=0
+router_mode=0
+trades_executed=0
+positions_closed=0
+
+if grep -q "monitor_positions_continuously" COMPLETE_ULTIMATE_ORCHESTRATOR.py; then
+    monitoring_in_code=1
+fi
+
+if grep -q "POSITION MONITORING LOOP STARTED" apex.log; then
+    monitoring_running=1
+fi
+
+if grep -q "Router initialized in.*TESTNET" apex.log; then
+    router_mode=1
+fi
+
+if [ $(grep -c "EXECUTED\|Order ID:" apex.log) -gt 0 ]; then
+    trades_executed=1
+fi
+
+if [ $(grep -c "POSITION CLOSED" apex.log) -gt 0 ]; then
+    positions_closed=1
+fi
+
+echo "Monitoring loop in code: $([ $monitoring_in_code -eq 1 ] && echo '✅ YES' || echo '❌ NO')"
+echo "Monitoring loop running: $([ $monitoring_running -eq 1 ] && echo '✅ YES' || echo '❌ NO')"
+echo "Router in testnet mode: $([ $router_mode -eq 1 ] && echo '✅ YES' || echo '⚠️  UNKNOWN')"
+echo "Trades executed: $([ $trades_executed -eq 1 ] && echo '✅ YES' || echo '❌ NO')"
+echo "Positions closed: $([ $positions_closed -eq 1 ] && echo '✅ YES' || echo '❌ NO')"
+echo ""
+
+echo "═══════════════════════════════════════════════════════════════"
+echo "🎯 RECOMMENDATION:"
+echo "═══════════════════════════════════════════════════════════════"
+echo ""
+
+if [ $monitoring_in_code -eq 1 ] && [ $monitoring_running -eq 1 ] && [ $positions_closed -eq 1 ]; then
+    echo "✅ ALL SYSTEMS WORKING! No fixes needed!"
+    echo "   - Monitoring loop exists and is running"
+    echo "   - Positions are closing"
+    echo "   - Bot is operational"
+elif [ $monitoring_in_code -eq 0 ]; then
+    echo "🚨 NEED TO PULL FIXES:"
+    echo "   - Monitoring loop code missing"
+    echo "   - Pull from continue-from-micro-fix branch"
+elif [ $monitoring_running -eq 0 ]; then
+    echo "⚠️  NEED TO RESTART BOT:"
+    echo "   - Code has monitoring loop"
+    echo "   - But loop not started"
+    echo "   - Restart bot to activate"
+else
+    echo "🔍 NEED MORE INVESTIGATION:"
+    echo "   - Some systems working, others not"
+    echo "   - Check logs for errors"
+fi
+
+echo ""
+echo "═══════════════════════════════════════════════════════════════"

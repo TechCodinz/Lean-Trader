@@ -2097,8 +2097,8 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             logger.info(f"   Router will monitor {len(router_exchanges)} exchanges")
             logger.info(f"   Exchanges: {list(router_exchanges.keys())}")
             
-            # Initialize router
-            self.intelligent_router = initialize_intelligent_router(router_exchanges, ai_consult)
+            # Initialize router (with mode awareness!)
+            self.intelligent_router = initialize_intelligent_router(router_exchanges, ai_consult, self.mode)
             
             # Discover all pairs immediately
             logger.info("   🔍 Discovering all pairs (crypto, forex, commodities, indices)...")
@@ -2111,6 +2111,11 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             logger.info(f"   Exchanges: {stats['total_exchanges']}")
             for market, count in stats['pairs_by_market_type'].items():
                 logger.info(f"   {market}: {count} pairs")
+            
+            # Start continuous monitoring loop for new listings
+            logger.info("   🔄 Starting new listing monitoring loop...")
+            asyncio.create_task(self.intelligent_router.start_monitoring_loop())
+            logger.info("   ✅ Monitoring loop started!")
             
         except Exception as e:
             logger.error(f"❌ Intelligent Router failed: {e}")
@@ -2586,6 +2591,26 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                 asyncio.create_task(self.news_engine.run_news_monitor())
             )
             logger.info("✅ 📰 NEWS TRADING ENGINE STARTED - Monitoring trending & sentiment!")
+        
+        # 🚨 START POSITION MONITORING LOOP - CRITICAL FOR CLOSING TRADES! 🚨
+        if getattr(self, 'advanced_orchestrators', {}).get('execution'):
+            async def monitor_positions_continuously():
+                """Monitor all open positions and close at TP/SL"""
+                logger.info("🔄 POSITION MONITORING LOOP STARTED")
+                logger.info("   Checking every 10 seconds for TP/SL triggers...")
+                
+                while self.is_running:
+                    try:
+                        await self.advanced_orchestrators['execution'].monitor_positions()
+                        await asyncio.sleep(10)  # Check every 10 seconds
+                    except Exception as e:
+                        logger.error(f"❌ Position monitoring error: {e}")
+                        await asyncio.sleep(30)  # Wait before retry
+            
+            tasks.append(asyncio.create_task(monitor_positions_continuously()))
+            logger.info("✅ 💰 POSITION MONITORING ACTIVE - Will close trades at TP/SL!")
+        else:
+            logger.warning("⚠️  No execution orchestrator for position monitoring!")
         
         # START HEDGE FUND ARSENAL - Professional strategies!
         if getattr(self, 'hedge_fund', None):

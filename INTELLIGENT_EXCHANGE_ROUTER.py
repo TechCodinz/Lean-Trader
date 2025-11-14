@@ -37,16 +37,20 @@ class IntelligentExchangeRouter:
     THE BOT FINDS THE RIGHT EXCHANGE FOR EVERY PAIR!
     """
     
-    def __init__(self, exchanges: Dict[str, Any], ai_consultation=None):
+    def __init__(self, exchanges: Dict[str, Any], ai_consultation=None, mode='live'):
         """
         Initialize intelligent router
         
         Args:
             exchanges: Dict of exchange instances {'bybit': exchange_obj, ...}
             ai_consultation: AI system for querying exchange capabilities
+            mode: Trading mode ('testnet' or 'live')
         """
         self.exchanges = exchanges
         self.ai_consultation = ai_consultation
+        self.mode = mode  # Track if we're in testnet or live mode
+        
+        logger.info(f"🧠 Router initialized in {mode.upper()} mode")
         
         # Discovered pairs per exchange per market type
         self.exchange_pairs = defaultdict(lambda: defaultdict(set))
@@ -124,12 +128,30 @@ class IntelligentExchangeRouter:
             for pairs in exchange_data.values()
         )
         
-        logger.info(f"✅ Discovered {total_pairs} pairs across {len(self.exchanges)} exchanges!")
+        logger.info(f"✅ DISCOVERY COMPLETE: {total_pairs} pairs across {len(self.exchanges)} exchanges!")
         
+        # Show detailed breakdown
         for exchange_name, markets in self.exchange_pairs.items():
-            for market_type, pairs in markets.items():
-                if pairs:
-                    logger.info(f"   📊 {exchange_name} {market_type}: {len(pairs)} pairs")
+            total_for_exchange = sum(len(pairs) for pairs in markets.values())
+            if total_for_exchange > 0:
+                logger.info(f"   📊 {exchange_name}: {total_for_exchange} pairs total")
+                for market_type, pairs in markets.items():
+                    if pairs:
+                        # Show first few pairs as examples
+                        sample_pairs = list(pairs)[:3]
+                        logger.info(f"      └─ {market_type}: {len(pairs)} pairs (e.g., {', '.join(sample_pairs)})")
+        
+        # Important message about testnet
+        if self.mode == 'testnet':
+            testnet_count = sum(
+                len(pairs) 
+                for ex, markets in self.exchange_pairs.items() 
+                if 'testnet' in ex.lower()
+                for pairs in markets.values()
+            )
+            logger.info(f"   🧪 TESTNET MODE: {testnet_count} pairs available on testnet exchanges")
+            logger.info(f"      → Bot will ONLY trade pairs that exist on testnet!")
+            logger.info(f"      → Signals for non-testnet pairs will be skipped (by design)")
     
     async def _discover_exchange_pairs(self, exchange_name: str, exchange: Any):
         """Discover all pairs on specific exchange"""
@@ -253,7 +275,9 @@ class IntelligentExchangeRouter:
                     })
         
         if not available_routes:
-            logger.warning(f"   ⚠️  {symbol} not found on any exchange!")
+            logger.info(f"   ⏭️  {symbol} not discovered on any exchange")
+            logger.info(f"      🔍 Router checked: {', '.join(self.exchange_pairs.keys())}")
+            logger.info(f"      💡 Pair may not be listed or discovery incomplete")
             
             # Try AI discovery if available
             if self.ai_consultation:
@@ -267,6 +291,11 @@ class IntelligentExchangeRouter:
         # Choose best route (prefer testnet if available, then by market type priority)
         best_route = self._choose_best_route(available_routes, signal)
         
+        # If no suitable route (e.g., testnet mode but pair not on testnet)
+        if not best_route:
+            logger.info(f"   ⏭️  {symbol} not available on suitable exchange (mode: {self.mode})")
+            return None
+        
         # Get adapted pattern for this market type
         pattern = self._get_adapted_pattern(best_route['market_type'], signal)
         
@@ -279,7 +308,28 @@ class IntelligentExchangeRouter:
         return best_route
     
     def _choose_best_route(self, routes: List[Dict], signal: Dict) -> Dict:
-        """Choose best exchange/market for this signal"""
+        """
+        Choose best exchange/market for this signal
+        
+        HYBRID INTELLIGENCE:
+        - Router discovers what pairs each exchange has
+        - In testnet mode: Routes ONLY to testnet IF pair exists there
+        - In live mode: Routes to best exchange that HAS the pair
+        """
+        # 🧪 TESTNET MODE: Prefer testnet exchanges
+        if self.mode == 'testnet':
+            testnet_routes = [r for r in routes if 'testnet' in r['exchange'].lower()]
+            if testnet_routes:
+                routes = testnet_routes
+                logger.info(f"   🧪 Testnet mode: Found on testnet → routing to testnet")
+            else:
+                # Pair discovered on live exchanges but not testnet
+                symbol = signal.get('symbol') or signal.get('pair', '')
+                logger.info(f"   🧪 Testnet mode: {symbol} not on testnet (only on live exchanges)")
+                logger.info(f"      Available on: {', '.join([r['exchange'] for r in routes])}")
+                logger.info(f"      ⏭️  Skipping (testnet mode, pair not on testnet)")
+                return None
+        
         # Priority order
         priority = {
             'testnet': 100,  # Prefer testnet if in testnet mode
@@ -386,6 +436,31 @@ class IntelligentExchangeRouter:
             except Exception as e:
                 logger.debug(f"New listing check failed for {exchange_name}: {e}")
     
+    async def start_monitoring_loop(self):
+        """
+        Continuously monitor for new listings
+        Runs every 1 hour to detect new pairs on exchanges
+        """
+        logger.info("🔄 Starting continuous new listing monitoring...")
+        
+        while True:
+            try:
+                # Check for new listings
+                await self.detect_new_listings()
+                
+                # Also refresh pair discovery if it's been too long
+                for exchange_name, last_time in self.last_discovery.items():
+                    if (datetime.now() - last_time).total_seconds() > self.discovery_interval:
+                        logger.info(f"🔄 Re-discovering pairs for {exchange_name}...")
+                        await self.discover_all_pairs()
+                
+                # Wait 1 hour before next check
+                await asyncio.sleep(3600)
+                
+            except Exception as e:
+                logger.error(f"❌ Monitoring loop error: {e}")
+                await asyncio.sleep(300)  # Wait 5 min on error before retry
+    
     def get_routing_stats(self) -> Dict:
         """Get routing statistics"""
         total_pairs = sum(
@@ -422,10 +497,10 @@ def get_intelligent_router():
     global _intelligent_router
     return _intelligent_router
 
-def initialize_intelligent_router(exchanges: Dict[str, Any], ai_consultation=None):
+def initialize_intelligent_router(exchanges: Dict[str, Any], ai_consultation=None, mode='live'):
     """Initialize intelligent router"""
     global _intelligent_router
     if _intelligent_router is None:
-        _intelligent_router = IntelligentExchangeRouter(exchanges, ai_consultation)
-        logger.info(f"✅ Intelligent Router singleton created with {len(exchanges)} exchanges")
+        _intelligent_router = IntelligentExchangeRouter(exchanges, ai_consultation, mode)
+        logger.info(f"✅ Intelligent Router singleton created with {len(exchanges)} exchanges ({mode.upper()} mode)")
     return _intelligent_router
