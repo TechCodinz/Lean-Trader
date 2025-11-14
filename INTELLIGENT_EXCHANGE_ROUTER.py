@@ -386,6 +386,31 @@ class IntelligentExchangeRouter:
             except Exception as e:
                 logger.debug(f"New listing check failed for {exchange_name}: {e}")
     
+    async def start_monitoring_loop(self):
+        """
+        Continuously monitor for new listings
+        Runs every 1 hour to detect new pairs on exchanges
+        """
+        logger.info("🔄 Starting continuous new listing monitoring...")
+        
+        while True:
+            try:
+                # Check for new listings
+                await self.detect_new_listings()
+                
+                # Also refresh pair discovery if it's been too long
+                for exchange_name, last_time in self.last_discovery.items():
+                    if (datetime.now() - last_time).total_seconds() > self.discovery_interval:
+                        logger.info(f"🔄 Re-discovering pairs for {exchange_name}...")
+                        await self.discover_all_pairs()
+                
+                # Wait 1 hour before next check
+                await asyncio.sleep(3600)
+                
+            except Exception as e:
+                logger.error(f"❌ Monitoring loop error: {e}")
+                await asyncio.sleep(300)  # Wait 5 min on error before retry
+    
     def get_routing_stats(self) -> Dict:
         """Get routing statistics"""
         total_pairs = sum(
