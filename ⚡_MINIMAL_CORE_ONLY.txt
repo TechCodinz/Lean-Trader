@@ -1,0 +1,72 @@
+⚡ MINIMAL CORE ONLY - STABLE TRADING BOT!
+═══════════════════════════════════════════════════════════════
+
+Disable ALL heavy systems that crash!
+Keep ONLY core trading!
+
+COPY/PASTE ON VPS:
+
+cd ~/apex_bot
+
+# Disable problematic systems
+python3 << 'EOF'
+import re
+
+with open('COMPLETE_ULTIMATE_ORCHESTRATOR.py', 'r') as f:
+    content = f.read()
+
+# 1. Disable DEX
+content = content.replace(
+    "await self.advanced_orchestrators['dex'].start()",
+    "pass  # DEX DISABLED"
+)
+
+# 2. Disable Telegram (main crash source!)
+content = content.replace(
+    "tasks.append(asyncio.create_task(self.monitor_signals_for_telegram()))",
+    "# Telegram DISABLED - causes timeouts"
+)
+
+# 3. Disable moon spotter
+content = re.sub(
+    r'gems = await self\.micro_moon_spotter\.scan_for_new_gems\(\)',
+    'gems = []  # Moon spotter DISABLED',
+    content
+)
+
+# 4. Disable heavy ML training
+content = re.sub(
+    r'await self\.ml_pipeline\.train_models\(\)',
+    'pass  # ML DISABLED',
+    content
+)
+
+# 5. Keep ONLY execution loop
+print("Disabling heavy systems...")
+print("✅ DEX disabled")
+print("✅ Telegram disabled")  
+print("✅ Moon spotter disabled")
+print("✅ Heavy ML disabled")
+
+with open('COMPLETE_ULTIMATE_ORCHESTRATOR.py', 'w') as f:
+    f.write(content)
+
+print("\n✅ MINIMAL CORE CONFIGURATION!")
+print("Only core trading will run!")
+EOF
+
+# Restart with minimal config
+pkill -f RUN_BOT
+nohup python3 RUN_BOT.py > apex.log 2>&1 &
+
+# Wait
+sleep 180
+
+# Check
+echo "=== MINIMAL BOT STATUS ==="
+echo "Running: $(ps aux | grep RUN_BOT | grep -v grep | wc -l)"
+echo "Connected: $(grep 'Bybit TESTNET connected' apex.log | wc -l)"
+echo "Wired: $(grep 'can now trade' apex.log | wc -l)"
+echo "Crashed: $(grep 'Timed out' apex.log | wc -l)"
+echo ""
+tail -f apex.log | grep -E "Order ID|EXECUTED"
