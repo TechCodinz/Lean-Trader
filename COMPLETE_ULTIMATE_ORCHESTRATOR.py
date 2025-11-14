@@ -1775,7 +1775,8 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                     'secret': os.getenv('BYBIT_TESTNET_API_SECRET'),  # ✅ FIXED!
                     'options': {
                         'defaultType': 'spot',
-                        'accountType': 'UNIFIED'  # ✅ USE UNIFIED ACCOUNT!
+                        'accountType': 'UNIFIED',  # ✅ USE UNIFIED ACCOUNT!
+                        'recvWindow': 30000  # ✅ FIX TIME SYNC!
                     },
                     'enableRateLimit': True
                 })
