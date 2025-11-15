@@ -590,6 +590,38 @@ class ExecutionOrchestrator:
                 logger.debug(f"Trade blocked: {reason}")
                 return False
             
+            # 🚀 TIER 1 ENHANCEMENTS - Apply before execution!
+            try:
+                # Get orchestrator's enhancement systems
+                from COMPLETE_ULTIMATE_ORCHESTRATOR import get_orchestrator
+                orchestrator = get_orchestrator()
+                
+                if orchestrator:
+                    # 1. Fund Protection Check
+                    if hasattr(orchestrator, 'fund_protection') and orchestrator.fund_protection:
+                        can_trade_safe, protection_reason = orchestrator.fund_protection.can_open_position(
+                            symbol, self.position_sizer.balance
+                        )
+                        if not can_trade_safe:
+                            logger.info(f"   🛡️  FUND PROTECTION: {protection_reason}")
+                            return False
+                    
+                    # 2. Hidden Pattern Enhancement
+                    if hasattr(orchestrator, 'pattern_detector') and orchestrator.pattern_detector:
+                        pattern_signal = orchestrator.pattern_detector.detect_hidden_patterns(
+                            symbol, signal.get('timeframe', '5m'), confidence
+                        )
+                        if pattern_signal and pattern_signal.get('boost_confidence'):
+                            confidence = min(0.98, confidence * 1.1)
+                            logger.info(f"   🎯 HIDDEN PATTERN BOOST: Confidence → {confidence:.0%}")
+                    
+                    # 3. Dynamic Risk Adjustment
+                    if hasattr(orchestrator, 'risk_adjuster') and orchestrator.risk_adjuster:
+                        # Risk adjuster will be used in position sizing
+                        pass
+            except:
+                pass  # Enhancements optional
+            
             logger.info(f"⚡ EXECUTING: {side.upper()} {symbol} (confidence: {confidence:.1%})")
             logger.info(f"   Mode: {self.mode} | Exchange: {self.active_exchange}")
             
