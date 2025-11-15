@@ -26,7 +26,7 @@ import json
 logger = logging.getLogger(__name__)
 
 
-class MultiTimeframeProfit Optimizer:
+class MultiTimeframeProfitOptimizer:
     """
     Profits on ALL timeframes simultaneously
     - 1m: Ultra-fast scalps (30sec-2min)
