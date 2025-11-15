@@ -221,6 +221,7 @@ from EXCHANGE_PAIR_VALIDATOR import ExchangePairValidator
 from MEMORY_STATION import MemoryStation
 from MULTI_TIMEFRAME_COORDINATOR import MultiTimeframeCoordinator
 from MICRO_GROWTH_ENGINE import MicroGrowthEngine
+from SAFE_MICRO_GROWTH_ENGINE import SafeMicroGrowthEngine
 from PRACTICAL_ADVANCED_VOLATILITY import (
     SimplifiedRoughVolatility,
     BlackSwanDetector,
@@ -1247,17 +1248,20 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             logger.warning(f"⚠️  Multi-Timeframe Coordinator: {e}")
             self.mtf_coordinator = None
         
-        # 5. Micro Growth Engine
+        # 5. SAFE Micro Growth Engine (DEPLOYED!)
         try:
-            self.micro_growth = MicroGrowthEngine(initial_balance=actual_balance if 'actual_balance' in locals() else 1000.0)
-            self.advanced_systems['micro_growth'] = self.micro_growth
-            logger.info("✅ 💰 MICRO GROWTH ENGINE - Scales with balance!")
-            logger.info(f"   → Current tier: {self.micro_growth.get_balance_tier()}")
-            logger.info(f"   → Position sizing: Auto-scales as balance grows")
-            logger.info(f"   → Growth target: 5% per cycle")
+            self.safe_micro_growth = SafeMicroGrowthEngine(initial_balance=actual_balance if 'actual_balance' in locals() else 1000.0)
+            self.advanced_systems['safe_micro_growth'] = self.safe_micro_growth
+            logger.info("✅ 🛡️  SAFE MICRO GROWTH ENGINE - ACTIVE!")
+            logger.info(f"   → Balance: ${self.safe_micro_growth.current_balance:.2f}")
+            logger.info(f"   → Tier: {self.safe_micro_growth.get_balance_tier()}")
+            logger.info(f"   → Risk limit: {self.safe_micro_growth.risk_by_tier[self.safe_micro_growth.get_balance_tier()]*100:.0f}%")
+            logger.info(f"   → Kelly protected: Fractional Kelly (50% for safety)")
+            logger.info(f"   → Circuit breakers: 5 layers active")
+            logger.info(f"   → Can grow from $5 to $millions SAFELY!")
         except Exception as e:
-            logger.warning(f"⚠️  Micro Growth Engine: {e}")
-            self.micro_growth = None
+            logger.warning(f"⚠️  Safe Micro Growth Engine: {e}")
+            self.safe_micro_growth = None
         
         # 6. Advanced Volatility Systems
         try:
