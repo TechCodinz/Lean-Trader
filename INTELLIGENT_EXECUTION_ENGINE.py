@@ -402,20 +402,26 @@ class IntelligentExecutionEngine:
             )
             
             # Apply limits - SCALE WITH BALANCE!
-            # Get actual balance from parent orchestrator
-            try:
-                from COMPLETE_ULTIMATE_ORCHESTRATOR import get_orchestrator
-                orchestrator = get_orchestrator()
-                if orchestrator and hasattr(orchestrator, 'advanced_orchestrators'):
-                    exec_orch = orchestrator.advanced_orchestrators.get('execution')
-                    if exec_orch and hasattr(exec_orch, 'position_sizer'):
-                        balance = exec_orch.position_sizer.balance
-                    else:
-                        balance = 1000
-                else:
-                    balance = 1000
-            except:
-                balance = 1000
+            # Get actual balance - TRY MULTIPLE SOURCES
+            balance = 1000  # Fallback
+            
+            # Method 1: From position_sizer
+            if hasattr(self, 'position_sizer') and hasattr(self.position_sizer, 'balance'):
+                balance = self.position_sizer.balance
+                logger.info(f"   💰 Using position_sizer balance: ${balance:.2f}")
+            
+            # Method 2: From orchestrator
+            elif hasattr(self, 'exchanges'):
+                try:
+                    from COMPLETE_ULTIMATE_ORCHESTRATOR import get_orchestrator
+                    orch = get_orchestrator()
+                    if orch:
+                        exec_orch = orch.advanced_orchestrators.get('execution')
+                        if exec_orch and hasattr(exec_orch, 'position_sizer'):
+                            balance = exec_orch.position_sizer.balance
+                            logger.info(f"   💰 Using orchestrator balance: ${balance:.2f}")
+                except:
+                    pass
             
             if balance < 100:
                 min_size, max_size = 3.0, 20.0
