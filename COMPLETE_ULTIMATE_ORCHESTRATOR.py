@@ -3812,6 +3812,12 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                                 # Share with swarm for voting
                                 signal_with_votes = await self.collective_swarm.share_signal('MONEY_PRINTER', signal)
                                 
+                                # 🎯 EXECUTE SPECIAL SIGNALS DIRECTLY!
+                                if self.advanced_orchestrators.get('execution'):
+                                    asyncio.create_task(
+                                        self.advanced_orchestrators['execution'].execute_signal(signal_with_votes)
+                                    )
+                                
                                 # Log top 3 opportunities
                                 if money_signals.index(signal) < 3:
                                     strategy = signal.get('strategy', 'UNKNOWN')
@@ -3819,6 +3825,7 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                                     logger.info(f"   💎 {strategy}: {reasoning}")
                             
                             logger.info(f"✅ Published {len(money_signals)} MONEY PRINTER signals to data hub!")
+                            logger.info(f"   🎯 Sent {len(money_signals)} signals to executor for execution!")
                         
                         # Run every 60 seconds (these opportunities change fast!)
                         await asyncio.sleep(60)
