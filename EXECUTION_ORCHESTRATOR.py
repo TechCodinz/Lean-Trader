@@ -1133,7 +1133,28 @@ class ExecutionOrchestrator:
     async def monitor_positions(self):
         """Monitor open positions with ADVANCED FEATURES (Trailing Stop, Partial TP)"""
         
-        for symbol, position in list(self.risk_manager.open_positions.items()):
+        # 🔥 CRITICAL FIX: Monitor BOTH tracking systems!
+        positions_to_monitor = {}
+        
+        # 1. Check risk_manager positions
+        positions_to_monitor.update(self.risk_manager.open_positions)
+        
+        # 2. Check intelligent_engine positions (THIS WAS MISSING!)
+        if self.intelligent_engine and hasattr(self.intelligent_engine, 'active_trades_by_tf'):
+            for symbol, trades in self.intelligent_engine.active_trades_by_tf.items():
+                for trade in trades:
+                    if trade.get('status') == 'open':
+                        positions_to_monitor[symbol] = {
+                            'entry_price': trade.get('entry_price'),
+                            'side': trade.get('side'),
+                            'order_id': trade.get('order_id'),
+                            'timeframe': trade.get('timeframe')
+                        }
+        
+        if positions_to_monitor:
+            logger.info(f"💰 Monitoring {len(positions_to_monitor)} open positions...")
+        
+        for symbol, position in list(positions_to_monitor.items()):
             try:
                 # Get current price
                 current_price = await self.get_current_price(symbol)
