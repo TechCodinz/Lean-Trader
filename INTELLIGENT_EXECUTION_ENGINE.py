@@ -402,7 +402,20 @@ class IntelligentExecutionEngine:
             )
             
             # Apply limits - SCALE WITH BALANCE!
-            balance = self.position_sizer.balance if hasattr(self, 'position_sizer') else 1000
+            # Get actual balance from parent orchestrator
+            try:
+                from COMPLETE_ULTIMATE_ORCHESTRATOR import get_orchestrator
+                orchestrator = get_orchestrator()
+                if orchestrator and hasattr(orchestrator, 'advanced_orchestrators'):
+                    exec_orch = orchestrator.advanced_orchestrators.get('execution')
+                    if exec_orch and hasattr(exec_orch, 'position_sizer'):
+                        balance = exec_orch.position_sizer.balance
+                    else:
+                        balance = 1000
+                else:
+                    balance = 1000
+            except:
+                balance = 1000
             
             if balance < 100:
                 min_size, max_size = 3.0, 20.0
