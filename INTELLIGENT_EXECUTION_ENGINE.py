@@ -340,8 +340,18 @@ class IntelligentExecutionEngine:
             # Get volatility for this pair
             volatility = self.volatility_by_pair.get(symbol, 0.02)  # Default 2%
             
-            # Base position size (USD) - SMALLER for testnet!
-            base_size = 5.0  # Start with $5 for testnet (conservative!)
+            # 🔥 Base position size - SCALE WITH BALANCE!
+            balance = self.actual_balance if hasattr(self, 'actual_balance') else 1000
+            
+            if balance < 100:
+                base_size = 3.0
+            elif balance < 1000:
+                base_size = 10.0
+            elif balance < 10000:
+                base_size = 50.0  # ✅ $50 for $8K balance!
+                logger.info(f"   💰 Balance: ${balance:.0f} → Base: ${base_size} ✅")
+            else:
+                base_size = 100.0
             
             # 1. CONFIDENCE MULTIPLIER (50-150%)
             confidence_mult = 0.5 + (confidence * 1.0)  # 0.5x to 1.5x
