@@ -221,6 +221,13 @@ from EXCHANGE_PAIR_VALIDATOR import ExchangePairValidator
 from MEMORY_STATION import MemoryStation
 from MULTI_TIMEFRAME_COORDINATOR import MultiTimeframeCoordinator
 from MICRO_GROWTH_ENGINE import MicroGrowthEngine
+from PRACTICAL_ADVANCED_VOLATILITY import (
+    SimplifiedRoughVolatility,
+    BlackSwanDetector,
+    SimplifiedGreeks,
+    AdaptiveStreakLogic,
+    VolatilityForecaster
+)
 
 try:
     from ULTRA_ENHANCEMENT_PACKAGE import (
@@ -1251,6 +1258,30 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
         except Exception as e:
             logger.warning(f"⚠️  Micro Growth Engine: {e}")
             self.micro_growth = None
+        
+        # 6. Advanced Volatility Systems
+        try:
+            self.rough_vol = SimplifiedRoughVolatility(H=0.1)
+            self.black_swan = BlackSwanDetector()
+            self.greeks_calc = SimplifiedGreeks()
+            self.streak_logic = AdaptiveStreakLogic()
+            self.vol_forecaster = VolatilityForecaster()
+            
+            self.advanced_systems['rough_vol'] = self.rough_vol
+            self.advanced_systems['black_swan'] = self.black_swan
+            self.advanced_systems['greeks'] = self.greeks_calc
+            self.advanced_systems['streak_logic'] = self.streak_logic
+            self.advanced_systems['vol_forecaster'] = self.vol_forecaster
+            
+            logger.info("✅ 📊 ADVANCED VOLATILITY SYSTEMS - VPS-compatible!")
+            logger.info("   → Rough Volatility (fBm approximation)")
+            logger.info("   → Black Swan Detector (3σ+ events)")
+            logger.info("   → Greeks Calculator (Delta/Gamma/Vega)")
+            logger.info("   → Adaptive Streak Logic (RL-inspired)")
+            logger.info("   → Volatility Forecaster (EWMA + momentum)")
+        except Exception as e:
+            logger.warning(f"⚠️  Advanced Volatility: {e}")
+            self.rough_vol = None
         
         # 4. Ultra Enhancement Package
         if ULTRA_ENHANCEMENTS_AVAILABLE:
