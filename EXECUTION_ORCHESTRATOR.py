@@ -552,11 +552,11 @@ class ExecutionOrchestrator:
                 logger.info(f"💰 TRIANGULAR ARBITRAGE: {signal.get('profit_pct', 0):.2f}% profit!")
                 return await self._execute_triangular_arbitrage(signal)
             
-            elif signal_type == 'pairs_trade':
+            elif signal_type == 'correlation_exploit':  # ✅ MONEY_PRINTER uses this for pairs trade
                 logger.info(f"💰 PAIRS TRADE: {signal.get('expected_profit_pct', 0):.1f}% profit potential!")
                 return await self._execute_pairs_trade(signal)
             
-            elif signal_type == 'volatility_straddle':
+            elif signal_type == 'volatility_harvest':  # ✅ MONEY_PRINTER uses this
                 logger.info(f"💰 VOLATILITY STRADDLE: Profit from {signal.get('volatility_pct', 0):.1f}% vol!")
                 return await self._execute_volatility_straddle(signal)
             
@@ -564,7 +564,7 @@ class ExecutionOrchestrator:
                 logger.info(f"💰 MARKET MAKER: Earn ${signal.get('expected_profit', 0):.2f} spread!")
                 return await self._execute_market_maker(signal)
             
-            elif signal_type == 'funding_arbitrage':
+            elif signal_type == 'funding_farm':  # ✅ MONEY_PRINTER uses this
                 logger.info(f"💰 FUNDING ARBITRAGE: {signal.get('daily_rate', 0)*100:.2f}% daily!")
                 return await self._execute_funding_arbitrage(signal)
             
