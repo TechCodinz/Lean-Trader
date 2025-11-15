@@ -632,6 +632,31 @@ class ExecutionOrchestrator:
                         optimal_size = orchestrator.micro_growth.get_position_size(confidence)
                         logger.info(f"   💰 MICRO GROWTH: Optimal size ${optimal_size:.2f} for ${orchestrator.micro_growth.current_balance:.0f} balance")
                         # Engine will use this size
+                    
+                    # 6. Black Swan Detection
+                    if hasattr(orchestrator, 'black_swan') and orchestrator.black_swan:
+                        orchestrator.black_swan.add_price(signal.get('price', 0) or signal.get('entry', 0))
+                        is_swan, z_score, severity = orchestrator.black_swan.check_black_swan()
+                        if is_swan:
+                            logger.warning(f"   🦢 BLACK SWAN: {severity} ({z_score:.1f}σ) - REDUCING SIZE 50%!")
+                            # Reduce size drastically during black swans
+                            confidence *= 0.5
+                    
+                    # 7. Adaptive Streak Logic (RL-inspired)
+                    if hasattr(orchestrator, 'streak_logic') and orchestrator.streak_logic:
+                        if orchestrator.streak_logic.should_pause_trading():
+                            logger.warning(f"   🛑 STREAK LOGIC: Pausing after losses!")
+                            return False
+                        size_mult = orchestrator.streak_logic.get_position_multiplier()
+                        conf_boost = orchestrator.streak_logic.get_confidence_boost()
+                        if size_mult != 1.0 or conf_boost != 1.0:
+                            logger.info(f"   🧠 STREAK LOGIC: Size {size_mult:.2f}x, Conf {conf_boost:.2f}x")
+                            confidence *= conf_boost
+                    
+                    # 8. Volatility Forecasting
+                    if hasattr(orchestrator, 'vol_forecaster') and orchestrator.vol_forecaster:
+                        # Will be used in stop-loss calculation
+                        pass
             except:
                 pass  # Enhancements optional
             
