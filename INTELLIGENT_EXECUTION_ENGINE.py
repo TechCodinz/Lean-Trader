@@ -401,8 +401,20 @@ class IntelligentExecutionEngine:
                 strategy_mult
             )
             
-            # Apply limits (testnet: $3-20 per trade to avoid balance issues!)
-            final_size = max(3.0, min(final_size, 20.0))
+            # Apply limits - SCALE WITH BALANCE!
+            balance = self.position_sizer.balance if hasattr(self, 'position_sizer') else 1000
+            
+            if balance < 100:
+                min_size, max_size = 3.0, 20.0
+            elif balance < 1000:
+                min_size, max_size = 10.0, 100.0
+            elif balance < 10000:
+                min_size, max_size = 20.0, 500.0  # ✅ For $8K balance!
+            else:
+                min_size, max_size = 50.0, 2000.0
+            
+            final_size = max(min_size, min(final_size, max_size))
+            logger.info(f"   💰 Position sizing: ${final_size:.2f} (balance: ${balance:.0f})")
             
             logger.info(f"🧠 INTELLIGENT LOT SIZING: {symbol} {timeframe}")
             logger.info(f"   Confidence: {confidence:.1%} → {confidence_mult:.2f}x")

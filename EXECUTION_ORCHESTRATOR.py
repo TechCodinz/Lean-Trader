@@ -657,8 +657,8 @@ class ExecutionOrchestrator:
                     if hasattr(orchestrator, 'vol_forecaster') and orchestrator.vol_forecaster:
                         # Will be used in stop-loss calculation
                         pass
-            except:
-                pass  # Enhancements optional
+            except Exception as e:
+                logger.warning(f"Enhancement hook error: {e}")  # Log errors instead of silent fail
             
             logger.info(f"⚡ EXECUTING: {side.upper()} {symbol} (confidence: {confidence:.1%})")
             logger.info(f"   Mode: {self.mode} | Exchange: {self.active_exchange}")
