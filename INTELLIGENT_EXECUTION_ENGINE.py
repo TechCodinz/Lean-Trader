@@ -402,13 +402,7 @@ class IntelligentExecutionEngine:
                 strategy_mult
             )
             
-            # Apply limits - SCALE WITH BALANCE!
-            # Use stored actual balance
-            balance = self.actual_balance if hasattr(self, 'actual_balance') else 1000
-            
-            if balance > 5000:
-                logger.info(f"   💰 Using actual balance: ${balance:.2f} ✅")
-            
+            # Apply final bounds based on balance
             if balance < 100:
                 min_size, max_size = 3.0, 20.0
             elif balance < 1000:
