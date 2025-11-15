@@ -105,10 +105,11 @@ class IntelligentExecutionEngine:
     13. ALL 116+ engines in harmony
     """
     
-    def __init__(self, exchange, mode='testnet', exchanges=None):
+    def __init__(self, exchange, mode='testnet', exchanges=None, balance=None):
         self.exchange = exchange  # Default exchange
         self.exchanges = exchanges or {}  # All available exchanges (for router)
         self.mode = mode
+        self.actual_balance = balance or 1000.0  # Store actual balance!
         
         # Multi-timeframe tracking
         self.active_trades_by_tf = defaultdict(list)  # {symbol: [{'tf': '1m', 'id': ...}, ...]}
@@ -402,26 +403,11 @@ class IntelligentExecutionEngine:
             )
             
             # Apply limits - SCALE WITH BALANCE!
-            # Get actual balance - TRY MULTIPLE SOURCES
-            balance = 1000  # Fallback
+            # Use stored actual balance
+            balance = self.actual_balance if hasattr(self, 'actual_balance') else 1000
             
-            # Method 1: From position_sizer
-            if hasattr(self, 'position_sizer') and hasattr(self.position_sizer, 'balance'):
-                balance = self.position_sizer.balance
-                logger.info(f"   💰 Using position_sizer balance: ${balance:.2f}")
-            
-            # Method 2: From orchestrator
-            elif hasattr(self, 'exchanges'):
-                try:
-                    from COMPLETE_ULTIMATE_ORCHESTRATOR import get_orchestrator
-                    orch = get_orchestrator()
-                    if orch:
-                        exec_orch = orch.advanced_orchestrators.get('execution')
-                        if exec_orch and hasattr(exec_orch, 'position_sizer'):
-                            balance = exec_orch.position_sizer.balance
-                            logger.info(f"   💰 Using orchestrator balance: ${balance:.2f}")
-                except:
-                    pass
+            if balance > 5000:
+                logger.info(f"   💰 Using actual balance: ${balance:.2f} ✅")
             
             if balance < 100:
                 min_size, max_size = 3.0, 20.0

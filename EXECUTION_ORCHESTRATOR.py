@@ -514,10 +514,14 @@ class ExecutionOrchestrator:
         
         # 🧠 Initialize INTELLIGENT EXECUTION ENGINE with testnet AND all exchanges!
         if INTELLIGENT_EXECUTION_AVAILABLE and testnet_exchange:
+            # Get actual balance
+            actual_bal = self.position_sizer.balance if hasattr(self, 'position_sizer') else 1000.0
+            
             self.intelligent_engine = IntelligentExecutionEngine(
                 testnet_exchange, 
                 mode='testnet',
-                exchanges=all_exchanges or {}  # ✅ Pass all exchanges for router!
+                exchanges=all_exchanges or {},  # ✅ Pass all exchanges for router!
+                balance=actual_bal  # ✅ PASS ACTUAL BALANCE!
             )
             logger.info("🧠 ✅ INTELLIGENT EXECUTION ENGINE initialized with TESTNET!")
             if all_exchanges:
