@@ -4684,6 +4684,22 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             logger.error(f"❌ Emergency close failed: {e}")
 
 
+# ============================================================================
+# SINGLETON ACCESS FOR ENHANCEMENT SYSTEMS
+# ============================================================================
+_orchestrator_instance = None
+
+def get_orchestrator():
+    """Get the orchestrator instance for accessing enhancement systems"""
+    global _orchestrator_instance
+    return _orchestrator_instance
+
+def set_orchestrator(orchestrator):
+    """Set the orchestrator instance"""
+    global _orchestrator_instance
+    _orchestrator_instance = orchestrator
+
+
 async def main():
     """Main entry point"""
     import argparse
