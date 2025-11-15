@@ -77,6 +77,26 @@ class CentralNervousSystem:
         logger.info("🧠 CENTRAL NERVOUS SYSTEM initialized!")
         logger.info("   THE BRAIN IS ONLINE!")
     
+    def register_exchange(self, exchange_name: str, has_connection: bool = True):
+        """
+        Register exchange with CNS
+        
+        Args:
+            exchange_name: Exchange identifier
+            has_connection: Whether exchange is connected
+        """
+        if not hasattr(self, 'exchanges'):
+            self.exchanges = {}
+        
+        self.exchanges[exchange_name] = {
+            'connected': has_connection,
+            'last_sync': datetime.now(),
+            'status': 'active'
+        }
+        
+        self.connected_exchanges.add(exchange_name)
+        logger.info(f"   ✅ CNS: Registered exchange {exchange_name}")
+    
     def register_system(self, name: str, system_instance, health_check_fn=None):
         """
         Register a system with the CNS
