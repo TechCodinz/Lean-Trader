@@ -222,6 +222,7 @@ from MEMORY_STATION import MemoryStation
 from MULTI_TIMEFRAME_COORDINATOR import MultiTimeframeCoordinator
 from MICRO_GROWTH_ENGINE import MicroGrowthEngine
 from SAFE_MICRO_GROWTH_ENGINE import SafeMicroGrowthEngine
+from AI_SELF_OPTIMIZATION_ENGINE import AISelfOptimizationEngine
 from PRACTICAL_ADVANCED_VOLATILITY import (
     SimplifiedRoughVolatility,
     BlackSwanDetector,
@@ -1286,6 +1287,22 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
         except Exception as e:
             logger.warning(f"⚠️  Advanced Volatility: {e}")
             self.rough_vol = None
+        
+        # 7. AI Self-Optimization Engine
+        try:
+            ai_consult = getattr(self, 'ai_consultation', None)
+            memory = getattr(self, 'memory_station', None)
+            self.self_optimizer = AISelfOptimizationEngine(ai_consult, memory)
+            self.advanced_systems['self_optimizer'] = self.self_optimizer
+            logger.info("✅ 🤖 AI SELF-OPTIMIZATION ENGINE - LIVING ORGANISM!")
+            logger.info("   → Analyzes own performance")
+            logger.info("   → Uses AI for research")
+            logger.info("   → Learns from every trade")
+            logger.info("   → Adapts to markets")
+            logger.info("   → EVOLVES CONTINUOUSLY!")
+        except Exception as e:
+            logger.warning(f"⚠️  Self-Optimization: {e}")
+            self.self_optimizer = None
         
         # 4. Ultra Enhancement Package
         if ULTRA_ENHANCEMENTS_AVAILABLE:
