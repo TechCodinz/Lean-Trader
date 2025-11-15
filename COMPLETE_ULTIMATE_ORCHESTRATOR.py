@@ -4693,6 +4693,7 @@ async def main():
     args = parser.parse_args()
     
     orchestrator = CompleteUltimateOrchestrator(mode=args.mode)
+    set_orchestrator(orchestrator)  # Make available to enhancement systems
     await orchestrator.start()
 
 
