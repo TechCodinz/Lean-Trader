@@ -648,10 +648,15 @@ class ExecutionOrchestrator:
                 logger.info(f"   🧠 Using INTELLIGENT EXECUTION ENGINE!")
                 
                 # Check if we should open another trade on this pair/timeframe
-                timeframe = signal.get('timeframe', '5m')
-                if not self.intelligent_engine.should_open_new_trade(symbol, timeframe):
-                    logger.info(f"   ⏸️  Skipping: Already have {timeframe} trade on {symbol}")
-                    return False
+                # UNLESS it's a hedge position (pairs trade)
+                is_hedge = signal.get('is_hedge', False)
+                if not is_hedge:
+                    timeframe = signal.get('timeframe', '5m')
+                    if not self.intelligent_engine.should_open_new_trade(symbol, timeframe):
+                        logger.info(f"   ⏸️  Skipping: Already have {timeframe} trade on {symbol}")
+                        return False
+                else:
+                    logger.info(f"   🛡️  Hedge position: Bypassing duplicate check")
                 
                 # ✅ PASS ROUTE INFO TO EXECUTION ENGINE!
                 if route:
@@ -1248,7 +1253,9 @@ class ExecutionOrchestrator:
                 'confidence': signal.get('confidence', 0.85),
                 'strategy': 'PAIRS_TRADE_LONG',
                 'paired_with': short_symbol,
-                'timeframe': '1h'  # Pairs trades are longer term
+                'timeframe': '4h',  # Use different timeframe to avoid conflicts
+                'is_hedge': True,  # Flag to bypass duplicate checks
+                'price': 0  # Will fetch live price
             }
             
             short_signal = {
@@ -1257,8 +1264,13 @@ class ExecutionOrchestrator:
                 'confidence': signal.get('confidence', 0.85),
                 'strategy': 'PAIRS_TRADE_SHORT',
                 'paired_with': long_symbol,
-                'timeframe': '1h'
+                'timeframe': '4h',  # Use different timeframe
+                'is_hedge': True,  # Flag to bypass duplicate checks
+                'price': 0  # Will fetch live price
             }
+            
+            logger.info(f"   🎯 Both legs use 4h timeframe (separate from 5m scalps)")
+            logger.info(f"   🛡️  Marked as hedge positions (bypass duplicate check)")
             
             # Execute both legs
             long_result = await self._execute_on_testnet(long_signal, long_symbol, 'buy', signal.get('confidence', 0.85))
