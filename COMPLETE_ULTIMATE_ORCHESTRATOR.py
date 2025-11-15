@@ -3876,6 +3876,12 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                                 # Share with swarm
                                 opp_with_votes = await self.collective_swarm.share_signal('ARBITRAGE_ENGINE', opp)
                                 
+                                # 🎯 EXECUTE ARBITRAGE SIGNALS DIRECTLY!
+                                if self.advanced_orchestrators.get('execution'):
+                                    asyncio.create_task(
+                                        self.advanced_orchestrators['execution'].execute_signal(opp_with_votes)
+                                    )
+                                
                                 # Log top 3
                                 if arb_opportunities.index(opp) < 3:
                                     strategy = opp.get('strategy', '')
@@ -3883,6 +3889,7 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                                     logger.info(f"   💎 {strategy}: {profit:.2f}% risk-free profit")
                             
                             logger.info(f"✅ Published {len(arb_opportunities)} ARBITRAGE signals!")
+                            logger.info(f"   🎯 Sent {len(arb_opportunities)} signals to executor!")
                             
                             # Show stats every 10 cycles
                             stats = self.single_arb.get_stats()
