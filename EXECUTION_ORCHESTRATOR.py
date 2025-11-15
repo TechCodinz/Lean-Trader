@@ -1237,10 +1237,18 @@ class ExecutionOrchestrator:
             
             await self.data_hub.publish_trade(close_record)
             
+            # Calculate actual P&L percentage
+            pnl_pct = ((exit_price - entry_price) / entry_price) if side == 'buy' else ((entry_price - exit_price) / entry_price)
+            
+            # Update win tracking
+            if pnl > 0:
+                self.winning_trades += 1
+            
             logger.info(f"💰 POSITION CLOSED:")
             logger.info(f"   Symbol: {symbol}")
+            logger.info(f"   Entry: ${entry_price:.4f}")
             logger.info(f"   Exit: ${exit_price:.4f}")
-            logger.info(f"   P&L: ${pnl:.2f}")
+            logger.info(f"   P&L: ${pnl:.2f} ({pnl_pct:+.2%})")
             logger.info(f"   Reason: {reason}")
             logger.info(f"   New Balance: ${new_balance:.2f}")
             logger.info(f"   Total Profit: ${self.total_profit:.2f}")
