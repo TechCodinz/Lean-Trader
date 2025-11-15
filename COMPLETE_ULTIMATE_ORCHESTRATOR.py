@@ -219,6 +219,8 @@ from MONEY_PRINTER_ULTRA_RARE import MoneyPrinterUltraRare
 from BALANCE_AWARE_INTELLIGENCE import BalanceAwareIntelligence
 from EXCHANGE_PAIR_VALIDATOR import ExchangePairValidator
 from MEMORY_STATION import MemoryStation
+from MULTI_TIMEFRAME_COORDINATOR import MultiTimeframeCoordinator
+from MICRO_GROWTH_ENGINE import MicroGrowthEngine
 
 try:
     from ULTRA_ENHANCEMENT_PACKAGE import (
@@ -1225,6 +1227,30 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
         except Exception as e:
             logger.warning(f"⚠️  Memory Station: {e}")
             self.memory_station = None
+        
+        # 4. Multi-Timeframe Coordinator  
+        try:
+            self.mtf_coordinator = MultiTimeframeCoordinator()
+            self.advanced_systems['mtf_coordinator'] = self.mtf_coordinator
+            logger.info("✅ ⏱️  MULTI-TIMEFRAME COORDINATOR - 5x opportunities!")
+            logger.info("   → Trades 1m, 5m, 15m, 1h, 4h simultaneously")
+            logger.info("   → Each timeframe independent")
+            logger.info("   → Up to 31 parallel trades!")
+        except Exception as e:
+            logger.warning(f"⚠️  Multi-Timeframe Coordinator: {e}")
+            self.mtf_coordinator = None
+        
+        # 5. Micro Growth Engine
+        try:
+            self.micro_growth = MicroGrowthEngine(initial_balance=actual_balance if 'actual_balance' in locals() else 1000.0)
+            self.advanced_systems['micro_growth'] = self.micro_growth
+            logger.info("✅ 💰 MICRO GROWTH ENGINE - Scales with balance!")
+            logger.info(f"   → Current tier: {self.micro_growth.get_balance_tier()}")
+            logger.info(f"   → Position sizing: Auto-scales as balance grows")
+            logger.info(f"   → Growth target: 5% per cycle")
+        except Exception as e:
+            logger.warning(f"⚠️  Micro Growth Engine: {e}")
+            self.micro_growth = None
         
         # 4. Ultra Enhancement Package
         if ULTRA_ENHANCEMENTS_AVAILABLE:
