@@ -619,6 +619,19 @@ class ExecutionOrchestrator:
                     if hasattr(orchestrator, 'risk_adjuster') and orchestrator.risk_adjuster:
                         # Risk adjuster will be used in position sizing
                         pass
+                    
+                    # 4. Multi-Timeframe Trading
+                    if hasattr(orchestrator, 'mtf_coordinator') and orchestrator.mtf_coordinator:
+                        timeframes = orchestrator.mtf_coordinator.get_priority_timeframes(signal)
+                        if len(timeframes) > 1:
+                            logger.info(f"   ⏱️  MULTI-TIMEFRAME: Will trade {len(timeframes)} timeframes!")
+                            # Signal will be executed on multiple TFs
+                    
+                    # 5. Micro Growth Position Sizing
+                    if hasattr(orchestrator, 'micro_growth') and orchestrator.micro_growth:
+                        optimal_size = orchestrator.micro_growth.get_position_size(confidence)
+                        logger.info(f"   💰 MICRO GROWTH: Optimal size ${optimal_size:.2f} for ${orchestrator.micro_growth.current_balance:.0f} balance")
+                        # Engine will use this size
             except:
                 pass  # Enhancements optional
             
