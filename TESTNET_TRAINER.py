@@ -15,7 +15,7 @@ NO ERRORS - just intelligent training!
 
 import logging
 import asyncio
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
