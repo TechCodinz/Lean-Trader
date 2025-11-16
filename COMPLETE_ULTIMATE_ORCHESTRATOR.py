@@ -1252,7 +1252,13 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
         
         # 5. SAFE Micro Growth Engine (DEPLOYED!)
         try:
-            self.safe_micro_growth = SafeMicroGrowthEngine(initial_balance=actual_balance if 'actual_balance' in locals() else 1000.0)
+            # Get actual balance
+            init_balance = actual_balance if 'actual_balance' in locals() else 1000.0
+            self.safe_micro_growth = SafeMicroGrowthEngine(initial_balance=init_balance)
+            
+            # 🔥 UPDATE TO ACTUAL BALANCE!
+            self.safe_micro_growth.current_balance = init_balance
+            
             self.advanced_systems['safe_micro_growth'] = self.safe_micro_growth
             logger.info("✅ 🛡️  SAFE MICRO GROWTH ENGINE - ACTIVE!")
             logger.info(f"   → Balance: ${self.safe_micro_growth.current_balance:.2f}")

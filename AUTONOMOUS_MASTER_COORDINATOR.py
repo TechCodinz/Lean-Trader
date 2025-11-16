@@ -106,14 +106,13 @@ class AutonomousMasterCoordinator:
             
             # Adjust for fund protection
             if self.fund_protection:
-                can_trade, reason, adjusted = self.fund_protection.can_trade(
-                    signal.get('symbol', ''),
-                    optimal_size
-                )
-                if not can_trade:
-                    logger.warning(f"   🛡️  Fund Protection: {reason}")
-                    return 0.0
-                optimal_size = adjusted
+                try:
+                    can_trade, reason = self.fund_protection.check_circuit_breakers()
+                    if not can_trade:
+                        logger.warning(f"   🛡️  Fund Protection: {reason}")
+                        return 0.0
+                except Exception as e:
+                    logger.debug(f"Fund protection check skipped: {e}")
             
             # Final safety bounds
             optimal_size = max(0.5, optimal_size)  # Min $0.50
