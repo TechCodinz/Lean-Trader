@@ -1,45 +1,136 @@
-# Trading Bot Dependencies
-# Install with: pip3 install -r requirements.txt
+# ============================================================================
+# APEX BOT - COMPLETE DEPENDENCIES
+# Living Digital Trading Organism - All Required Packages
+# ============================================================================
 
-# Core Trading
-ccxt>=4.0.0
-web3>=6.0.0
-aiohttp>=3.8.0
+# ============================================================================
+# CORE TRADING LIBRARIES (Required)
+# ============================================================================
+ccxt>=4.0.0                    # Exchange connectivity (Bybit, Binance, etc.)
+python-dotenv>=1.0.0           # Environment variable management
+requests>=2.31.0               # HTTP requests
+aiohttp>=3.9.0                 # Async HTTP for concurrent operations
+asyncio-mqtt>=0.16.0           # Async MQTT if needed
 
-# Data Processing
-pandas>=2.0.0
-numpy>=1.24.0
-yfinance>=0.2.0
+# ============================================================================
+# AI/ML LIBRARIES (Required for Intelligence Systems)
+# ============================================================================
+anthropic>=0.7.0               # Claude AI API
+openai>=1.3.0                  # GPT-4 API
+numpy>=1.24.0                  # Numerical computing
+pandas>=2.0.0                  # Data manipulation
+scipy>=1.11.0                  # Scientific computing
+scikit-learn>=1.3.0            # Machine learning models
 
-# Machine Learning
-tensorflow>=2.13.0
-scikit-learn>=1.3.0
-joblib>=1.3.0
-xgboost>=2.0.0
-lightgbm>=4.0.0
-catboost>=1.2.0
+# ============================================================================
+# DEEP LEARNING (Optional but Recommended)
+# ============================================================================
+tensorflow>=2.14.0             # Deep learning framework
+keras>=2.14.0                  # High-level neural networks API
+torch>=2.1.0                   # PyTorch (alternative to TensorFlow)
 
-# Quantum Computing
-qiskit>=0.44.0
-qiskit-aer>=0.12.0
+# ============================================================================
+# ADVANCED FEATURES DEPENDENCIES
+# ============================================================================
+# For ULTRA_GOLDMINE_FEATURES
+matplotlib>=3.7.0              # Data visualization
+seaborn>=0.12.0                # Statistical visualization
 
-# Telegram
-python-telegram-bot>=20.0
-aiogram>=3.0.0
+# For DIVINE_INTELLIGENCE_FEATURES
+sympy>=1.12                    # Symbolic mathematics
+networkx>=3.1                  # Graph/network analysis
 
-# Web APIs
-requests>=2.31.0
-beautifulsoup4>=4.12.0
-feedparser>=6.0.0
-fastapi>=0.100.0
-uvicorn>=0.23.0
+# ============================================================================
+# WEB SCRAPING & DATA COLLECTION
+# ============================================================================
+beautifulsoup4>=4.12.0         # Web scraping
+selenium>=4.15.0               # Browser automation
+lxml>=4.9.0                    # XML/HTML parsing
 
-# Utilities
-pytz>=2023.3
-python-dateutil>=2.8.0
-networkx>=3.0
+# ============================================================================
+# DATABASE & PERSISTENCE
+# ============================================================================
+sqlalchemy>=2.0.0              # SQL toolkit
+redis>=5.0.0                   # In-memory data store
+pymongo>=4.5.0                 # MongoDB driver (if using MongoDB)
 
-# Optional (Advanced Features)
-# tweepy>=4.14.0
-# praw>=7.7.0
-# discord.py>=2.3.0
+# ============================================================================
+# TELEGRAM BOT (Optional but Recommended for Notifications)
+# ============================================================================
+python-telegram-bot>=20.6      # Telegram bot framework
+
+# ============================================================================
+# QUANTUM COMPUTING (Optional - for IBM Quantum features)
+# ============================================================================
+qiskit>=0.45.0                 # IBM Quantum toolkit
+qiskit-aer>=0.13.0             # Quantum simulators
+
+# ============================================================================
+# WEB3 / BLOCKCHAIN (Optional - for DEX trading)
+# ============================================================================
+web3>=6.11.0                   # Ethereum interactions
+eth-account>=0.10.0            # Ethereum account management
+
+# ============================================================================
+# UTILITIES & HELPERS
+# ============================================================================
+pyyaml>=6.0.0                  # YAML parsing
+python-dateutil>=2.8.0         # Date/time utilities
+pytz>=2023.3                   # Timezone handling
+colorama>=0.4.6                # Colored terminal output
+tqdm>=4.66.0                   # Progress bars
+ujson>=5.8.0                   # Fast JSON parsing
+
+# ============================================================================
+# TESTING & DEVELOPMENT (Optional)
+# ============================================================================
+pytest>=7.4.0                  # Testing framework
+pytest-asyncio>=0.21.0         # Async testing
+black>=23.11.0                 # Code formatter
+flake8>=6.1.0                  # Code linter
+
+# ============================================================================
+# PERFORMANCE OPTIMIZATION
+# ============================================================================
+numba>=0.58.0                  # JIT compilation for faster computation
+cython>=3.0.0                  # C-extensions for Python
+
+# ============================================================================
+# MONITORING & LOGGING
+# ============================================================================
+loguru>=0.7.0                  # Advanced logging
+sentry-sdk>=1.38.0             # Error tracking (optional)
+
+# ============================================================================
+# SECURITY
+# ============================================================================
+cryptography>=41.0.0           # Cryptographic operations
+pycryptodome>=3.19.0           # Additional crypto functions
+
+# ============================================================================
+# API RATE LIMITING & THROTTLING
+# ============================================================================
+ratelimit>=2.2.1               # Rate limiting decorator
+backoff>=2.2.1                 # Retry with exponential backoff
+
+# ============================================================================
+# NOTES:
+# ============================================================================
+# MINIMUM INSTALL (Core Trading Only):
+#   pip install ccxt python-dotenv requests aiohttp
+#
+# RECOMMENDED INSTALL (Full Intelligence):
+#   pip install -r requirements.txt
+#
+# If you get errors, install packages individually:
+#   pip install ccxt
+#   pip install anthropic openai
+#   pip install numpy pandas scipy scikit-learn
+#   pip install tensorflow keras
+#
+# Some packages are optional based on features you want:
+#   - Skip TensorFlow/Torch if not using deep learning
+#   - Skip Qiskit if not using quantum features
+#   - Skip Web3 if not trading on DEX
+#   - Skip Telegram if not using notifications
+# ============================================================================
