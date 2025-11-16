@@ -67,6 +67,20 @@ class AIConsultationService:
         self.consultation_history = []
         self.active_provider = None
         
+        # TOKEN CONSUMPTION LIMITS - Don't burn through API credits!
+        self.max_tokens_per_request = 4000  # Max tokens per AI query
+        self.max_consultations_per_hour = 12  # Max 12 consultations/hour = 1 every 5 min
+        self.max_consultations_per_day = 200  # Max 200/day (safety limit)
+        self.last_consultation_time = None
+        self.consultations_this_hour = 0
+        self.consultations_today = 0
+        self.tokens_used_today = 0
+        self.max_tokens_per_day = 500000  # 500K tokens/day limit
+        
+        # Moonshot query frequency (don't spam AI for moons!)
+        self.moonshot_query_interval = 3600  # Query every 1 hour
+        self.last_moonshot_query = None
+        
         # Initialize all available providers
         self._init_claude()
         self._init_openai()
