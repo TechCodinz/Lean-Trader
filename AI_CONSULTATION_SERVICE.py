@@ -2,13 +2,14 @@
 """
 🤖 AI CONSULTATION SERVICE 🤖
 
-Uses Claude/Anthropic API to:
+Uses MULTIPLE AI APIs to:
 1. Continuously learn from trading results
 2. Get strategy improvements
 3. Research new market patterns
 4. Optimize position sizing
 5. Stay ahead of market changes
 
+SUPPORTS: Claude, GPT-4, Grok, Raiziom, and more!
 THE BOT THAT UPGRADES ITSELF!
 """
 
@@ -21,47 +22,151 @@ import asyncio
 
 logger = logging.getLogger(__name__)
 
+# Check available AI providers
 try:
     import anthropic
     ANTHROPIC_AVAILABLE = True
 except ImportError:
     ANTHROPIC_AVAILABLE = False
-    logger.warning("Anthropic not installed. Run: pip install anthropic")
+
+try:
+    import openai
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
+
+try:
+    import requests
+    REQUESTS_AVAILABLE = True
+except ImportError:
+    REQUESTS_AVAILABLE = False
 
 
 class AIConsultationService:
     """
     AI CONSULTATION SERVICE
     
-    Makes the bot learn and improve continuously by consulting Claude API
+    Makes the bot learn and improve continuously by consulting MULTIPLE AI APIs:
+    - Claude (Anthropic)
+    - GPT-4 (OpenAI)
+    - Grok (xAI)
+    - Raiziom (Custom AI)
+    - Any custom endpoint
     """
     
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, provider: str = 'auto'):
         """
         Initialize AI consultation service
         
         Args:
-            api_key: Anthropic API key (or uses ANTHROPIC_API_KEY env var)
+            provider: AI provider to use ('auto', 'claude', 'gpt4', 'grok', 'raiziom', 'custom')
         """
-        self.api_key = api_key or os.getenv('ANTHROPIC_API_KEY')
-        self.client = None
+        self.provider = provider
+        self.clients = {}
         self.available = False
         self.consultation_history = []
+        self.active_provider = None
         
-        # Initialize if API key available
-        if ANTHROPIC_AVAILABLE and self.api_key:
-            try:
-                self.client = anthropic.Anthropic(api_key=self.api_key)
-                self.available = True
-                logger.info("🤖 AI CONSULTATION SERVICE initialized!")
-                logger.info("   Bot will continuously learn and improve!")
-            except Exception as e:
-                logger.warning(f"AI service initialization failed: {e}")
+        # Initialize all available providers
+        self._init_claude()
+        self._init_openai()
+        self._init_grok()
+        self._init_raiziom()
+        self._init_custom()
+        
+        # Auto-select provider if not specified
+        if provider == 'auto':
+            self._auto_select_provider()
         else:
-            if not ANTHROPIC_AVAILABLE:
-                logger.warning("⚠️  AI consultation disabled: anthropic not installed")
-            elif not self.api_key:
-                logger.warning("⚠️  AI consultation disabled: ANTHROPIC_API_KEY not set")
+            self.active_provider = provider
+            self.available = self.clients.get(provider) is not None
+        
+        if self.available:
+            logger.info(f"🤖 AI CONSULTATION SERVICE initialized!")
+            logger.info(f"   Provider: {self.active_provider}")
+            logger.info("   Bot will continuously learn and improve!")
+        else:
+            logger.warning("⚠️  No AI providers available")
+            logger.info("   Set API keys in .env: ANTHROPIC_API_KEY, OPENAI_API_KEY, GROK_API_KEY, RAIZIOM_API_KEY")
+    
+    def _init_claude(self):
+        """Initialize Claude (Anthropic)"""
+        api_key = os.getenv('ANTHROPIC_API_KEY')
+        if ANTHROPIC_AVAILABLE and api_key:
+            try:
+                self.clients['claude'] = anthropic.Anthropic(api_key=api_key)
+                logger.info("✅ Claude (Anthropic) initialized")
+            except Exception as e:
+                logger.debug(f"Claude init failed: {e}")
+    
+    def _init_openai(self):
+        """Initialize GPT-4 (OpenAI)"""
+        api_key = os.getenv('OPENAI_API_KEY')
+        if OPENAI_AVAILABLE and api_key:
+            try:
+                openai.api_key = api_key
+                self.clients['gpt4'] = openai
+                logger.info("✅ GPT-4 (OpenAI) initialized")
+            except Exception as e:
+                logger.debug(f"OpenAI init failed: {e}")
+    
+    def _init_grok(self):
+        """Initialize Grok (xAI)"""
+        api_key = os.getenv('GROK_API_KEY')
+        endpoint = os.getenv('GROK_ENDPOINT', 'https://api.x.ai/v1/chat/completions')
+        if REQUESTS_AVAILABLE and api_key:
+            try:
+                self.clients['grok'] = {
+                    'api_key': api_key,
+                    'endpoint': endpoint,
+                    'type': 'openai_compatible'
+                }
+                logger.info("✅ Grok (xAI) initialized")
+            except Exception as e:
+                logger.debug(f"Grok init failed: {e}")
+    
+    def _init_raiziom(self):
+        """Initialize Raiziom (Custom AI)"""
+        api_key = os.getenv('RAIZIOM_API_KEY')
+        endpoint = os.getenv('RAIZIOM_ENDPOINT')
+        if REQUESTS_AVAILABLE and api_key and endpoint:
+            try:
+                self.clients['raiziom'] = {
+                    'api_key': api_key,
+                    'endpoint': endpoint,
+                    'type': 'custom'
+                }
+                logger.info("✅ Raiziom (Custom AI) initialized")
+            except Exception as e:
+                logger.debug(f"Raiziom init failed: {e}")
+    
+    def _init_custom(self):
+        """Initialize any custom AI endpoint"""
+        api_key = os.getenv('CUSTOM_AI_API_KEY')
+        endpoint = os.getenv('CUSTOM_AI_ENDPOINT')
+        if REQUESTS_AVAILABLE and api_key and endpoint:
+            try:
+                self.clients['custom'] = {
+                    'api_key': api_key,
+                    'endpoint': endpoint,
+                    'type': 'custom'
+                }
+                logger.info("✅ Custom AI endpoint initialized")
+            except Exception as e:
+                logger.debug(f"Custom AI init failed: {e}")
+    
+    def _auto_select_provider(self):
+        """Auto-select best available provider"""
+        # Priority order: Claude > GPT-4 > Grok > Raiziom > Custom
+        priority = ['claude', 'gpt4', 'grok', 'raiziom', 'custom']
+        
+        for provider in priority:
+            if provider in self.clients:
+                self.active_provider = provider
+                self.available = True
+                return
+        
+        self.available = False
     
     async def consult_strategy(self, context: Dict) -> Dict:
         """
@@ -80,30 +185,35 @@ class AIConsultationService:
             # Prepare prompt
             prompt = self._create_strategy_prompt(context)
             
-            # Call Claude API
-            logger.info("🤖 Consulting Claude for strategy improvements...")
+            # Call appropriate AI provider
+            logger.info(f"🤖 Consulting {self.active_provider.upper()} for strategy improvements...")
             
-            message = self.client.messages.create(
-                model="claude-3-5-sonnet-20241022",
-                max_tokens=1024,
-                messages=[{
-                    "role": "user",
-                    "content": prompt
-                }]
-            )
+            if self.active_provider == 'claude':
+                response_text = await self._call_claude(prompt)
+            elif self.active_provider == 'gpt4':
+                response_text = await self._call_openai(prompt)
+            elif self.active_provider == 'grok':
+                response_text = await self._call_grok(prompt)
+            elif self.active_provider == 'raiziom':
+                response_text = await self._call_raiziom(prompt)
+            elif self.active_provider == 'custom':
+                response_text = await self._call_custom(prompt)
+            else:
+                return {'error': f'Unknown provider: {self.active_provider}'}
             
             # Parse response
-            response_text = message.content[0].text
             suggestions = self._parse_suggestions(response_text)
             
             # Store consultation
             self.consultation_history.append({
                 'timestamp': datetime.now().isoformat(),
+                'provider': self.active_provider,
                 'context': context,
                 'suggestions': suggestions
             })
             
             logger.info("✅ AI consultation complete")
+            logger.info(f"   Provider: {self.active_provider}")
             logger.info(f"   Suggestions: {len(suggestions.get('actions', []))} actions")
             
             return suggestions
@@ -111,6 +221,76 @@ class AIConsultationService:
         except Exception as e:
             logger.error(f"AI consultation error: {e}")
             return {'error': str(e)}
+    
+    async def _call_claude(self, prompt: str) -> str:
+        """Call Claude API"""
+        message = self.clients['claude'].messages.create(
+            model="claude-3-5-sonnet-20241022",
+            max_tokens=1024,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return message.content[0].text
+    
+    async def _call_openai(self, prompt: str) -> str:
+        """Call OpenAI GPT-4 API"""
+        response = self.clients['gpt4'].ChatCompletion.create(
+            model="gpt-4-turbo-preview",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=1024
+        )
+        return response.choices[0].message.content
+    
+    async def _call_grok(self, prompt: str) -> str:
+        """Call Grok API (OpenAI-compatible)"""
+        config = self.clients['grok']
+        response = requests.post(
+            config['endpoint'],
+            headers={
+                'Authorization': f'Bearer {config["api_key"]}',
+                'Content-Type': 'application/json'
+            },
+            json={
+                'model': 'grok-beta',
+                'messages': [{'role': 'user', 'content': prompt}],
+                'max_tokens': 1024
+            }
+        )
+        response.raise_for_status()
+        return response.json()['choices'][0]['message']['content']
+    
+    async def _call_raiziom(self, prompt: str) -> str:
+        """Call Raiziom custom AI API"""
+        config = self.clients['raiziom']
+        response = requests.post(
+            config['endpoint'],
+            headers={
+                'Authorization': f'Bearer {config["api_key"]}',
+                'Content-Type': 'application/json'
+            },
+            json={
+                'prompt': prompt,
+                'max_tokens': 1024
+            }
+        )
+        response.raise_for_status()
+        return response.json().get('response', response.text)
+    
+    async def _call_custom(self, prompt: str) -> str:
+        """Call custom AI endpoint"""
+        config = self.clients['custom']
+        response = requests.post(
+            config['endpoint'],
+            headers={
+                'Authorization': f'Bearer {config["api_key"]}',
+                'Content-Type': 'application/json'
+            },
+            json={
+                'prompt': prompt,
+                'max_tokens': 1024
+            }
+        )
+        response.raise_for_status()
+        return response.json().get('response', response.text)
     
     def _create_strategy_prompt(self, context: Dict) -> str:
         """Create prompt for strategy consultation"""
@@ -283,10 +463,15 @@ def get_ai_consultation():
     """Get AI consultation service"""
     return _ai_consultation
 
-def initialize_ai_consultation(api_key: Optional[str] = None):
-    """Initialize AI consultation service"""
+def initialize_ai_consultation(provider: str = 'auto'):
+    """
+    Initialize AI consultation service
+    
+    Args:
+        provider: AI provider ('auto', 'claude', 'gpt4', 'grok', 'raiziom', 'custom')
+    """
     global _ai_consultation
-    _ai_consultation = AIConsultationService(api_key)
+    _ai_consultation = AIConsultationService(provider)
     logger.info("✅ AI CONSULTATION SERVICE ready!")
     return _ai_consultation
 
