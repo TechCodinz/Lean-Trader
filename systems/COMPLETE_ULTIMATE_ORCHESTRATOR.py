@@ -166,6 +166,22 @@ from INTELLIGENT_BALANCE_MANAGER import IntelligentBalanceManager, initialize_ba
 from ULTIMATE_AUTONOMOUS_INTELLIGENCE import UltimateAutonomousIntelligence, initialize_ultimate_intelligence
 from AUTONOMOUS_MASTER_COORDINATOR import AutonomousMasterCoordinator, initialize_coordinator
 
+# Import EXCHANGE MASTERY - Complete exchange knowledge!
+try:
+    from ULTIMATE_EXCHANGE_MASTERY import UltimateExchangeMastery, initialize_exchange_mastery
+    EXCHANGE_MASTERY_AVAILABLE = True
+except ImportError:
+    EXCHANGE_MASTERY_AVAILABLE = False
+    logger.warning("ULTIMATE_EXCHANGE_MASTERY not available")
+
+# Import TESTNET TRAINER - Smart testnet/live switching!
+try:
+    from TESTNET_TRAINER import TestnetTrainer, initialize_testnet_trainer
+    TESTNET_TRAINER_AVAILABLE = True
+except ImportError:
+    TESTNET_TRAINER_AVAILABLE = False
+    logger.warning("TESTNET_TRAINER not available")
+
 
 class AdvancedScoutingOrchestrator:
     """
