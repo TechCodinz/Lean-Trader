@@ -35,16 +35,18 @@ class UltimateAutonomousIntelligence:
     - NEVER makes insufficient balance errors
     """
     
-    def __init__(self, ai_consultation=None, all_systems=None):
+    def __init__(self, ai_consultation=None, all_systems=None, balance_manager=None):
         """
         Initialize ultimate intelligence
         
         Args:
             ai_consultation: AI system for research/upgrades
             all_systems: Dict of all 202 systems
+            balance_manager: Intelligent balance manager
         """
         self.ai = ai_consultation
         self.all_systems = all_systems or {}
+        self.balance_manager = balance_manager
         
         # Dynamic trade management
         self.max_trades_per_pair = 20  # Can do up to 20!
@@ -115,23 +117,29 @@ class UltimateAutonomousIntelligence:
         
         return max(1, optimal_count)  # Minimum 1
     
-    def calculate_max_affordable_trades(self) -> int:
+    def calculate_max_affordable_trades(self, exchange: str = 'bybit_testnet', avg_position_size: float = 120.0) -> int:
         """
         Calculate how many trades we can afford
         
         INTELLIGENT: Never exceeds balance!
+        Uses balance manager for accurate tracking
         """
+        # Use balance manager if available
+        if self.balance_manager:
+            return self.balance_manager.calculate_max_positions(exchange, avg_position_size)
+        
+        # Fallback calculation
         if self.available_balance <= 0:
             return 0
         
         # Estimate: Each trade uses ~$100-200
         # With $8,000, can do 40-80 trades
         # Be conservative: divide by 150
-        max_trades = int(self.available_balance / 150)
+        max_trades = int(self.available_balance / avg_position_size)
         
         return max(1, min(max_trades, 50))  # Cap at 50 for safety
     
-    def update_balance_tracking(self, total_balance: float, locked_in_positions: float):
+    def update_balance_tracking(self, exchange: str, total_balance: float, locked_in_positions: float):
         """
         Track available vs locked balance
         
@@ -139,6 +147,15 @@ class UltimateAutonomousIntelligence:
         """
         self.available_balance = total_balance - locked_in_positions
         self.locked_balance = locked_in_positions
+        
+        # Update balance manager if available
+        if hasattr(self, 'balance_manager') and self.balance_manager:
+            self.balance_manager.update_exchange_balance(
+                exchange=exchange,
+                total=total_balance,
+                available=self.available_balance,
+                in_positions=locked_in_positions
+            )
         
         if self.available_balance < total_balance * 0.1:
             logger.warning(f"   ⚠️  90% balance locked! Available: ${self.available_balance:.2f}")
@@ -234,10 +251,10 @@ def get_ultimate_intelligence():
     """Get ultimate intelligence"""
     return _ultimate_intelligence
 
-def initialize_ultimate_intelligence(ai_consultation=None, all_systems=None):
+def initialize_ultimate_intelligence(ai_consultation=None, all_systems=None, balance_manager=None):
     """Initialize ultimate intelligence"""
     global _ultimate_intelligence
-    _ultimate_intelligence = UltimateAutonomousIntelligence(ai_consultation, all_systems)
+    _ultimate_intelligence = UltimateAutonomousIntelligence(ai_consultation, all_systems, balance_manager)
     logger.info("✅ ULTIMATE AUTONOMOUS INTELLIGENCE initialized!")
     return _ultimate_intelligence
 
