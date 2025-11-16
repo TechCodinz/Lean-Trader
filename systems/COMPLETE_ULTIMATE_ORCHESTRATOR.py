@@ -520,19 +520,19 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
         
         # Register all key systems with master coordinator
         if self.master_coordinator:
-            # Register key systems
-            if self.safe_micro_growth:
+            # Register key systems (defensive - check if they exist)
+            if hasattr(self, 'safe_micro_growth') and self.safe_micro_growth:
                 self.master_coordinator.register_system('safe_micro_growth', self.safe_micro_growth)
-            if self.balance_intelligence:
+            if hasattr(self, 'balance_intelligence') and self.balance_intelligence:
                 self.master_coordinator.register_system('balance_intelligence', self.balance_intelligence)
-            if self.black_swan:
+            if hasattr(self, 'black_swan') and self.black_swan:
                 self.master_coordinator.register_system('black_swan', self.black_swan)
-            if self.streak_logic:
+            if hasattr(self, 'streak_logic') and self.streak_logic:
                 self.master_coordinator.register_system('streak_logic', self.streak_logic)
-            if self.fund_protection:
+            if hasattr(self, 'fund_protection') and self.fund_protection:
                 self.master_coordinator.register_system('fund_protection', self.fund_protection)
             
-            logger.info("✅ 🧠 Master Coordinator wired with all key systems")
+            logger.info("✅ 🧠 Master Coordinator wired with available systems")
         
         # Wire ultimate intelligence to balance manager
         if self.ultimate_intelligence and self.balance_manager:
