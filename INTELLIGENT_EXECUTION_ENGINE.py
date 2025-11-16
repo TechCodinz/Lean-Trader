@@ -317,16 +317,31 @@ class IntelligentExecutionEngine:
         """
         Calculate lot size using ALL available intelligence
         
-        Considers:
-        - Confidence (from all engines)
-        - Volatility (current market state)
-        - Session (London/NY = larger, Asian = smaller)
-        - Timeframe (1m = smaller, 4h = larger)
-        - Account balance
-        - Risk per trade
-        - Strategy type
+        🧠 NOW USES AUTONOMOUS COORDINATOR!
+        All 202 systems contribute to this decision!
         """
         try:
+            # 🧠 TRY AUTONOMOUS COORDINATOR FIRST!
+            try:
+                from COMPLETE_ULTIMATE_ORCHESTRATOR import get_orchestrator
+                orch = get_orchestrator()
+                if orch and hasattr(orch, 'master_coordinator') and orch.master_coordinator:
+                    # Get balance
+                    exec_orch = orch.advanced_orchestrators.get('execution')
+                    balance = exec_orch.position_sizer.balance if exec_orch and hasattr(exec_orch, 'position_sizer') else 1000
+                    
+                    # Let coordinator decide size using ALL systems!
+                    size = orch.master_coordinator.calculate_optimal_position_size(signal, balance)
+                    logger.info(f"   🧠 AUTONOMOUS: ${size:.2f} (from all 202 systems!)")
+                    return size
+            except Exception as e:
+                logger.debug(f"Coordinator sizing failed, using fallback: {e}")
+            
+            # FALLBACK: Original intelligence
+            symbol = signal.get('symbol', '')
+            confidence = signal.get('confidence', 0.5)
+            timeframe = signal.get('timeframe', '5m')
+            strategy = signal.get('strategy', 'unknown')
             # Extract ALL intelligence from signal
             confidence = signal.get('confidence', 0.5)
             if confidence > 1:
