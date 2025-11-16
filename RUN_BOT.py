@@ -44,7 +44,7 @@ print()
 # Import orchestrator
 print("📦 Loading trading systems...")
 try:
-    from COMPLETE_ULTIMATE_ORCHESTRATOR import CompleteUltimateOrchestrator
+    from COMPLETE_ULTIMATE_ORCHESTRATOR import CompleteUltimateOrchestrator, set_orchestrator
     print("✅ All systems loaded\n")
 except Exception as e:
     print(f"❌ Failed to load systems: {e}")
@@ -88,6 +88,10 @@ async def main():
     
     # Create orchestrator
     bot = CompleteUltimateOrchestrator(mode=mode)
+    
+    # 🧠 SET ORCHESTRATOR GLOBALLY (CRITICAL FOR AUTONOMOUS OPERATION!)
+    set_orchestrator(bot)
+    print("🧠 Orchestrator set globally - autonomous systems can now access it!")
     
     # Initialize
     print("⏳ Initializing all systems...")
