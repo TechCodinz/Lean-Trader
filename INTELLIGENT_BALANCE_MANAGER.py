@@ -43,7 +43,7 @@ class IntelligentBalanceManager:
         # Trading limits
         self.max_balance_usage = 0.90  # Use max 90% of balance
         self.safety_buffer = 0.10  # Keep 10% as safety buffer
-        self.min_position_size = 0.50  # Minimum $0.50 per position
+        self.min_position_size = 0.10  # Minimum $0.10 per position (works with $20!)
         
         # Statistics
         self.total_trades_blocked = 0
@@ -95,9 +95,16 @@ class IntelligentBalanceManager:
         # Calculate what's actually free
         free_balance = available - reserved
         
-        # Check minimum
-        if position_size < self.min_position_size:
-            return False, f"Position too small: ${position_size:.2f} < ${self.min_position_size:.2f}"
+        # Check minimum (adaptive for small balances!)
+        # If balance < $100, allow smaller positions
+        total = self.total_balance.get(exchange, 0)
+        if total < 100:
+            adaptive_min = max(0.10, total * 0.01)  # 1% of balance, min $0.10
+        else:
+            adaptive_min = self.min_position_size
+        
+        if position_size < adaptive_min:
+            return False, f"Position too small: ${position_size:.2f} < ${adaptive_min:.2f}"
         
         # Check if we have enough
         if free_balance < position_size:
@@ -214,9 +221,15 @@ class IntelligentBalanceManager:
         # Return smaller of desired vs affordable
         optimal = min(desired_size, size_per_position)
         
-        # Ensure minimum
-        if optimal < self.min_position_size:
-            logger.warning(f"   ⚠️  Position too small: ${optimal:.2f} < ${self.min_position_size:.2f}")
+        # Ensure minimum (adaptive for small balances!)
+        total = self.total_balance.get(exchange, 0)
+        if total < 100:
+            adaptive_min = max(0.10, total * 0.01)  # 1% of balance, min $0.10
+        else:
+            adaptive_min = self.min_position_size
+        
+        if optimal < adaptive_min:
+            logger.warning(f"   ⚠️  Position too small: ${optimal:.2f} < ${adaptive_min:.2f}")
             return 0
         
         logger.info(f"   💰 Optimal size: ${optimal:.2f} (desired: ${desired_size:.2f})")
