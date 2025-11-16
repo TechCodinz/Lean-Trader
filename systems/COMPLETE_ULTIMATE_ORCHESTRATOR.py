@@ -143,7 +143,25 @@ from UTILITY_INTEGRATION_LAYER import UtilityIntegrationLayer
 from DEX_ORCHESTRATOR import DEXOrchestrator, DEXConfig
 
 # Import ULTIMATE INTELLIGENCE SYSTEMS - The Brain that makes everything work perfectly!
-from AI_CONSULTATION_SERVICE import AIConsultationService, initialize_ai_consultation
+try:
+    from AI_CONSULTATION_SERVICE import AIConsultationService, initialize_ai_consultation
+    AI_CONSULTATION_SERVICE_AVAILABLE = True
+except ImportError:
+    AI_CONSULTATION_SERVICE_AVAILABLE = False
+    logger.warning("AI_CONSULTATION_SERVICE not available")
+
+try:
+    from AI_CONSULTATION_SYSTEM import AIConsultationSystem
+    AI_CONSULTATION_SYSTEM_AVAILABLE = True
+except ImportError:
+    AI_CONSULTATION_SYSTEM_AVAILABLE = False
+
+try:
+    from MULTI_AI_INTELLIGENCE_LAYER import MultiAIIntelligence
+    MULTI_AI_LAYER_AVAILABLE = True
+except ImportError:
+    MULTI_AI_LAYER_AVAILABLE = False
+
 from INTELLIGENT_BALANCE_MANAGER import IntelligentBalanceManager, initialize_balance_manager
 from ULTIMATE_AUTONOMOUS_INTELLIGENCE import UltimateAutonomousIntelligence, initialize_ultimate_intelligence
 from AUTONOMOUS_MASTER_COORDINATOR import AutonomousMasterCoordinator, initialize_coordinator
@@ -418,13 +436,32 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
         logger.info("🧠 Phase 7: ULTIMATE INTELLIGENCE SYSTEMS...")
         logger.info("=" * 80)
         
-        # 1. AI Consultation Service
-        try:
-            self.ai_consultation = initialize_ai_consultation()
-            logger.info("✅ 🤖 AI Consultation Service initialized (Claude API)")
-        except Exception as e:
-            logger.warning(f"AI Consultation: {e}")
+        # 1. AI Consultation Service (NEW multi-AI with Grok, Raiziom support!)
+        if AI_CONSULTATION_SERVICE_AVAILABLE:
+            try:
+                self.ai_consultation = initialize_ai_consultation()
+                logger.info("✅ 🤖 AI Consultation Service initialized (Multi-AI: Claude, GPT-4, Grok, Raiziom)")
+            except Exception as e:
+                logger.warning(f"AI Consultation Service: {e}")
+                self.ai_consultation = None
+        # Fallback to existing AI systems if new one not available
+        elif AI_CONSULTATION_SYSTEM_AVAILABLE:
+            try:
+                self.ai_consultation = AIConsultationSystem()
+                logger.info("✅ 🤖 AI Consultation System initialized (Existing)")
+            except Exception as e:
+                logger.warning(f"AI Consultation System: {e}")
+                self.ai_consultation = None
+        elif MULTI_AI_LAYER_AVAILABLE:
+            try:
+                self.ai_consultation = MultiAIIntelligence()
+                logger.info("✅ 🤖 Multi-AI Intelligence Layer initialized (Existing)")
+            except Exception as e:
+                logger.warning(f"Multi-AI Layer: {e}")
+                self.ai_consultation = None
+        else:
             self.ai_consultation = None
+            logger.warning("⚠️  No AI consultation system available")
         
         # 2. Intelligent Balance Manager
         try:
