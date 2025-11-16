@@ -517,6 +517,38 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             logger.warning(f"Ultimate Intelligence: {e}")
             self.ultimate_intelligence = None
         
+        # 5. Exchange Mastery - COMPLETE EXCHANGE KNOWLEDGE!
+        if EXCHANGE_MASTERY_AVAILABLE:
+            logger.info("\n🌟 Ultimate Exchange Mastery...")
+            try:
+                self.exchange_mastery = initialize_exchange_mastery(
+                    exchange=self.router,
+                    ai_consultation=self.ai_consultation
+                )
+                logger.info("✅ 🌟 Exchange Mastery initialized")
+                logger.info("   Will discover ALL pairs and find BEST opportunities!")
+            except Exception as e:
+                logger.warning(f"Exchange Mastery: {e}")
+                self.exchange_mastery = None
+        else:
+            self.exchange_mastery = None
+        
+        # 6. Testnet Trainer - SMART TESTNET/LIVE SWITCHING!
+        if TESTNET_TRAINER_AVAILABLE:
+            logger.info("\n🧪 Testnet Trainer...")
+            try:
+                self.testnet_trainer = initialize_testnet_trainer(
+                    testnet_exchange=self.router,
+                    live_exchange=self.router
+                )
+                logger.info("✅ 🧪 Testnet Trainer initialized")
+                logger.info("   Will auto-switch between testnet and live based on funds!")
+            except Exception as e:
+                logger.warning(f"Testnet Trainer: {e}")
+                self.testnet_trainer = None
+        else:
+            self.testnet_trainer = None
+        
         logger.info("\n✅ Ultimate Intelligence Systems initialized")
         
         logger.info("\n" + "=" * 80)
