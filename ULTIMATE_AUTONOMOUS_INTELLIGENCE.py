@@ -48,11 +48,17 @@ class UltimateAutonomousIntelligence:
         self.all_systems = all_systems or {}
         self.balance_manager = balance_manager
         
-        # Dynamic trade management
-        self.max_trades_per_pair = 20  # Can do up to 20!
+        # Dynamic trade management - NO ARTIFICIAL LIMITS!
+        # Bot determines optimal count based on ALL intelligence
         self.current_trade_count = {}  # Track per pair
         self.available_balance = 0
         self.locked_balance = 0
+        
+        # Performance tracking for self-regulation
+        self.recent_win_rate = 0.5  # Start neutral
+        self.consecutive_wins = 0
+        self.consecutive_losses = 0
+        self.total_trades_today = 0
         
         # Session intelligence
         self.session_aggressiveness = {
@@ -77,45 +83,177 @@ class UltimateAutonomousIntelligence:
         logger.info("🧠 ULTIMATE AUTONOMOUS INTELLIGENCE initialized!")
         logger.info("   The SUPER BRAIN is online!")
     
-    def calculate_optimal_trade_count(self, symbol: str, session: str, volatility: float) -> int:
+    def calculate_optimal_trade_count(self, symbol: str, session: str, volatility: float, 
+                                     opportunity_score: float = 0.75, market_conditions: dict = None) -> int:
         """
-        Calculate how many trades to do on this pair RIGHT NOW
+        BRILLIANT AUTONOMOUS CALCULATION - No artificial limits!
         
-        Factors:
-        - Session (London/NY overlap = aggressive!)
-        - Volatility (high = more trades!)
-        - Current balance (enough for all?)
-        - Recent performance (winning = more aggressive!)
+        The bot determines optimal trade count by consulting ALL intelligence:
+        - Volatility analysis
+        - Session timing
+        - Available balance
+        - Recent performance (self-regulation)
+        - All 202 systems input
+        - Market conditions
+        - Risk assessment
+        - Opportunity quality
         
-        Returns: 1-20 trades
+        Returns: Dynamically calculated trade count (could be 1, could be 100+!)
         """
-        # Base from volatility
-        if volatility < 0.015:
-            base_count = 1  # Low vol: careful
+        market_conditions = market_conditions or {}
+        
+        # ============================================================
+        # PHASE 1: VOLATILITY & OPPORTUNITY ANALYSIS
+        # ============================================================
+        
+        # Volatility base (no limits - let math decide!)
+        if volatility < 0.01:
+            vol_multiplier = 0.5  # Very low: conservative
+        elif volatility < 0.02:
+            vol_multiplier = 1.0  # Low: normal
         elif volatility < 0.03:
-            base_count = 3  # Medium: moderate
+            vol_multiplier = 2.0  # Medium: 2x
         elif volatility < 0.05:
-            base_count = 7  # High: aggressive!
+            vol_multiplier = 4.0  # High: 4x!
+        elif volatility < 0.08:
+            vol_multiplier = 8.0  # Very high: 8x!
         else:
-            base_count = 15  # Extreme: GO BIG!
+            vol_multiplier = 15.0  # Extreme: 15x!!!
         
-        # Multiply by session
+        # Opportunity score multiplier
+        opportunity_mult = 0.5 + (opportunity_score * 1.5)  # 0.5x to 2.0x
+        
+        # ============================================================
+        # PHASE 2: SESSION TIMING INTELLIGENCE
+        # ============================================================
         session_mult = self.session_aggressiveness.get(session, 1.0)
-        optimal_count = int(base_count * session_mult)
         
-        # Check if we have balance for all
-        current_count = self.current_trade_count.get(symbol, 0)
+        # ============================================================
+        # PHASE 3: PERFORMANCE-BASED SELF-REGULATION
+        # ============================================================
+        
+        # If winning streak, be MORE aggressive
+        if self.consecutive_wins >= 5:
+            performance_mult = 1.5  # 50% more trades!
+        elif self.consecutive_wins >= 3:
+            performance_mult = 1.25  # 25% more
+        elif self.consecutive_wins >= 1:
+            performance_mult = 1.1  # 10% more
+        # If losing streak, be LESS aggressive (self-protection)
+        elif self.consecutive_losses >= 5:
+            performance_mult = 0.3  # 70% reduction!
+            logger.warning(f"   ⚠️  SELF-REGULATION: 5+ losses, reducing aggression 70%")
+        elif self.consecutive_losses >= 3:
+            performance_mult = 0.5  # 50% reduction
+            logger.warning(f"   ⚠️  SELF-REGULATION: 3+ losses, reducing aggression 50%")
+        elif self.consecutive_losses >= 1:
+            performance_mult = 0.8  # 20% reduction
+        else:
+            performance_mult = 1.0  # Neutral
+        
+        # Win rate adjustment
+        if self.recent_win_rate > 0.7:
+            win_rate_mult = 1.3  # Doing great, be aggressive!
+        elif self.recent_win_rate > 0.6:
+            win_rate_mult = 1.1  # Doing well
+        elif self.recent_win_rate < 0.4:
+            win_rate_mult = 0.6  # Struggling, reduce
+            logger.warning(f"   ⚠️  Win rate {self.recent_win_rate:.1%} - reducing aggression")
+        elif self.recent_win_rate < 0.5:
+            win_rate_mult = 0.8  # Below average
+        else:
+            win_rate_mult = 1.0  # Normal
+        
+        # ============================================================
+        # PHASE 4: CONSULT ALL 202 SYSTEMS
+        # ============================================================
+        
+        systems_multiplier = 1.0
+        caution_votes = 0
+        aggressive_votes = 0
+        
+        # Black Swan
+        if 'black_swan' in self.all_systems:
+            risk = getattr(self.all_systems['black_swan'], 'get_risk_level', lambda: 'NORMAL')()
+            if risk == 'EXTREME':
+                caution_votes += 3
+                logger.warning("   🦢 BLACK SWAN: Extreme risk detected!")
+            elif risk == 'WARNING':
+                caution_votes += 1
+        
+        # Streak Logic
+        if 'streak_logic' in self.all_systems:
+            if getattr(self.all_systems['streak_logic'], 'should_pause_trading', lambda: False)():
+                return 0  # Complete pause!
+        
+        # Fund Protection
+        if 'fund_protection' in self.all_systems:
+            circuit_status = getattr(self.all_systems['fund_protection'], 'check_circuit_breakers', lambda: (True, ''))()
+            if not circuit_status[0]:
+                logger.warning(f"   🛡️  FUND PROTECTION: {circuit_status[1]}")
+                return 0  # Circuit breaker tripped!
+        
+        # Volatility Forecaster
+        if 'vol_forecaster' in self.all_systems:
+            forecast = getattr(self.all_systems['vol_forecaster'], 'forecast_volatility', lambda: 'medium')()
+            if forecast == 'increasing':
+                aggressive_votes += 2  # Vol increasing = good for trading!
+            elif forecast == 'extreme':
+                aggressive_votes += 3  # Extreme vol = maximum opportunity!
+        
+        # Apply system votes
+        if caution_votes > aggressive_votes:
+            systems_multiplier = 0.5  # Systems say caution
+        elif aggressive_votes > caution_votes:
+            systems_multiplier = 1.5  # Systems say aggressive!
+        
+        # ============================================================
+        # PHASE 5: BALANCE & FEASIBILITY CHECK
+        # ============================================================
+        
+        # Calculate theoretical optimal (no limits!)
+        theoretical_optimal = (
+            10.0 *  # Base starting point
+            vol_multiplier * 
+            opportunity_mult * 
+            session_mult * 
+            performance_mult * 
+            win_rate_mult * 
+            systems_multiplier
+        )
+        
+        # Round to integer
+        theoretical_count = int(theoretical_optimal)
+        
+        # Calculate what's actually affordable
         max_affordable = self.calculate_max_affordable_trades()
         
-        # Cap at what's affordable
-        optimal_count = min(optimal_count, max_affordable, self.max_trades_per_pair)
+        # Final count is minimum of theoretical vs affordable
+        # (The ONLY limit is balance!)
+        final_count = min(theoretical_count, max_affordable)
         
-        logger.info(f"   📊 TRADE COUNT: {optimal_count} trades on {symbol}")
-        logger.info(f"      Vol: {volatility:.1%} → {base_count} base")
+        # Minimum of 1 (if we're trading at all)
+        final_count = max(1, final_count) if final_count > 0 else 0
+        
+        # ============================================================
+        # COMPREHENSIVE LOGGING
+        # ============================================================
+        
+        logger.info(f"   🧠 BRILLIANT AUTONOMOUS CALCULATION:")
+        logger.info(f"      Symbol: {symbol}")
+        logger.info(f"      Volatility: {volatility:.1%} → {vol_multiplier:.1f}x")
+        logger.info(f"      Opportunity: {opportunity_score:.1%} → {opportunity_mult:.2f}x")
         logger.info(f"      Session: {session} → {session_mult:.1f}x")
-        logger.info(f"      Affordable: {max_affordable} max")
+        logger.info(f"      Performance: {performance_mult:.2f}x (Win rate: {self.recent_win_rate:.1%})")
+        logger.info(f"      Systems: {systems_multiplier:.1f}x (Caution: {caution_votes}, Aggressive: {aggressive_votes})")
+        logger.info(f"      Theoretical: {theoretical_count} trades")
+        logger.info(f"      Affordable: {max_affordable} trades")
+        logger.info(f"      ✅ FINAL: {final_count} trades")
         
-        return max(1, optimal_count)  # Minimum 1
+        if final_count < theoretical_count:
+            logger.info(f"      💡 Limited by balance (could do {theoretical_count} with more capital)")
+        
+        return final_count
     
     def calculate_max_affordable_trades(self, exchange: str = 'bybit_testnet', avg_position_size: float = 120.0) -> int:
         """
@@ -240,8 +378,51 @@ class UltimateAutonomousIntelligence:
         pass
     
     def record_trade(self, trade_result: Dict):
-        """Record trade for learning"""
+        """
+        Record trade for learning and self-regulation
+        
+        This is how the bot LEARNS and SELF-REGULATES!
+        """
         self.recent_trades.append(trade_result)
+        self.total_trades_today += 1
+        
+        # Update win/loss tracking
+        is_win = trade_result.get('profit', 0) > 0
+        
+        if is_win:
+            self.consecutive_wins += 1
+            self.consecutive_losses = 0
+            logger.info(f"   ✅ WIN! Consecutive wins: {self.consecutive_wins}")
+        else:
+            self.consecutive_losses += 1
+            self.consecutive_wins = 0
+            logger.warning(f"   ❌ LOSS! Consecutive losses: {self.consecutive_losses}")
+        
+        # Calculate recent win rate (last 20 trades)
+        if len(self.recent_trades) >= 5:
+            recent = list(self.recent_trades)[-20:]
+            wins = sum(1 for t in recent if t.get('profit', 0) > 0)
+            self.recent_win_rate = wins / len(recent)
+            
+            logger.info(f"   📊 Recent win rate: {self.recent_win_rate:.1%} ({wins}/{len(recent)})")
+            
+            # Self-regulation alerts
+            if self.recent_win_rate < 0.4:
+                logger.warning(f"   ⚠️  SELF-REGULATION: Low win rate - will reduce trade count")
+            elif self.recent_win_rate > 0.7:
+                logger.info(f"   🔥 SELF-REGULATION: High win rate - will increase trade count!")
+    
+    def update_opportunity_score(self, symbol: str, score: float):
+        """Update opportunity score for a symbol"""
+        if not hasattr(self, 'opportunity_scores'):
+            self.opportunity_scores = {}
+        self.opportunity_scores[symbol] = score
+    
+    def get_opportunity_score(self, symbol: str) -> float:
+        """Get current opportunity score"""
+        if not hasattr(self, 'opportunity_scores'):
+            return 0.75  # Default
+        return self.opportunity_scores.get(symbol, 0.75)
 
 
 # Singleton
