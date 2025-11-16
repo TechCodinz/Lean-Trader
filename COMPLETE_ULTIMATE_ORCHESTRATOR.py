@@ -1309,23 +1309,37 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
         try:
             self.master_coordinator = initialize_coordinator()
             
-            # Register ALL key systems with coordinator
-            if self.safe_micro_growth:
+            # Register ALL key systems with coordinator (with logging!)
+            registered_count = 0
+            
+            if hasattr(self, 'safe_micro_growth') and self.safe_micro_growth:
                 self.master_coordinator.register_system('safe_micro_growth', self.safe_micro_growth)
-            if self.balance_intelligence:
+                registered_count += 1
+            
+            if hasattr(self, 'balance_intelligence') and self.balance_intelligence:
                 self.master_coordinator.register_system('balance_intelligence', self.balance_intelligence)
-            if self.black_swan:
+                registered_count += 1
+            
+            if hasattr(self, 'black_swan') and self.black_swan:
                 self.master_coordinator.register_system('black_swan', self.black_swan)
-            if self.streak_logic:
+                registered_count += 1
+            
+            if hasattr(self, 'streak_logic') and self.streak_logic:
                 self.master_coordinator.register_system('streak_logic', self.streak_logic)
-            if self.fund_protection:
+                registered_count += 1
+            
+            if hasattr(self, 'fund_protection') and self.fund_protection:
                 self.master_coordinator.register_system('fund_protection', self.fund_protection)
+                registered_count += 1
+            
             if hasattr(self, 'cns') and self.cns:
                 self.master_coordinator.register_system('cns', self.cns)
+                registered_count += 1
             
             self.advanced_systems['master_coordinator'] = self.master_coordinator
             
             logger.info("✅ 🧠 AUTONOMOUS MASTER COORDINATOR - FINAL INTEGRATION!")
+            logger.info(f"   → Registered {registered_count} key systems!")
             logger.info("   → All 202 systems now work as ONE brain!")
             logger.info("   → NO manual overrides!")
             logger.info("   → Systems decide EVERYTHING!")
@@ -1334,7 +1348,9 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             logger.info("   → Trade selection: AUTONOMOUS")
             logger.info("   → TRUE COLLECTIVE INTELLIGENCE!")
         except Exception as e:
-            logger.warning(f"⚠️  Master Coordinator: {e}")
+            logger.error(f"⚠️  Master Coordinator: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             self.master_coordinator = None
         
         # 4. Ultra Enhancement Package
