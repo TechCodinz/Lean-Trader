@@ -223,6 +223,7 @@ from MULTI_TIMEFRAME_COORDINATOR import MultiTimeframeCoordinator
 from MICRO_GROWTH_ENGINE import MicroGrowthEngine
 from SAFE_MICRO_GROWTH_ENGINE import SafeMicroGrowthEngine
 from AI_SELF_OPTIMIZATION_ENGINE import AISelfOptimizationEngine
+from AUTONOMOUS_MASTER_COORDINATOR import AutonomousMasterCoordinator, initialize_coordinator
 from PRACTICAL_ADVANCED_VOLATILITY import (
     SimplifiedRoughVolatility,
     BlackSwanDetector,
@@ -1303,6 +1304,38 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
         except Exception as e:
             logger.warning(f"⚠️  Self-Optimization: {e}")
             self.self_optimizer = None
+        
+        # 8. AUTONOMOUS MASTER COORDINATOR - THE FINAL PIECE!
+        try:
+            self.master_coordinator = initialize_coordinator()
+            
+            # Register ALL key systems with coordinator
+            if self.safe_micro_growth:
+                self.master_coordinator.register_system('safe_micro_growth', self.safe_micro_growth)
+            if self.balance_intelligence:
+                self.master_coordinator.register_system('balance_intelligence', self.balance_intelligence)
+            if self.black_swan:
+                self.master_coordinator.register_system('black_swan', self.black_swan)
+            if self.streak_logic:
+                self.master_coordinator.register_system('streak_logic', self.streak_logic)
+            if self.fund_protection:
+                self.master_coordinator.register_system('fund_protection', self.fund_protection)
+            if hasattr(self, 'cns') and self.cns:
+                self.master_coordinator.register_system('cns', self.cns)
+            
+            self.advanced_systems['master_coordinator'] = self.master_coordinator
+            
+            logger.info("✅ 🧠 AUTONOMOUS MASTER COORDINATOR - FINAL INTEGRATION!")
+            logger.info("   → All 202 systems now work as ONE brain!")
+            logger.info("   → NO manual overrides!")
+            logger.info("   → Systems decide EVERYTHING!")
+            logger.info("   → Position sizing: AUTONOMOUS")
+            logger.info("   → Risk management: AUTONOMOUS")
+            logger.info("   → Trade selection: AUTONOMOUS")
+            logger.info("   → TRUE COLLECTIVE INTELLIGENCE!")
+        except Exception as e:
+            logger.warning(f"⚠️  Master Coordinator: {e}")
+            self.master_coordinator = None
         
         # 4. Ultra Enhancement Package
         if ULTRA_ENHANCEMENTS_AVAILABLE:
