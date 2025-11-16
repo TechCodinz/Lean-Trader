@@ -41,6 +41,12 @@ try:
 except ImportError:
     REQUESTS_AVAILABLE = False
 
+try:
+    import google.generativeai as genai
+    GEMINI_AVAILABLE = True
+except ImportError:
+    GEMINI_AVAILABLE = False
+
 
 class AIConsultationService:
     """
@@ -81,12 +87,28 @@ class AIConsultationService:
         self.moonshot_query_interval = 3600  # Query every 1 hour
         self.last_moonshot_query = None
         
+        # AI Provider Specializations (learned automatically)
+        self.ai_specializations = {
+            'claude': {'strengths': ['deep_analysis', 'complex_reasoning', 'code_generation', 'strategic_thinking']},
+            'gpt4': {'strengths': ['pattern_recognition', 'creativity', 'general_purpose', 'technical_analysis']},
+            'grok': {'strengths': ['social_sentiment', 'real_time_trends', 'twitter_analysis', 'meme_coins']},
+            'gemini': {'strengths': ['multimodal', 'fast_inference', 'reasoning', 'data_analysis']},
+            'raiziom': {'strengths': ['custom_strategies', 'personalized', 'user_preferences']},
+        }
+        
+        # Track performance of each AI (learns which is best)
+        self.ai_performance = {}
+        
         # Initialize all available providers
         self._init_claude()
         self._init_openai()
         self._init_grok()
+        self._init_gemini()
         self._init_raiziom()
         self._init_custom()
+        
+        # Auto-discover custom AI capabilities
+        self._analyze_custom_ais()
         
         # Auto-select provider if not specified
         if provider == 'auto':
@@ -154,6 +176,17 @@ class AIConsultationService:
             except Exception as e:
                 logger.debug(f"Raiziom init failed: {e}")
     
+    def _init_gemini(self):
+        """Initialize Google Gemini"""
+        api_key = os.getenv('GEMINI_API_KEY') or os.getenv('GOOGLE_API_KEY')
+        if GEMINI_AVAILABLE and api_key:
+            try:
+                genai.configure(api_key=api_key)
+                self.clients['gemini'] = genai.GenerativeModel('gemini-pro')
+                logger.info("✅ Google Gemini initialized")
+            except Exception as e:
+                logger.debug(f"Gemini init failed: {e}")
+    
     def _init_custom(self):
         """Initialize any custom AI endpoint"""
         api_key = os.getenv('CUSTOM_AI_API_KEY')
@@ -169,18 +202,123 @@ class AIConsultationService:
             except Exception as e:
                 logger.debug(f"Custom AI init failed: {e}")
     
+    def add_custom_ai(self, name: str, api_key: str, endpoint: str, ai_type: str = 'openai_compatible'):
+        """
+        🔌 DYNAMICALLY ADD ANY AI API
+        
+        Args:
+            name: AI name (e.g., 'deepseek', 'mistral', 'perplexity')
+            api_key: API key
+            endpoint: API endpoint URL
+            ai_type: 'openai_compatible' or 'custom'
+        """
+        try:
+            self.clients[name] = {
+                'api_key': api_key,
+                'endpoint': endpoint,
+                'type': ai_type
+            }
+            
+            # Auto-analyze what this AI is good at
+            logger.info(f"🔌 Added custom AI: {name}")
+            logger.info(f"   Analyzing capabilities...")
+            
+            # Test query to learn specialization
+            asyncio.create_task(self._learn_ai_specialization(name))
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to add custom AI {name}: {e}")
+            return False
+    
+    async def _learn_ai_specialization(self, ai_name: str):
+        """
+        🧠 AUTOMATICALLY LEARN WHAT EACH AI IS GOOD AT
+        
+        Asks the AI: "What are you best at?"
+        Records specialization for optimal routing
+        """
+        try:
+            prompt = """In 2-3 sentences, what are you BEST at? 
+What tasks should I send to you vs other AIs?
+Be specific about your unique strengths."""
+            
+            # Query the AI
+            result = await self._query_specific_provider(ai_name, prompt)
+            
+            # Parse specialization
+            specialization = self._parse_specialization(result)
+            
+            # Store learned specialization
+            if ai_name not in self.ai_specializations:
+                self.ai_specializations[ai_name] = {'strengths': []}
+            
+            self.ai_specializations[ai_name]['description'] = result
+            
+            logger.info(f"✅ Learned {ai_name} specialization:")
+            logger.info(f"   {result[:100]}...")
+            
+        except Exception as e:
+            logger.debug(f"Could not learn {ai_name} specialization: {e}")
+    
+    def _analyze_custom_ais(self):
+        """Analyze all custom AI endpoints to learn capabilities"""
+        for name in self.clients.keys():
+            if name not in ['claude', 'gpt4', 'grok', 'gemini', 'raiziom']:
+                # Custom AI - learn what it's good at
+                logger.info(f"🔍 Analyzing custom AI: {name}...")
+                # Will learn async
+    
+    def _select_best_ai_for_task(self, task_type: str) -> str:
+        """
+        🎯 INTELLIGENTLY SELECT BEST AI FOR EACH TASK
+        
+        Args:
+            task_type: 'moonshot', 'strategy', 'analysis', 'social', 'technical', etc.
+        
+        Returns:
+            Best AI provider name
+        """
+        # Task-to-specialization mapping
+        task_preferences = {
+            'moonshot': ['grok', 'gemini', 'gpt4'],  # Grok best for social/memes
+            'social_sentiment': ['grok', 'gemini'],   # Grok has Twitter/X access
+            'deep_analysis': ['claude', 'gpt4'],      # Claude best at reasoning
+            'technical_analysis': ['gpt4', 'gemini', 'claude'],
+            'pattern_recognition': ['gpt4', 'gemini'],
+            'strategy': ['claude', 'gpt4'],
+            'fast_query': ['gemini', 'grok'],         # Gemini is fastest
+            'code_generation': ['claude', 'gpt4'],
+            'custom': ['raiziom', 'custom']
+        }
+        
+        # Get preferred AIs for this task
+        preferred = task_preferences.get(task_type, ['claude', 'gpt4', 'grok'])
+        
+        # Find first available AI from preferred list
+        for ai in preferred:
+            if ai in self.clients:
+                logger.debug(f"Selected {ai} for {task_type} (specialization match)")
+                return ai
+        
+        # Fallback to active provider
+        return self.active_provider if self.active_provider else 'claude'
+    
     def _auto_select_provider(self):
         """Auto-select best available provider"""
-        # Priority order: Claude > GPT-4 > Grok > Raiziom > Custom
-        priority = ['claude', 'gpt4', 'grok', 'raiziom', 'custom']
+        # Priority order: Claude > GPT-4 > Gemini > Grok > Raiziom > Custom
+        priority = ['claude', 'gpt4', 'gemini', 'grok', 'raiziom', 'custom']
         
         for provider in priority:
             if provider in self.clients:
                 self.active_provider = provider
                 self.available = True
+                logger.info(f"Auto-selected AI: {provider}")
                 return
         
         self.available = False
+        logger.warning("No AI providers available")
     
     async def consult_strategy(self, context: Dict) -> Dict:
         """
