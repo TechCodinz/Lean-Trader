@@ -325,17 +325,29 @@ class IntelligentExecutionEngine:
             try:
                 from COMPLETE_ULTIMATE_ORCHESTRATOR import get_orchestrator
                 orch = get_orchestrator()
-                if orch and hasattr(orch, 'master_coordinator') and orch.master_coordinator:
+                
+                if not orch:
+                    logger.warning("   ⚠️  Orchestrator not available (autonomous sizing disabled)")
+                elif not hasattr(orch, 'master_coordinator'):
+                    logger.warning("   ⚠️  Orchestrator has no master_coordinator")
+                elif not orch.master_coordinator:
+                    logger.warning("   ⚠️  Master coordinator is None")
+                else:
                     # Get balance
                     exec_orch = orch.advanced_orchestrators.get('execution')
-                    balance = exec_orch.position_sizer.balance if exec_orch and hasattr(exec_orch, 'position_sizer') else 1000
+                    if exec_orch and hasattr(exec_orch, 'position_sizer'):
+                        balance = exec_orch.position_sizer.balance
+                        logger.info(f"   💰 Got live balance: ${balance:.2f}")
+                    else:
+                        balance = 1000
+                        logger.warning(f"   ⚠️  Using fallback balance: ${balance}")
                     
                     # Let coordinator decide size using ALL systems!
                     size = orch.master_coordinator.calculate_optimal_position_size(signal, balance)
-                    logger.info(f"   🧠 AUTONOMOUS: ${size:.2f} (from all 202 systems!)")
+                    logger.info(f"   🧠 AUTONOMOUS SIZE: ${size:.2f} (from all systems!)")
                     return size
             except Exception as e:
-                logger.debug(f"Coordinator sizing failed, using fallback: {e}")
+                logger.warning(f"   ⚠️  Coordinator sizing error: {e}")
             
             # FALLBACK: Original intelligence
             symbol = signal.get('symbol', '')
