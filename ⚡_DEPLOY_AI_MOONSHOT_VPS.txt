@@ -1,0 +1,185 @@
+═══════════════════════════════════════════════════════════════════════════════════
+⚡ DEPLOY AI MOONSHOT QUERY TO VPS - SAFE TOKEN LIMITS
+═══════════════════════════════════════════════════════════════════════════════════
+
+COPY-PASTE THESE COMMANDS ON YOUR VPS:
+═══════════════════════════════════════════════════════════════════════════════════
+
+cd ~/apex_bot
+
+# Stop bot
+pkill -f COMPLETE_ULTIMATE_ORCHESTRATOR
+
+# Pull latest (includes token limits + moonshot query)
+git stash
+git pull origin continue-from-micro-fix
+
+# Check your AI keys are set
+grep -E "ANTHROPIC_API_KEY|OPENAI_API_KEY|GROK_API_KEY" .env
+
+# Restart bot with AI moonshot hunting
+source apex_venv/bin/activate
+python3 systems/COMPLETE_ULTIMATE_ORCHESTRATOR.py > apex_bot.log 2>&1 &
+
+# Watch AI query for moonshots
+tail -f apex_bot.log | grep -iE "moonshot|AI.*found|consulting|tokens" --color=always
+
+
+═══════════════════════════════════════════════════════════════════════════════════
+📊 WHAT YOU'LL SEE:
+═══════════════════════════════════════════════════════════════════════════════════
+
+STARTUP:
+  ✅ AI_CONSULTATION_SERVICE initialized
+  ✅ Grok (xAI) available
+  ✅ Claude (Anthropic) available
+  ✅ GPT-4 (OpenAI) available
+
+FIRST MOONSHOT QUERY (after 5 minutes):
+  🚀 Querying AI for MOONSHOT opportunities...
+  ✅ AI found 3 potential moonshots
+     🌙 PEPE: 150% gain - Binance listing rumored
+     🌙 FET: 80% gain - AI narrative heating up
+     🌙 ARB: 60% gain - Major upgrade coming
+
+TOKEN USAGE:
+  📊 AI Usage: 1 consultations, 3,000 tokens today
+  
+HOURLY QUERIES:
+  (Every hour, bot asks AI for moonshots)
+  🚀 Querying AI for MOONSHOT opportunities...
+  📊 AI Usage: 5 consultations, 15,000 tokens today
+
+RATE LIMIT PROTECTION:
+  ⚠️  Skipping moonshot query (last query 45m ago, wait 15m)
+  (Won't burn tokens - waits full hour between queries)
+
+DAILY LIMIT CHECK:
+  📊 AI Usage: 150 consultations, 450,000 tokens today
+  ⚠️  Approaching daily token limit: 450,000/500,000
+
+
+═══════════════════════════════════════════════════════════════════════════════════
+🔒 TOKEN LIMITS (SAFE - WON'T BURN CREDITS):
+═══════════════════════════════════════════════════════════════════════════════════
+
+PER QUERY:
+  Max tokens: 4,000 per request
+  Moonshot query: ~3,000 tokens (cheaper!)
+
+PER HOUR:
+  Max queries: 12/hour
+  = 1 query every 5 minutes max
+  = 48,000 tokens/hour max
+
+PER DAY:
+  Max queries: 200/day
+  Max tokens: 500,000/day
+  = Stays well within API limits
+
+MOONSHOT SPECIFIC:
+  Frequency: Once per hour only
+  Tokens: ~3,000 per query
+  Daily: 24 queries × 3,000 = 72,000 tokens/day
+
+TOTAL SAFE USAGE:
+  Daily tokens: ~150,000 tokens/day typical
+  Cost estimate: ~$2-5/day (depending on provider)
+  Monthly: ~$60-150/month
+
+
+═══════════════════════════════════════════════════════════════════════════════════
+📊 MONITOR TOKEN USAGE:
+═══════════════════════════════════════════════════════════════════════════════════
+
+# Watch AI consultations
+tail -f apex_bot.log | grep -i "AI Usage"
+
+# See moonshot discoveries
+grep -i "AI found.*moonshots" apex_bot.log
+
+# Check if approaching limits
+grep -i "Approaching.*limit" apex_bot.log
+
+# Count consultations today
+grep "AI Usage:" apex_bot.log | tail -1
+
+
+═══════════════════════════════════════════════════════════════════════════════════
+🎯 WHAT THE BOT DOES:
+═══════════════════════════════════════════════════════════════════════════════════
+
+EVERY HOUR:
+  1. Checks: Can I query? (rate limits OK?)
+  2. If YES:
+     - Queries AI: "What tokens about to moon?"
+     - Gets 2-3 moonshot suggestions
+     - Validates with your 202 engines
+     - Executes if high confidence
+  3. If NO:
+     - Skips query
+     - Logs: "Wait 15m more"
+     - Saves tokens
+
+TOKEN TRACKING:
+  - Counts tokens used
+  - Warns at 80% daily limit
+  - Stops at 100% daily limit
+  - Resets at midnight UTC
+
+SMART LIMITS:
+  - Won't spam AI (1 hour between moonshot queries)
+  - Won't burn credits (strict limits)
+  - Won't exceed budget (500K tokens/day max)
+
+
+═══════════════════════════════════════════════════════════════════════════════════
+💰 COST ESTIMATE:
+═══════════════════════════════════════════════════════════════════════════════════
+
+GROK (xAI):
+  Rate: $5 per 1M tokens
+  Daily usage: ~150K tokens
+  Daily cost: ~$0.75
+  Monthly: ~$22.50
+
+CLAUDE (Anthropic):
+  Rate: $15 per 1M tokens (Claude 3.5)
+  Daily usage: ~150K tokens
+  Daily cost: ~$2.25
+  Monthly: ~$67.50
+
+GPT-4 (OpenAI):
+  Rate: $10 per 1M tokens (GPT-4)
+  Daily usage: ~150K tokens
+  Daily cost: ~$1.50
+  Monthly: ~$45
+
+RECOMMENDED: Use Grok ($22.50/month) - best for social sentiment + moonshots!
+
+
+═══════════════════════════════════════════════════════════════════════════════════
+✅ SAFE DEPLOYMENT:
+═══════════════════════════════════════════════════════════════════════════════════
+
+The bot is now:
+  ✅ Query-limited (max 1 moonshot query/hour)
+  ✅ Token-limited (max 500K tokens/day)
+  ✅ Rate-limited (max 12 queries/hour total)
+  ✅ Budget-safe (~$2-5/day typical)
+  ✅ Won't burn through API credits
+  ✅ Warns before hitting limits
+
+Pull, restart, watch it hunt moons safely! 🚀
+
+
+═══════════════════════════════════════════════════════════════════════════════════
+🚀 ONE COMMAND TO DEPLOY:
+═══════════════════════════════════════════════════════════════════════════════════
+
+cd ~/apex_bot && pkill -f COMPLETE_ULTIMATE_ORCHESTRATOR && git stash && git pull origin continue-from-micro-fix && source apex_venv/bin/activate && python3 systems/COMPLETE_ULTIMATE_ORCHESTRATOR.py > apex_bot.log 2>&1 & sleep 5 && tail -f apex_bot.log | grep -iE "moonshot|AI.*found|tokens|initialized" --color=always
+
+
+═══════════════════════════════════════════════════════════════════════════════════
+✅ RUN THIS NOW!
+═══════════════════════════════════════════════════════════════════════════════════
