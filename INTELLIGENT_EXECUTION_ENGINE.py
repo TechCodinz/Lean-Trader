@@ -341,7 +341,19 @@ class IntelligentExecutionEngine:
             volatility = self.volatility_by_pair.get(symbol, 0.02)  # Default 2%
             
             # 🔥 Base position size - SCALE WITH BALANCE!
-            balance = self.actual_balance if hasattr(self, 'actual_balance') else 1000
+            # Get LIVE balance from orchestrator's position_sizer
+            balance = 1000  # Fallback
+            try:
+                from COMPLETE_ULTIMATE_ORCHESTRATOR import get_orchestrator
+                orch = get_orchestrator()
+                if orch and hasattr(orch, 'advanced_orchestrators'):
+                    exec_orch = orch.advanced_orchestrators.get('execution')
+                    if exec_orch and hasattr(exec_orch, 'position_sizer'):
+                        balance = exec_orch.position_sizer.balance
+                        if balance > 5000:
+                            logger.info(f"   💰 LIVE Balance: ${balance:.0f} ✅")
+            except:
+                balance = self.actual_balance if hasattr(self, 'actual_balance') else 1000
             
             if balance < 100:
                 base_size = 3.0
@@ -349,7 +361,8 @@ class IntelligentExecutionEngine:
                 base_size = 10.0
             elif balance < 10000:
                 base_size = 50.0  # ✅ $50 for $8K balance!
-                logger.info(f"   💰 Balance: ${balance:.0f} → Base: ${base_size} ✅")
+                if balance > 5000:
+                    logger.info(f"   🎯 Using ${base_size} base for ${balance:.0f} balance!")
             else:
                 base_size = 100.0
             
