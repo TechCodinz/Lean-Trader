@@ -266,6 +266,11 @@ def get_pair_discovery():
     return _pair_discovery
 
 
+def get_discovery_engine(exchange, min_volume=50000):
+    """Alias for compatibility - returns pair discovery engine"""
+    return initialize_pair_discovery(exchange, min_volume)
+
+
 if __name__ == "__main__":
     # Test
     import os
