@@ -520,11 +520,17 @@ class ExchangeRouter:
         """
         lg = logger or _log
         try:
-            enable_live_env = _env("ENABLE_LIVE", "").strip().lower() == "true"
             # Do not override behavior for paper broker
             if getattr(self, "id", "").lower() == "paper":
                 lg.debug("[router] paper broker detected: skipping runtime order overlay")
                 return
+            
+            # Bypass order-block for testnet mode - testnet is safe to trade!
+            if self.testnet:
+                lg.info("[router] Testnet mode - orders allowed without ENABLE_LIVE check")
+                return
+            
+            enable_live_env = _env("ENABLE_LIVE", "").strip().lower() == "true"
 
             if enable_live_env:
                 lg.debug("[router] ENABLE_LIVE=true: no runtime order overlay applied")
