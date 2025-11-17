@@ -142,6 +142,28 @@ from UTILITY_INTEGRATION_LAYER import UtilityIntegrationLayer
 # Import DEX ORCHESTRATOR - DEX trading with Moon Spotting & MEV protection
 from DEX_ORCHESTRATOR import DEXOrchestrator, DEXConfig
 
+# Import MASTER INTELLIGENCE COORDINATORS - Supreme control systems
+try:
+    from CENTRAL_CONTROL_INTELLIGENCE import CentralControlIntelligence
+    CENTRAL_CONTROL_AVAILABLE = True
+except ImportError:
+    CENTRAL_CONTROL_AVAILABLE = False
+    logger.warning("CENTRAL_CONTROL_INTELLIGENCE not available")
+
+try:
+    from HYBRID_INTELLIGENCE_COORDINATOR import HybridIntelligenceCoordinator
+    HYBRID_COORDINATOR_AVAILABLE = True
+except ImportError:
+    HYBRID_COORDINATOR_AVAILABLE = False
+    logger.warning("HYBRID_INTELLIGENCE_COORDINATOR not available")
+
+try:
+    from COLLECTIVE_SWARM_INTELLIGENCE import CollectiveSwarmIntelligence
+    SWARM_INTELLIGENCE_AVAILABLE = True
+except ImportError:
+    SWARM_INTELLIGENCE_AVAILABLE = False
+    logger.warning("COLLECTIVE_SWARM_INTELLIGENCE not available")
+
 # Import ULTIMATE INTELLIGENCE SYSTEMS - The Brain that makes everything work perfectly!
 try:
     from AI_CONSULTATION_SERVICE import AIConsultationService, initialize_ai_consultation
