@@ -695,31 +695,22 @@ class ExecutionOrchestrator:
         - Complete trade planning
         """
         try:
-            # Initialize route
-            route = None
+            # Initialize route with default
+            route = {"exchange": "bybit_testnet", "market_type": "spot"}
             
             # 🧠 INTELLIGENT ROUTING: Find best exchange/market for this pair!
             try:
                 from INTELLIGENT_EXCHANGE_ROUTER import get_intelligent_router
                 router = get_intelligent_router()
                 if router:
-                    route = await router.route_signal(signal)
-                if route:
-                    logger.info(f"   🧠 ROUTER: {symbol} routed to {route['exchange']} {route['market_type']}")
-                    # If pair not on this exchange, skip
-                    if route['exchange'] != 'bybit_testnet' and self.mode == 'testnet':
-                        logger.info(f"   ⏭️  {symbol} not on testnet, skipping")
-                        return False
-                else:
-                    if route is None:
-                        logger.debug("   Router: No route found")
+                    smart_route = await router.route_signal(signal)
+                    if smart_route:
+                        route = smart_route
+                        logger.info(f"   🧠 ROUTER: {symbol} routed to {route['exchange']} {route['market_type']}")
                     else:
-                        logger.debug("   Router not available (not initialized yet)")
+                        logger.debug(f"   Router: Using default route for {symbol}")
             except Exception as e:
-                logger.debug(f"   Router check failed: {e}")
-                # Fallback route
-                if not route:
-                    route = {"exchange": "bybit_testnet", "market_type": "spot"}
+                logger.debug(f"   Router check failed: {e}, using default route")
             
             logger.info(f"   🧪 Executing on BYBIT TESTNET...")
             

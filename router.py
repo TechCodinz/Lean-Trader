@@ -525,9 +525,9 @@ class ExchangeRouter:
                 lg.debug("[router] paper broker detected: skipping runtime order overlay")
                 return
             
-            # Bypass order-block for testnet mode - testnet is safe to trade!
+            # ALWAYS bypass for testnet - testnet is safe!
             if self.testnet:
-                lg.info("[router] Testnet mode - orders allowed without ENABLE_LIVE check")
+                lg.info("[router] Testnet mode - ALL orders allowed")
                 return
             
             enable_live_env = _env("ENABLE_LIVE", "").strip().lower() == "true"
