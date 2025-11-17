@@ -156,6 +156,11 @@ class ExchangeRouter:
                 raise RuntimeError(f"Unknown ccxt exchange id: {self.id}")
             self.ex = klass(opts)
             
+            # Enable testnet/sandbox mode if configured
+            if self.testnet:
+                self.ex.set_sandbox_mode(True)
+                _log.info("[router] Testnet mode enabled - using sandbox")
+            
             # Apply guard hook for order safety and exchange intel
             try:
                 from tools.guard_hook import enable_guard, print_intel_summary

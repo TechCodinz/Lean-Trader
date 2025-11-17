@@ -367,14 +367,19 @@ class CompleteUnifiedOrchestrator:
         self.pattern_memory = PatternMemory()
         self.ledger = Ledger()
         
-        # Start with small universe, market scanner will discover ALL pairs from exchanges
-        # Don't hardcode - let scanner find thousands of pairs!
-        initial_universe = ["BTC/USDT", "ETH/USDT", "SOL/USDT", "BNB/USDT", "AVAX/USDT"]  # Just to start
-        self.universe = initial_universe
-        logger.info(f"ℹ️  Starting with {len(initial_universe)} pairs")
+        # Load testnet crypto pairs
+        try:
+            from BYBIT_TESTNET_PAIRS_FILTER import BYBIT_TESTNET_PAIRS
+            universe = sorted([p for p in BYBIT_TESTNET_PAIRS if "/" in p and "USDT" in p])
+            logger.info(f"✅ Loaded {len(universe)} testnet crypto pairs")
+        except:
+            universe = ["BTC/USDT", "ETH/USDT", "SOL/USDT", "BNB/USDT", "AVAX/USDT"]
+            logger.info("Using default 5 pairs")
+        
+        self.universe = universe
         logger.info("   🔍 Market Scanner will discover ALL pairs from 6 exchanges...")
         
-        self.ultra_core = UltraCore(self.router, initial_universe, logger)
+        self.ultra_core = UltraCore(self.router, universe, logger)
         
         awareness_cfg = AwarenessConfig()
         self.awareness = SituationalAwareness(awareness_cfg)

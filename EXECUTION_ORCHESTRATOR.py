@@ -332,7 +332,7 @@ class ExecutionOrchestrator:
                     await self.process_decision(decision)
                 
                 # ACTIVELY CHECK HUB FOR NEW SIGNALS (don't just wait for alert queue!)
-                signals = self.data_hub.get_signals(limit=20)
+                signals = list(self.data_hub.recent_signals)[:20]
                 
                 for signal in signals:
                     # Only execute high-confidence scalper signals
