@@ -52,6 +52,14 @@ class DynamicMarketScanner:
         """Main scanning loop - runs forever"""
         logger.info("🔍 Starting continuous market scanning...")
         
+        # FIRST SCAN IMMEDIATELY!
+        try:
+            logger.info("🔍 Initial scan - discovering ALL pairs from all exchanges...")
+            await self.scan_all_exchanges()
+            logger.info(f"✅ Initial scan complete! Found {len(self.active_pairs)} tradable pairs")
+        except Exception as e:
+            logger.warning(f"Initial scan error: {e}")
+        
         while True:
             try:
                 await self.scan_all_exchanges()
@@ -79,10 +87,13 @@ class DynamicMarketScanner:
             return
         
         new_opportunities = set()
+        all_pairs_found = []
         
         # CRITICAL FIX: The exchanges are already ccxt objects from arbitrage engine
         # Just use them directly!
         actual_exchanges = self.exchanges
+        
+        logger.info(f"🔍 Scanning {len(actual_exchanges)} exchanges for ALL pairs...")
         
         # Check if they're ccxt exchanges
         first_exchange = next(iter(actual_exchanges.values())) if actual_exchanges else None
@@ -108,6 +119,7 @@ class DynamicMarketScanner:
                 }
                 
                 logger.info(f"   Found {len(usdt_pairs)} USDT pairs on {exchange_name}")
+                all_pairs_found.extend(list(usdt_pairs.keys()))
                 
                 # Analyze each pair
                 for symbol, ticker in usdt_pairs.items():
