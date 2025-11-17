@@ -1075,6 +1075,22 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                 logger.info("✅ 🤖 AI SELF-UPGRADE LOOP STARTED - Bot learns & improves continuously!")
         
         # Start enhanced main loop
+        # Master Intelligence Loops
+        if hasattr(self, "central_control") and self.central_control:
+            tasks.append(asyncio.create_task(self.central_control.strategic_oversight_loop()))
+            tasks.append(asyncio.create_task(self.central_control.performance_optimization_loop()))
+            tasks.append(asyncio.create_task(self.central_control.learning_aggregation_loop()))
+            tasks.append(asyncio.create_task(self.central_control.autonomous_evolution_loop()))
+            logger.info("✅ Central Control started (4 loops)")
+        if hasattr(self, "hybrid_coordinator") and self.hybrid_coordinator:
+            tasks.append(asyncio.create_task(self.hybrid_coordinator.testnet_learning_loop()))
+            tasks.append(asyncio.create_task(self.hybrid_coordinator.live_execution_loop()))
+            tasks.append(asyncio.create_task(self.hybrid_coordinator.learning_transfer_loop()))
+            logger.info("✅ Hybrid Coordinator started (3 loops)")
+        if hasattr(self, "swarm_intelligence") and self.swarm_intelligence:
+            tasks.append(asyncio.create_task(self.swarm_intelligence.run_swarm_loop()))
+            logger.info("✅ Swarm started (50 scouts)")
+
         tasks.append(asyncio.create_task(self.enhanced_trading_loop()))
         logger.info("✅ Enhanced trading loop started")
         
