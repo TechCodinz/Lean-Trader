@@ -110,7 +110,12 @@ class DynamicMarketScanner:
                     logger.warning(f"   {exchange_name} doesn't have fetch_tickers, skipping")
                     continue
                 
-                tickers = await exchange.fetch_tickers()
+                # Handle both async and sync exchanges
+                if hasattr(exchange, 'fetch_tickers'):
+                    tickers = await asyncio.to_thread(exchange.fetch_tickers)
+                else:
+                    logger.warning(f"   {exchange_name} doesn't support fetch_tickers")
+                    continue
                 
                 # Filter for USDT pairs only
                 usdt_pairs = {
