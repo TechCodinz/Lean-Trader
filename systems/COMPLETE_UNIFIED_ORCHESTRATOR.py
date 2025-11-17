@@ -367,7 +367,25 @@ class CompleteUnifiedOrchestrator:
         self.pattern_memory = PatternMemory()
         self.ledger = Ledger()
         
-        universe = ["BTC/USDT", "ETH/USDT", "BNB/USDT", "SOL/USDT", "DOGE/USDT"]
+        # Read universe from .env or use testnet pairs
+        env_universe = os.getenv("UNIVERSE", "")
+        if env_universe:
+            universe = [p.strip() for p in env_universe.split(",")]
+            self.universe = universe
+            logger.info(f"✅ Loaded {len(universe)} pairs from .env UNIVERSE")
+        else:
+            # Use Bybit testnet pairs
+            try:
+                from BYBIT_TESTNET_PAIRS_FILTER import BYBIT_TESTNET_PAIRS
+                crypto_pairs = sorted([p for p in BYBIT_TESTNET_PAIRS if '/' in p and 'USDT' in p])
+                universe = crypto_pairs if crypto_pairs else ["BTC/USDT", "ETH/USDT", "BNB/USDT", "SOL/USDT", "DOGE/USDT"]
+                self.universe = universe
+                logger.info(f"✅ Loaded {len(universe)} testnet pairs")
+            except:
+                universe = ["BTC/USDT", "ETH/USDT", "BNB/USDT", "SOL/USDT", "DOGE/USDT"]
+                self.universe = universe
+                logger.info("ℹ️  Using default 5 pairs")
+        
         self.ultra_core = UltraCore(self.router, universe, logger)
         
         awareness_cfg = AwarenessConfig()
