@@ -22,7 +22,7 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 
-async def monitor_trade_for_profit(exchange, trade_plan: Dict):
+async def monitor_trade_for_profit(exchange, trade_plan: Dict, orchestrator=None):
     """
     Monitor trade and close at profit targets
     
@@ -60,7 +60,7 @@ async def monitor_trade_for_profit(exchange, trade_plan: Dict):
                     final_pnl = (current_price - entry_price) / entry_price
                 else:
                     final_pnl = (entry_price - current_price) / entry_price
-                await close_position_at_market(exchange, symbol, entry_price, side, final_pnl)
+                await close_position_at_market(exchange, symbol, entry_price, side, final_pnl, orchestrator)
                 break
             
             # Get current price
@@ -85,7 +85,7 @@ async def monitor_trade_for_profit(exchange, trade_plan: Dict):
                         logger.info(f"   Exit: ${current_price:.6f}")
                         logger.info(f"   💰 PROFIT: +{pnl_pct:.2%}")
                         
-                        await close_position_at_market(exchange, symbol, entry_price, side, pnl_pct)
+                        await close_position_at_market(exchange, symbol, entry_price, side, pnl_pct, orchestrator)
                         return  # Exit monitoring
                 
                 # Check stop loss
@@ -110,11 +110,12 @@ async def monitor_trade_for_profit(exchange, trade_plan: Dict):
         logger.error(f"Monitoring error for {symbol}: {e}")
 
 
-async def close_position_at_market(exchange, symbol: str, entry_price: float, 
-                                   side: str, pnl_pct: float):
-    """Close position at market price"""
+async def close_position_at_market(exchange, symbol: str, entry_price: float,
+                                   side: str, pnl_pct: float, orchestrator=None):
+    """Close position at market price and record profit"""
     try:
-        # Would place closing order here
+        # Calculate actual P&L
+        # For now we log it - actual close order would go here
         logger.info(f"💰 POSITION CLOSED: {symbol}")
         logger.info(f"   Entry: ${entry_price:.6f}")
         logger.info(f"   P&L: {pnl_pct:+.2%}")
@@ -125,6 +126,12 @@ async def close_position_at_market(exchange, symbol: str, entry_price: float,
             logger.info(f"✅ WINNING TRADE: +{pnl_pct:.2%}! 🎉")
         else:
             logger.info(f"❌ Losing trade: {pnl_pct:.2%}")
-    
+        
+        # Record in orchestrator if provided
+        if orchestrator and hasattr(orchestrator, 'record_closed_trade'):
+            current_price = entry_price * (1 + pnl_pct) if side == 'buy' else entry_price * (1 - pnl_pct)
+            orchestrator.record_closed_trade(symbol, entry_price, current_price, pnl_pct)
+            logger.info(f"   📊 Profit recorded in orchestrator")
+        
     except Exception as e:
         logger.error(f"Close position error: {e}")
