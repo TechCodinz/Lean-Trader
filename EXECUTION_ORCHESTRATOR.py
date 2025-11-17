@@ -705,16 +705,16 @@ class ExecutionOrchestrator:
                 if router:
                     route = await router.route_signal(signal)
                 if route:
-                        logger.info(f"   🧠 ROUTER: {symbol} routed to {route['exchange']} {route['market_type']}")
-                        # If pair not on this exchange, skip
-                        if route['exchange'] != 'bybit_testnet' and self.mode == 'testnet':
-                            logger.info(f"   ⏭️  {symbol} not on testnet, skipping")
-                            return False
-                    else:
-                        logger.info(f"   ⏭️  {symbol} not available anywhere, skipping")
+                    logger.info(f"   🧠 ROUTER: {symbol} routed to {route['exchange']} {route['market_type']}")
+                    # If pair not on this exchange, skip
+                    if route['exchange'] != 'bybit_testnet' and self.mode == 'testnet':
+                        logger.info(f"   ⏭️  {symbol} not on testnet, skipping")
                         return False
                 else:
-                    logger.debug("   Router not available (not initialized yet)")
+                    if route is None:
+                        logger.debug("   Router: No route found")
+                    else:
+                        logger.debug("   Router not available (not initialized yet)")
             except Exception as e:
                 logger.debug(f"   Router check failed: {e}")
                 # Fallback route
