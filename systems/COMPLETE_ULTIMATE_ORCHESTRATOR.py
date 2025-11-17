@@ -1087,12 +1087,9 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             tasks.append(asyncio.create_task(self.hybrid_coordinator.learning_transfer_loop()))
             logger.info("✅ Hybrid Coordinator started (2 loops)")
         if hasattr(self, "swarm_intelligence") and self.swarm_intelligence:
-            # Check what method it actually has
-            if hasattr(self.swarm_intelligence, 'run_collective_loop'):
-                tasks.append(asyncio.create_task(self.swarm_intelligence.run_collective_loop()))
-            elif hasattr(self.swarm_intelligence, 'run'):
-                tasks.append(asyncio.create_task(self.swarm_intelligence.run()))
-            logger.info("✅ Swarm started")
+            # Swarm is event-driven, not loop-based - it responds to signals
+            # Just log that it's available
+            logger.info("✅ Swarm Intelligence ready (event-driven - responds to signals)")
 
         tasks.append(asyncio.create_task(self.enhanced_trading_loop()))
         logger.info("✅ Enhanced trading loop started")
