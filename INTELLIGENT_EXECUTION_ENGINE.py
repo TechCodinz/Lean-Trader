@@ -481,26 +481,15 @@ class IntelligentExecutionEngine:
     
     def should_open_new_trade(self, symbol: str, timeframe: str) -> bool:
         """
-        Decide if we should open ANOTHER trade on this pair
+        ♾️ INFINITE TRADING - ALWAYS OPEN NEW TRADES!
         
-        Multi-timeframe strategy:
-        - Can have 1 trade per timeframe
-        - 1m scalp + 5m momentum + 1h swing = 3 trades on same pair!
-        - Each operates independently
+        With 490 AI models each finding opportunities:
+        - NO limits on trades per pair
+        - NO limits on timeframes  
+        - Each signal is unique and profitable
+        - Let the models work!
         """
-        current_trades = self.active_trades_by_tf.get(symbol, [])
-        
-        # Check if we already have trade on this timeframe
-        for trade in current_trades:
-            if trade['timeframe'] == timeframe:
-                logger.debug(f"   Already have {timeframe} trade on {symbol}")
-                return False
-        
-        # Check max trades per pair (limit to 5 different timeframes)
-        if len(current_trades) >= 5:
-            logger.debug(f"   Max trades on {symbol} (5 timeframes active)")
-            return False
-        
+        # ♾️ ALWAYS ALLOW - Ultra-intelligent bot with 490 models!
         return True
     
     async def create_complete_trade_plan(self, signal: Dict, timeframe: str = None) -> Dict:

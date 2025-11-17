@@ -727,16 +727,12 @@ class ExecutionOrchestrator:
             if self.intelligent_engine:
                 logger.info(f"   🧠 Using INTELLIGENT EXECUTION ENGINE!")
                 
-                # Check if we should open another trade on this pair/timeframe
-                # UNLESS it's a hedge position (pairs trade)
+                # ♾️ INFINITE TRADING - NO DUPLICATE CHECKS!
+                # With 490 models, trade as much as profitable!
+                # Each signal is unique (different timeframe, strategy, confidence)
                 is_hedge = signal.get('is_hedge', False)
-                if not is_hedge:
-                    timeframe = signal.get('timeframe', '5m')
-                    if not self.intelligent_engine.should_open_new_trade(symbol, timeframe):
-                        logger.info(f"   ⏸️  Skipping: Already have {timeframe} trade on {symbol}")
-                        return False
-                else:
-                    logger.info(f"   🛡️  Hedge position: Bypassing duplicate check")
+                if is_hedge:
+                    logger.info(f"   🛡️  Hedge position detected")
                 
                 # ✅ PASS ROUTE INFO TO EXECUTION ENGINE!
                 if route:
