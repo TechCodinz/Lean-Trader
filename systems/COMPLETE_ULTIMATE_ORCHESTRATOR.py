@@ -1084,12 +1084,15 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             logger.info("✅ Central Control started (4 loops)")
         if hasattr(self, "hybrid_coordinator") and self.hybrid_coordinator:
             tasks.append(asyncio.create_task(self.hybrid_coordinator.testnet_learning_loop()))
-            tasks.append(asyncio.create_task(self.hybrid_coordinator.live_execution_loop()))
             tasks.append(asyncio.create_task(self.hybrid_coordinator.learning_transfer_loop()))
-            logger.info("✅ Hybrid Coordinator started (3 loops)")
+            logger.info("✅ Hybrid Coordinator started (2 loops)")
         if hasattr(self, "swarm_intelligence") and self.swarm_intelligence:
-            tasks.append(asyncio.create_task(self.swarm_intelligence.run_swarm_loop()))
-            logger.info("✅ Swarm started (50 scouts)")
+            # Check what method it actually has
+            if hasattr(self.swarm_intelligence, 'run_collective_loop'):
+                tasks.append(asyncio.create_task(self.swarm_intelligence.run_collective_loop()))
+            elif hasattr(self.swarm_intelligence, 'run'):
+                tasks.append(asyncio.create_task(self.swarm_intelligence.run()))
+            logger.info("✅ Swarm started")
 
         tasks.append(asyncio.create_task(self.enhanced_trading_loop()))
         logger.info("✅ Enhanced trading loop started")
