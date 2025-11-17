@@ -571,6 +571,45 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
         else:
             self.testnet_trainer = None
         
+        # 7. CENTRAL CONTROL INTELLIGENCE - Master coordinator
+        if CENTRAL_CONTROL_AVAILABLE:
+            logger.info("\n🌟 Central Control Intelligence...")
+            try:
+                self.central_control = CentralControlIntelligence(self.data_hub)
+                logger.info("✅ 🌟 Central Control Intelligence initialized")
+                logger.info("   Supreme coordinator for all 116+ engines!")
+            except Exception as e:
+                logger.warning(f"Central Control: {e}")
+                self.central_control = None
+        else:
+            self.central_control = None
+        
+        # 8. HYBRID INTELLIGENCE COORDINATOR - Testnet/Live coordination
+        if HYBRID_COORDINATOR_AVAILABLE:
+            logger.info("\n🌐 Hybrid Intelligence Coordinator...")
+            try:
+                self.hybrid_coordinator = HybridIntelligenceCoordinator(self.data_hub)
+                logger.info("✅ 🌐 Hybrid Coordinator initialized")
+                logger.info("   Testnet learning + Live trading coordination!")
+            except Exception as e:
+                logger.warning(f"Hybrid Coordinator: {e}")
+                self.hybrid_coordinator = None
+        else:
+            self.hybrid_coordinator = None
+        
+        # 9. SWARM INTELLIGENCE - 50 scouts
+        if SWARM_INTELLIGENCE_AVAILABLE:
+            logger.info("\n🐝 Collective Swarm Intelligence...")
+            try:
+                self.swarm_intelligence = CollectiveSwarmIntelligence(self.data_hub)
+                logger.info("✅ 🐝 Swarm Intelligence initialized")
+                logger.info("   50 scouts across 10 chains for moonshot detection!")
+            except Exception as e:
+                logger.warning(f"Swarm Intelligence: {e}")
+                self.swarm_intelligence = None
+        else:
+            self.swarm_intelligence = None
+        
         logger.info("\n✅ Ultimate Intelligence Systems initialized")
         
         logger.info("\n" + "=" * 80)
