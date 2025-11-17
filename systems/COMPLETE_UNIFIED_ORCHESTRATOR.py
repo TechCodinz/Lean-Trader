@@ -7,9 +7,14 @@ NO MORE DELAYS - EVERYTHING CONNECTED NOW
 
 import asyncio
 import logging
+import os
+from dotenv import load_dotenv
 import sys
 import time
 from pathlib import Path
+
+# Load .env file
+load_dotenv(Path(__file__).parent.parent / ".env")
 from typing import Dict, List, Optional, Any
 from collections import deque
 from datetime import datetime
@@ -384,7 +389,11 @@ class CompleteUnifiedOrchestrator:
         # SMART SCALPING - Multi-timeframe + Session aware!
         try:
             from SMART_SCALPING_ENGINE import SmartScalpingEngine
-            self.trading_engines['smart_scalping'] = SmartScalpingEngine(self.ultra_core, self.risk_engine)
+            self.trading_engines['smart_scalping'] = SmartScalpingEngine(
+                self.ultra_core, 
+                self.risk_engine,
+                universe=getattr(self, 'universe', [])
+            )
             logger.info("🎯 Smart Scalping Engine initialized (MTF + Session aware)")
         except Exception as e:
             logger.warning(f"Smart scalping: {e}")

@@ -619,6 +619,11 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
         )
         logger.info("✅ ⚡ EXECUTION ORCHESTRATOR WIRED - TRADES WILL NOW EXECUTE!")
         
+        # Wire testnet exchange for execution
+        if self.mode == "testnet":
+            self.advanced_orchestrators['execution'].wire_execution_to_testnet(self.router)
+            logger.info("✅ Testnet exchange wired to execution")
+        
         # 5. TELEGRAM ORCHESTRATOR - Complete notifications & remote trading!
         self.advanced_orchestrators['telegram'] = TelegramOrchestrator(
             self.data_hub,

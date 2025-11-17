@@ -622,17 +622,28 @@ class IntelligentExecutionEngine:
                 # Fetch from our exchange
                 if self.exchange:
                     try:
-                        ticker = await asyncio.to_thread(self.exchange.fetch_ticker, symbol)
-                        entry_price = ticker.get('last', ticker.get('close', 0))
-                        logger.info(f"   ✅ Got live price: ${entry_price:.6f}")
+                        # Handle both router and raw exchange
+                        if hasattr(self.exchange, 'ex'):
+                            # It's a router - use .ex
+                            ticker = await asyncio.to_thread(self.exchange.ex.fetch_ticker, symbol)
+                        else:
+                            # It's a raw exchange
+                            ticker = await asyncio.to_thread(self.exchange.fetch_ticker, symbol)
                         
-                        # Validate it's a REAL price (not placeholder)
-                        if entry_price in [100.0, 7.0, 300.0, 10.0, 1.0, 65.0, 32.0]:
-                            logger.warning(f"   ❌ Placeholder price detected: ${entry_price:.2f}, SKIPPING!")
+                        if isinstance(ticker, dict):
+                            entry_price = ticker.get('last', ticker.get('close', 0))
+                            logger.info(f"   ✅ Got live price: ${entry_price:.6f}")
+
+                            # Validate it's a REAL price (not placeholder)
+                            if entry_price in [100.0, 7.0, 300.0, 10.0, 1.0, 65.0, 32.0]:
+                                logger.warning(f"   ❌ Placeholder price detected: ${entry_price:.2f}, SKIPPING!")
+                                return None
+                        else:
+                            logger.warning(f"   ❌ Ticker not a dict: {type(ticker)}")
                             return None
-                            
+
                     except Exception as e:
-                        logger.warning(f"   ⚠️  Fetch failed: {str(e)[:80]}")
+                        logger.warning(f"   ⚠️  Fetch failed for {symbol}: {str(e)}")
                 
                 # Still invalid? Skip
                 if not entry_price or entry_price <= 0:

@@ -203,6 +203,9 @@ class UltimateOrchestrator(CompleteUnifiedOrchestrator):
             # Wire everything with enhancements
             await self.wire_all_systems()
             
+            # Start all advanced orchestrators (market scanner, arbitrage, etc)
+            await self.start_all_orchestrators()
+
             # Start all background orchestrators
             background_tasks = []
             
