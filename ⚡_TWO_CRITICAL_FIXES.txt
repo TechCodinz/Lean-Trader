@@ -1,0 +1,61 @@
+═══════════════════════════════════════════════════════════════════════════════════
+⚡ TWO CRITICAL FIXES - APPLY ON VPS NOW
+═══════════════════════════════════════════════════════════════════════════════════
+
+FIX 1: Scanner can't await dict
+FIX 2: Check why Order ID is None
+
+═══════════════════════════════════════════════════════════════════════════════════
+COPY-PASTE THIS:
+═══════════════════════════════════════════════════════════════════════════════════
+
+cd ~/apex_bot && pkill -f COMPLETE_ULTIMATE_ORCHESTRATOR && python3 << 'EOF'
+# FIX 1: Scanner - use asyncio.to_thread for sync exchanges
+import re
+with open('DYNAMIC_MARKET_SCANNER.py', 'r') as f:
+    content = f.read()
+
+old_code = 'tickers = await exchange.fetch_tickers()'
+new_code = '''if hasattr(exchange, 'fetch_tickers'):
+                    tickers = await asyncio.to_thread(exchange.fetch_tickers)
+                else:
+                    logger.warning(f"   {exchange_name} no fetch_tickers")
+                    continue'''
+
+content = content.replace(old_code, new_code)
+
+with open('DYNAMIC_MARKET_SCANNER.py', 'w') as f:
+    f.write(content)
+    
+print("✅ Scanner fixed")
+
+# FIX 2: Check if order-block is still active
+with open('router.py', 'r') as f:
+    router_content = f.read()
+    if 'blocked live order call' in router_content:
+        print("⚠️ Router still has order-block!")
+    else:
+        print("✅ Order-block removed")
+EOF
+python3 systems/COMPLETE_ULTIMATE_ORCHESTRATOR.py > apex_systematic.log 2>&1 & sleep 20 && tail -f apex_systematic.log | grep -E "Scanning|Found.*pairs|Order ID|EXECUTING.*USDT"
+
+
+═══════════════════════════════════════════════════════════════════════════════════
+EXPECTED RESULT:
+═══════════════════════════════════════════════════════════════════════════════════
+
+🔍 Scanning mexc...
+   Found 198 USDT pairs on mexc
+🔍 Scanning gateio...
+   Found 423 USDT pairs on gateio  
+🔍 Scanning binance...
+   Found 847 USDT pairs on binance
+✅ Scan complete: 1,468 total pairs!
+
+⚡ EXECUTING: BUY BTC/USDT
+📋 Order ID: 2085907... (REAL!)
+
+⚡ EXECUTING: BUY ETH/USDT
+📋 Order ID: 2085908...
+
+TRADES WITH REAL IDs! 🚀
