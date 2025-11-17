@@ -624,6 +624,21 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             self.advanced_orchestrators['execution'].wire_execution_to_testnet(self.router)
             logger.info("✅ Testnet exchange wired to execution")
         
+        # Initialize INTELLIGENT_EXCHANGE_ROUTER for multi-exchange routing
+        try:
+            from INTELLIGENT_EXCHANGE_ROUTER import IntelligentExchangeRouter
+            self.intelligent_router = IntelligentExchangeRouter()
+            # Register all available exchanges
+            if hasattr(self, 'arbitrage_engine') and self.arbitrage_engine:
+                for ex_name, ex_obj in self.arbitrage_engine.exchanges.items():
+                    self.intelligent_router.register_exchange(ex_name, ex_obj)
+                logger.info(f"✅ INTELLIGENT_EXCHANGE_ROUTER initialized with {len(self.arbitrage_engine.exchanges)} exchanges")
+            else:
+                logger.info("✅ INTELLIGENT_EXCHANGE_ROUTER initialized (will route as exchanges become available)")
+        except Exception as e:
+            logger.warning(f"Intelligent router: {e}")
+            self.intelligent_router = None
+        
         # 5. TELEGRAM ORCHESTRATOR - Complete notifications & remote trading!
         self.advanced_orchestrators['telegram'] = TelegramOrchestrator(
             self.data_hub,
