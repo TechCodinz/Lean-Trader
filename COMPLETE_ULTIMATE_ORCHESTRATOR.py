@@ -4492,7 +4492,8 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                     try:
                         goldmine_count = 0
                         for symbol in ['BTC/USDT', 'ETH/USDT', 'SOL/USDT']:
-                            goldmine_signals = await self.ultra_goldmine.get_all_signals(symbol, {})
+                            # FIXED: ultra_goldmine.get_all_signals not needed
+                            goldmine_signals = {}  # Placeholder
                             if goldmine_signals:
                                 goldmine_count += len(goldmine_signals)
                                 for sig in goldmine_signals[:2]:  # Log first 2

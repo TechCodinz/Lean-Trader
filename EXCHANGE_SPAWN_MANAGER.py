@@ -223,7 +223,7 @@ class ExchangeSpawnManager:
         
         try:
             # Get signals from data hub for this exchange
-            all_signals = await self.data_hub.get_all_signals()
+            all_signals = await self.data_hub.get_recent_signals(limit=1000)
             
             # Filter for this exchange
             exchange_signals = [

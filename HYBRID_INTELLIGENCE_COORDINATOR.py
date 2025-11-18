@@ -145,7 +145,7 @@ class HybridIntelligenceCoordinator:
         while self.active:
             try:
                 # Get signals from all engines
-                signals = await self.data_hub.get_all_signals()
+                signals = await self.data_hub.get_recent_signals(limit=1000)
                 
                 for signal in signals:
                     # Execute on testnet for learning
@@ -185,7 +185,7 @@ class HybridIntelligenceCoordinator:
         while self.active:
             try:
                 # Get signals from all engines
-                signals = await self.data_hub.get_all_signals()
+                signals = await self.data_hub.get_recent_signals(limit=1000)
                 
                 for signal in signals:
                     strategy_id = signal.get('strategy_id', 'unknown')
