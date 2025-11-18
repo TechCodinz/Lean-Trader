@@ -247,6 +247,10 @@ except ImportError:
 # Import TESTNET TRAINER - Smart testnet/live switching!
 try:
     from TESTNET_TRAINER import TestnetTrainer, initialize_testnet_trainer
+    TESTNET_TRAINER_AVAILABLE = True
+except Exception as e:
+    logger.warning(f"TESTNET_TRAINER not available: {e}")
+    TESTNET_TRAINER_AVAILABLE = False
 
 # ============================================================================
 # UNIVERSAL AI ORCHESTRATOR - SUPPORTS ANY AI API (DEEPSEEK, CLAUDE, GPT-4, etc.)
