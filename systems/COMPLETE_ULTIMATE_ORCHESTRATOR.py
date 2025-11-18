@@ -21,6 +21,32 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ============================================================================
+# MT5 FOREX INTEGRATION - AUTOMATED BYBIT MT5 FOREX PAIRS!
+# ============================================================================
+try:
+    from mt5_forex_sync import initialize_mt5_forex_sync, start_mt5_auto_update
+    from MT5_FOREX_ENGINE_INTEGRATION import get_mt5_forex_integration
+    MT5_FOREX_AVAILABLE = True
+    logger.info("=" * 80)
+    logger.info("🌍💱 MT5 FOREX INTEGRATION LOADED!")
+    logger.info("=" * 80)
+    logger.info("   Features:")
+    logger.info("   • Auto-scrapes Bybit MT5 forex pairs")
+    logger.info("   • Merges with existing forex pairs")
+    logger.info("   • Auto-updates every 24 hours")
+    logger.info("   • Intelligent routing (forex→MT5, crypto→exchanges)")
+    logger.info("   • Never misses tradable pairs")
+    logger.info("")
+    logger.info("   When you add MT5 credentials:")
+    logger.info("   • All forex pairs will be traded automatically")
+    logger.info("   • Dynamic pair updates (no manual config)")
+    logger.info("=" * 80)
+except Exception as e:
+    logger.warning(f"⚠️  MT5 Forex integration not available: {e}")
+    MT5_FOREX_AVAILABLE = False
+
+
+# ============================================================================
 # BOOTSTRAP PROFIT TRACKER - TRACK JOURNEY FROM $20 TO INFINITY!
 # ============================================================================
 try:
