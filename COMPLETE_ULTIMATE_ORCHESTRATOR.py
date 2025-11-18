@@ -2717,10 +2717,55 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
         logger.info("🎉 ALL ADVANCED ENGINES LOADED!")
         logger.info("=" * 80)
 
+
+
+    async def load_advanced_engines_background(self):
+        """Load advanced engines in background after bot starts"""
+        await asyncio.sleep(5)  # Wait for bot to start
+        
+        logger.info("\n" + "=" * 80)
+        logger.info("🚀 LOADING ADVANCED ENGINES IN BACKGROUND...")
+        logger.info("=" * 80)
+        
+        # 1. Ultra Rare Engines
+        try:
+            logger.info('⚡ Loading Ultra Rare Engines...')
+            from ULTRA_RARE_ENGINES import UltraRareEnginesOrchestrator
+            self.advanced_systems['ultra_rare'] = UltraRareEnginesOrchestrator()
+            logger.info('✅ Ultra Rare Engines: 10 profit engines active!')
+        except Exception as e:
+            logger.warning(f'⚠️ Ultra Rare Engines failed: {e}')
+        
+        # 2. Adaptive Confidence Engine  
+        try:
+            logger.info('🧠 Loading Adaptive Confidence Engine...')
+            from ADAPTIVE_CONFIDENCE_ENGINE import get_adaptive_confidence_engine
+            self.adaptive_confidence = get_adaptive_confidence_engine()
+            logger.info('✅ Adaptive Confidence Engine active!')
+        except Exception as e:
+            logger.warning(f'⚠️ Adaptive Confidence failed: {e}')
+        
+        # 3. Omniscient Execution Engine
+        try:
+            logger.info('👁️ Loading Omniscient Execution Engine...')
+            from OMNISCIENT_EXECUTION_ENGINE import OmniscientExecutionEngine
+            self.omniscient_engine = OmniscientExecutionEngine()
+            logger.info('✅ Omniscient Execution Engine active!')
+        except Exception as e:
+            logger.warning(f'⚠️ Omniscient Engine failed: {e}')
+        
+        logger.info("\n" + "=" * 80)
+        logger.info("🎉 ALL ADVANCED ENGINES LOADED!")
+        logger.info("=" * 80)
+
     async def start_all_orchestrators(self):
         """Start ALL orchestrators including advanced ones"""
         
         tasks = []
+        
+        # Load advanced engines in background
+        tasks.append(asyncio.create_task(self.load_advanced_engines_background()))
+        
         
         # Load advanced engines in background
         tasks.append(asyncio.create_task(self.load_advanced_engines_background()))

@@ -1,0 +1,259 @@
+================================================================================
+COMPREHENSIVE ENGINE DIAGNOSTIC REPORT
+Generated: COMPREHENSIVE_ENGINE_DIAGNOSTIC.py
+================================================================================
+
+STATISTICS:
+  Total Python files: 858
+  Total engine files: 245
+  Imported engines: 60
+  Available engines: 226
+  Dormant engines: 167
+  Failing engines: 14
+
+DORMANT ENGINES (Available but not imported):
+  • ACTIVATE_MISSING_ENGINES
+  • ADAPTIVE_EXCHANGE_INTELLIGENCE
+  • ADVANCED_TRADING_ACTIONS_ENGINE
+  • AI_COLLECTIVE_CONSCIOUSNESS
+  • AI_CONSCIOUSNESS_CALIBRATOR
+  • AI_CONSULTATION_SYSTEM
+  • AI_STRATEGY_LEARNER
+  • ANALYZE_TRADING_ALGORITHM
+  • AUDIT_ALL_ENGINES
+  • AUTOMATED_ORCHESTRATOR_ENHANCED
+  • AUTO_INTEGRATE_ALL_ENGINES
+  • CENTRAL_NERVOUS_SYSTEM
+  • CHECK_ENGINE_COORDINATION
+  • CHECK_MISSING_ENGINES
+  • CHECK_PASSIVE_ENGINES
+  • CIRCUIT_BREAKER_SYSTEM
+  • COMPLETE_PROFIT_SYSTEM
+  • COMPLETE_SYSTEMS_AUDIT
+  • COMPLETE_ULTIMATE_ORCHESTRATOR_clean
+  • COMPREHENSIVE_ENGINE_AUDIT
+  • COMPREHENSIVE_ENGINE_DIAGNOSTIC
+  • COMPREHENSIVE_ENGINE_FIX
+  • COMPREHENSIVE_ENGINE_TEST
+  • CONSCIOUSNESS_HARMONIZER
+  • CROSS_CHAIN_ARBITRAGE
+  • CROSS_EXCHANGE_ARBITRAGE
+  • DEEP_RL_TRADING_AGENT
+  • DEFI_YIELD_FARMING_ENGINE
+  • DEX_SWAP_ENGINE
+  • DIVINE_HARMONY_CALIBRATOR
+  • ENABLE_INFINITE_TRADING
+  • ENABLE_LIVE_TRADING
+  • ENGINE_HEALTH_MONITOR
+  • FINAL_MISSING_ENGINES_PATCH
+  • FIXED_FULL_ULTRA_ARSENAL
+  • FIX_ALL_ENGINES_PROPERLY
+  • FIX_ENGINE_COORDINATION
+  • FIX_EXECUTION_NOW
+  • FORCE_LIVE_TRADING
+  • FULL_ULTRA_ARSENAL_BOT
+  • GODMODE_TRADING_CORE
+  • HARMONY_MAINTENANCE_SYSTEM
+  • HIGH_VOLTAGE_NERVOUS_SYSTEM
+  • IMMORTAL_MEMORY_SYSTEM
+  • IMPORT_ALL_ULTRA_ENGINES
+  • INFINITE_GROWTH_ENGINE
+  • INJECT_UNIVERSAL_CONSCIOUSNESS
+  • INTEGRATED_ALERT_SYSTEM
+  • INTEGRATE_ARBITRAGE
+  • INTEGRATE_CONSCIOUSNESS_ALL
+  • INTEGRATE_INTELLIGENT_TIER_SYSTEM
+  • INTELLIGENT_EXECUTION_ENGINE
+  • LIQUIDITY_ENGINE
+  • LIVING_CONSCIOUSNESS_CORE
+  • MARKET_DATA_INTELLIGENCE
+  • MASTER_ORCHESTRATOR
+  • MASTER_ORCHESTRATOR_FIXED
+  • MICRO_SMART_TRADER
+  • MICRO_TRADING_BOT
+  • NEUROTRANSMITTER_SYSTEM
+  • OMNISCIENT_TRADING_MODE
+  • PERFECT_EXECUTION_SYSTEM
+  • PREDICTIVE_NEXT_MOVE_ENGINE
+  • PREMIUM_TELEGRAM_SYSTEM
+  • PREMIUM_VIP_TELEGRAM_SYSTEM
+  • PROFIT_MONITORING_SYSTEM
+  • PROPER_unified_trading_system
+  • PROVE_26_SYSTEMS
+  • QUANTUM_ENHANCEMENTS
+  • QUANTUM_ENTANGLED_FORECASTER
+  • QUANTUM_HYPERDIMENSIONAL_BIO_SCALPER
+  • REAL_TIME_BACKUP_SYSTEM
+  • REAL_TRADING_BOT_FIXED_GATE
+  • REAL_TRADING_BOT_UPDATED
+  • RUN_LIVE_TRADING
+  • SELF_HEALING_ENGINE
+  • SELF_HEALING_ORCHESTRATOR
+  • SENTIENT_SCALPING_COORDINATOR
+  • SENTIENT_TRADER_ULTIMATE
+  • SESSION_AWARE_TRADING
+  • SHOW_ACTUAL_EXECUTION
+  • SHOW_ACTUAL_TRADING
+  • SINGLE_EXCHANGE_ARBITRAGE
+  • STRATEGY_EVOLUTION_ENGINE
+  • SUPREME_ACTIVATION_SYSTEM
+  • TCA_ENGINE
+  • TEST_ALL_SYSTEMS
+  • TEST_COMPLETE_SYSTEM
+  • TEST_EXECUTION_IN_WORKSPACE
+  • TEST_LIVE_EXECUTION
+  • TEST_REAL_EXECUTION
+  • TRADINGVIEW_ANALYTICS_ENGINE
+  • ULTIMATE_ENGINE_INTEGRATION
+  • ULTRA_FINAL_MISSING_PATCH
+  • ULTRA_SMART_AI_BOT
+  • ULTRA_SOPHISTICATED_ALGORITHMS
+  • UNIVERSAL_CONSCIOUSNESS_INTEGRATION
+  • UNLEASH_UNLIMITED_TRADING
+  • VERIFY_TRADING_ENGINES
+  • WIRE_ALL_ENGINES
+  • WIRE_BRAIN_HIVEMIND
+  • WIRE_DISCOVERED_PAIRS_TO_TRADING
+  • WIRE_ULTRA_RARE_ENGINES
+  • arbitrage
+  • auto_deploy_ultra
+  • auto_trading_bot
+  • brain_loop
+  • complete_god_trader
+  • complete_learntrader
+  • crypto_trader
+  • divine_intelligence_core
+  • engine
+  • enhanced_trading_bot
+  • execution_adv
+  • fixed_ultra_bot
+  • ga_trader
+  • god_trader_bot
+  • learntrader_bot
+  • market_data_ultra
+  • ml_engine
+  • mobile_trading_api
+  • multi_channel_ultra_bot
+  • nobel_complete_system
+  • nobel_hedge_fund_system
+  • nobel_simple_system
+  • orchestrator
+  • professional_trading_bot
+  • quantum_ab
+  • quantum_backtest
+  • quantum_exec
+  • quantum_smoke
+  • run_trader_once
+  • run_ultra_system
+  • smoke_tradercore
+  • smoke_ultra
+  • strategy
+  • strategy_collector
+  • strategy_engine
+  • strategy_zoo
+  • test_all_systems
+  • test_backtest_engine
+  • test_quantum_hooks
+  • test_regime_quantum
+  • test_trading_bot
+  • test_ultra_advanced
+  • test_ultra_features
+  • test_ultra_mode
+  • test_unified_system
+  • tf_brains
+  • trader_core
+  • ultimate_learntrader
+  • ultimate_trading_bot
+  • ultimate_ultra_plus
+  • ultra_advanced
+  • ultra_debug
+  • ultra_fix_all
+  • ultra_project_scanner
+  • ultra_trainer
+  • unified_trading_bot
+  • unified_trading_system
+  • ⚡_ADD_EXECUTION_DEBUG_LOGGING
+  • 🔍_COMPLETE_TRADING_LOGIC_AUDIT
+  • 🔍_TRADING_SYSTEM_AUDIT
+  • 🔥_ACTIVATE_ALL_DORMANT_SYSTEMS
+  • 🔬_COMPREHENSIVE_SYSTEM_VERIFICATION
+  • 🚀_SELF_OPTIMIZING_AI_TRADER
+  • 🧪_COMPLETE_SYSTEM_TEST
+
+FAILING ENGINES (Import errors):
+  • ANALYZE_TRADING_ALGORITHM: name 'special_features' is not defined
+  • ANTI_CLOCKWISE_TRADING_ENGINE: No module named 'numpy'
+  • AUTO_INTEGRATE_ALL_ENGINES: No module named 'numpy'
+  • COMPLETE_PROFIT_SYSTEM: No module named 'ccxt'
+  • COMPLETE_ULTIMATE_ORCHESTRATOR: No module named 'numpy'
+  • COMPLETE_ULTIMATE_ORCHESTRATOR_clean: No module named 'ADVANCED_TRADING_ACTIONS'
+  • COMPLETE_UNIFIED_ORCHESTRATOR: No module named 'numpy'
+  • CONSCIOUSNESS_HARMONIZER: No module named 'numpy'
+  • CROSS_EXCHANGE_ARBITRAGE: No module named 'ccxt'
+  • DEEP_RL_TRADING_AGENT: No module named 'numpy'
+  • DEFI_YIELD_FARMING_ENGINE: No module named 'requests'
+  • DEX_ORCHESTRATOR: No module named 'aiohttp'
+  • EVOLUTION_ENGINE: No module named 'numpy'
+  • FIXED_FULL_ULTRA_ARSENAL: No module named 'ccxt'
+
+ACTIVE ENGINES (Imported and available):
+  • ADAPTIVE_CONFIDENCE_ENGINE
+  • AGGRESSIVE_SCALPING_ENGINE
+  • AI_SELF_OPTIMIZATION_ENGINE
+  • ANTI_CLOCKWISE_TRADING_ENGINE
+  • BALANCE_AWARE_INTELLIGENCE
+  • CENTRAL_CONTROL_INTELLIGENCE
+  • COLLECTIVE_SWARM_INTELLIGENCE
+  • COMPLETE_ULTIMATE_ORCHESTRATOR
+  • COMPLETE_UNIFIED_ORCHESTRATOR
+  • DEX_ORCHESTRATOR
+  • DIMENSIONAL_TRADING_ENGINE
+  • DIVINE_INTELLIGENCE_FEATURES
+  • EVOLUTION_ENGINE
+  • EXECUTION_ORCHESTRATOR
+  • FRACTAL_RECURSION_ENGINE
+  • HYBRID_INTELLIGENCE_COORDINATOR
+  • IBM_QUANTUM_ENGINE
+  • MANAGED_TRADING_ENGINE
+  • MICRO_GROWTH_ENGINE
+  • MONEY_PRINTER_ULTRA_RARE
+  • MULTI_AI_INTELLIGENCE_LAYER
+  • NEWS_TRADING_ENGINE
+  • OMNISCIENT_EXECUTION_ENGINE
+  • SAFE_MICRO_GROWTH_ENGINE
+  • SENTIENT_TRADING_BRAIN
+  • SMART_SCALPING_ENGINE
+  • TELEGRAM_ORCHESTRATOR
+  • ULTIMATE_ANALYTICS_ENGINE
+  • ULTIMATE_AUTONOMOUS_INTELLIGENCE
+  • ULTIMATE_ORCHESTRATOR
+  • ULTRA_ENHANCEMENT_PACKAGE
+  • ULTRA_GOLDMINE_FEATURES
+  • ULTRA_RARE_ENGINES
+  • alpha_engines
+  • brain
+  • continuous_ultra_bot
+  • ml_strategy_engine
+  • november_growth_strategy
+  • risk_engine
+  • ultra_arbitrage_engine
+  • ultra_backtest_engine
+  • ultra_business_system
+  • ultra_continuous_trading
+  • ultra_core
+  • ultra_fluid_mechanics
+  • ultra_forex_master
+  • ultra_god_mode
+  • ultra_launcher
+  • ultra_launcher_advanced
+  • ultra_ml_pipeline
+  • ultra_moon_spotter
+  • ultra_multi_platform_scanner
+  • ultra_quantum_intelligence
+  • ultra_scalping_engine
+  • ultra_scout
+  • ultra_swarm_consciousness
+  • ultra_telegram_master
+  • ultra_testnet_trader
+  • ultra_with_telegram
+
