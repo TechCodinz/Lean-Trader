@@ -1,0 +1,36 @@
+=============================================================================
+⚡ DEPLOY DEBUG VERSION - FIND THE TIMEFRAME BUG!
+=============================================================================
+
+cd ~/bot
+git pull origin continue-from-micro-fix --no-edit
+pkill -f COMPLETE_ULTIMATE_ORCHESTRATOR  
+sleep 3
+nohup python3 COMPLETE_ULTIMATE_ORCHESTRATOR.py > bot.log 2>&1 &
+sleep 20
+
+echo "✅ Debug version deployed!"
+echo ""
+echo "Checking timeframe debug..."
+grep "_get_check_interval" bot.log | tail -10
+echo ""
+echo "Monitoring debug..."
+grep "DEBUG:" bot.log | tail -10
+echo ""
+tail -f bot.log
+
+=============================================================================
+🔍 WHAT TO LOOK FOR:
+=============================================================================
+
+You should see:
+   _get_check_interval called with: '1m' (type: str)
+   _get_check_interval returning: 1.0 for '1m'
+   
+OR:
+   _get_check_interval called with: 'None' (PROBLEM!)
+   _get_check_interval returning: 10.0 for 'None'
+
+This will tell us EXACTLY what's wrong!
+
+=============================================================================

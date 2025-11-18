@@ -149,6 +149,9 @@ class IntelligentExecutionEngine:
         
         GOAL: INSTANT PROFIT DETECTION → CLOSE FAST → RECYCLE CAPITAL!
         """
+        # DEBUG: Log exact timeframe being checked
+        logger.debug(f"_get_check_interval called with: '{timeframe}' (type: {type(timeframe).__name__})")
+        
         timeframe_to_interval = {
             '1m': 1.0,      # ⚡ Check every second!
             '3m': 2.0,
@@ -161,7 +164,9 @@ class IntelligentExecutionEngine:
             '1d': 300.0,
             '1w': 600.0
         }
-        return timeframe_to_interval.get(timeframe, 10.0)
+        result = timeframe_to_interval.get(timeframe, 10.0)
+        logger.debug(f"_get_check_interval returning: {result} for '{timeframe}'")
+        return result
     
     def _should_skip_symbol(self, symbol: str) -> bool:
         """
