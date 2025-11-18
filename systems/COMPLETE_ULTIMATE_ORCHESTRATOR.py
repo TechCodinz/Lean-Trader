@@ -2189,10 +2189,11 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             # Get initial balance
             initial_capital = 1000.0  # Will update from exchange
             
-            self.trailing_stops = TrailingStopManager(trail_percent=0.02)
-            self.compound_engine = CompoundEngine(initial_capital=initial_capital, compound_rate=0.5)
+            self.trailing_stops = TrailingStopManager()
+            self.compound_engine = CompoundEngine()
+            self.compound_engine.set_initial_balance(initial_capital)
             self.partial_tp = PartialTPManager()
-            self.emergency_stop = EmergencyStop(max_loss=0.10, max_trades_per_min=10)
+            self.emergency_stop = EmergencyStop()
             self.funding_arb = FundingArbitrage(min_spread=0.001)
             self.volume_analyzer = VolumeProfileAnalyzer()
             
