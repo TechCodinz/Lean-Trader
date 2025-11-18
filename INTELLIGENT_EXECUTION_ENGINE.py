@@ -105,6 +105,40 @@ class IntelligentExecutionEngine:
     13. ALL 116+ engines in harmony
     """
     
+    def _should_skip_symbol(self, symbol: str) -> bool:
+        """
+        Check if symbol should be skipped on current exchange
+        
+        PaperBroker/crypto exchanges only support USDT pairs
+        Forex (USD/JPY) and TradFi (GOLD) will be routed to MT5 when added
+        """
+        # Forex patterns (3-letter currency codes)
+        forex_codes = ['USD', 'EUR', 'GBP', 'JPY', 'CHF', 'CAD', 'AUD', 'NZD', 'CNY', 'HKD']
+        
+        # TradFi symbols (commodities, indices without /)
+        tradfi_symbols = ['GOLD', 'SILVER', 'OIL', 'GAS', 'SUGAR', 'COFFEE', 'WHEAT', 'CORN', 
+                         'COPPER', 'PLATINUM', 'NATGAS', 'BRENT']
+        
+        # Check if it's a symbol without '/' (forex or TradFi)
+        if '/' not in symbol:
+            return True  # Skip - needs MT5
+        
+        # Check if it's a forex pair (USD/JPY, EUR/GBP, etc.)
+        parts = symbol.split('/')
+        if len(parts) == 2:
+            base, quote = parts
+            # If both parts are forex codes, it's a forex pair
+            if base in forex_codes and quote in forex_codes:
+                return True  # Skip - needs MT5
+        
+        # Check if it's not a USDT pair
+        if '/USDT' not in symbol:
+            # For crypto exchanges, we only trade USDT pairs
+            return True  # Skip - not USDT pair
+        
+        # It's a USDT crypto pair - OK to trade!
+        return False
+    
     def __init__(self, exchange, mode='testnet', exchanges=None, balance=None):
         self.exchange = exchange  # Default exchange
         self.exchanges = exchanges or {}  # All available exchanges (for router)
