@@ -35,10 +35,11 @@ class DynamicMarketScanner:
         self.trending_pairs = deque(maxlen=50)  # Top 50 trending
         self.volume_leaders = deque(maxlen=30)  # Top 30 by volume
         
-        # Scanning config - RELAXED for more opportunities
-        self.min_24h_volume_usd = 1_000_000  # $1M minimum (was $5M)
-        self.min_price_change_pct = 1.5  # 1.5% move (was 3%)
+        # Scanning config - ULTRA-RELAXED for maximum opportunities
+        self.min_24h_volume_usd = 100_000  # $100K minimum (lowered from $1M)
+        self.min_price_change_pct = 0.5  # 0.5% move (lowered from 1.5%)
         self.rescan_interval = 3600  # 1 hour
+        self.include_all_pairs = True  # Include ALL pairs regardless of volume!
         
         # Stats
         self.last_scan = None
@@ -128,10 +129,20 @@ class DynamicMarketScanner:
                     continue
                 
                 # Filter for USDT pairs only
-                usdt_pairs = {
-                    symbol: ticker for symbol, ticker in tickers.items()
-                    if '/USDT' in symbol and ':' not in symbol  # Exclude futures
-                }
+                # FIXED: More flexible filtering for different exchange formats
+                usdt_pairs = {}
+                for symbol, ticker in tickers.items():
+                    # Include if it's a USDT pair
+                    if '/USDT' in symbol:
+                        # Exclude futures/perps ONLY if they have specific markers
+                        # Bybit uses different notation, so be more selective
+                        if exchange_name == 'bybit':
+                            # Bybit: Include all /USDT pairs (spot and linear)
+                            usdt_pairs[symbol] = ticker
+                        else:
+                            # Other exchanges: Exclude if has : (futures notation)
+                            if ':' not in symbol:
+                                usdt_pairs[symbol] = ticker
                 
                 logger.info(f"   Found {len(usdt_pairs)} USDT pairs on {exchange_name}")
                 all_pairs_found.extend(list(usdt_pairs.keys()))
@@ -143,9 +154,9 @@ class DynamicMarketScanner:
                         volume_24h = ticker.get('quoteVolume', 0)  # Volume in USDT
                         price_change_pct = ticker.get('percentage', 0)
                         
-                        # Check if it meets criteria
-                        if volume_24h >= self.min_24h_volume_usd:
-                            # High volume pair
+                        # ULTRA-RELAXED: Include ALL pairs OR check volume
+                        if self.include_all_pairs or volume_24h >= self.min_24h_volume_usd:
+                            # Add to opportunities
                             new_opportunities.add(symbol)
                             
                             # Track as volume leader
