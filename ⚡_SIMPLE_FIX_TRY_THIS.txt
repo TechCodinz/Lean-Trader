@@ -1,0 +1,25 @@
+============================================================================
+⚡ SIMPLE FIX - TRY THIS INSTEAD
+============================================================================
+
+# Option 1: Clean pull (safest)
+cd ~/bot && pkill -f ORCHESTRATOR && git stash && git fetch origin continue-from-micro-fix && git reset --soft origin/continue-from-micro-fix && git stash pop && python3 systems/COMPLETE_ULTIMATE_ORCHESTRATOR.py > bot.log 2>&1 & sleep 15 && tail -80 bot.log
+
+============================================================================
+
+# Option 2: If router.py exists in current directory
+cd ~/bot && ls -la router.py && python3 systems/COMPLETE_ULTIMATE_ORCHESTRATOR.py > bot.log 2>&1 & sleep 15 && tail -50 bot.log
+
+============================================================================
+
+# Option 3: Use systems/COMPLETE_UNIFIED_ORCHESTRATOR.py directly
+cd ~/bot && pkill -f ORCHESTRATOR && python3 systems/COMPLETE_UNIFIED_ORCHESTRATOR.py > bot.log 2>&1 & sleep 15 && tail -80 bot.log
+
+============================================================================
+
+# Option 4: Check if files exist first
+cd ~/bot && echo "Checking files..." && ls -1 router.py mt5_forex_sync.py BOOTSTRAP_PROFIT_TRACKER.py ULTRA_GOLDMINE_FEATURES.py DIVINE_INTELLIGENCE_FEATURES.py ULTRASONIC_INTEGRATION_COMPLETE.py 2>&1
+
+============================================================================
+TRY OPTION 4 FIRST to see which files are missing!
+============================================================================

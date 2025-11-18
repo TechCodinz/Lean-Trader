@@ -1,0 +1,24 @@
+============================================================================
+🚨 EMERGENCY FILE CHECK
+============================================================================
+
+Run these commands to see what's actually on your VPS:
+
+# 1. Check current directory
+cd ~/bot && pwd
+
+# 2. Check if critical files exist
+ls -la router.py mt5_forex_sync.py BOOTSTRAP_PROFIT_TRACKER.py 2>&1
+
+# 3. Check git status
+git status
+
+# 4. Check which branch you're on
+git branch
+
+# 5. See if files are in repo
+git ls-files | grep -E "router|mt5_forex|BOOTSTRAP"
+
+============================================================================
+📋 PASTE THE OUTPUT HERE
+============================================================================
