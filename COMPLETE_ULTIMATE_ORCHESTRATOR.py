@@ -2125,6 +2125,35 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             logger.info(f"   🔍 ALL signals scrutinized collectively before routing!")
             logger.info(f"   🎯 Precision + Accuracy + Steady Profits ENABLED!")
             
+            # 🧠 INITIALIZE SUPREME SITUATIONAL AWARENESS - Supersede expectations!
+            try:
+                from SUPREME_SITUATIONAL_AWARENESS import initialize_situational_awareness
+                
+                situational_awareness = initialize_situational_awareness()
+                
+                # Wire to execution orchestrator
+                if 'execution' in self.advanced_orchestrators:
+                    self.advanced_orchestrators['execution'].situational_awareness = situational_awareness
+                
+                # Wire to dynamic scanner
+                if hasattr(self, 'dynamic_scanner') and self.dynamic_scanner:
+                    self.dynamic_scanner.situational_awareness = situational_awareness
+                
+                # Wire to market scanner (fallback)
+                if hasattr(self, 'market_scanner') and self.market_scanner:
+                    self.market_scanner.situational_awareness = situational_awareness
+                
+                # Store globally
+                self.situational_awareness = situational_awareness
+                
+                logger.info(f"🧠 ✅ SUPREME SITUATIONAL AWARENESS initialized!")
+                logger.info(f"   📊 Monitors: Market, System, Risk, Opportunities, Performance")
+                logger.info(f"   🎯 Adaptive Modes: SUPERSEDE/FLAWLESS/BALANCED/CONSERVATIVE/DEFENSIVE")
+                logger.info(f"   ⚡ Wired to: Execution + Scanner + All Systems")
+                logger.info(f"   💎 Result: FLAWLESS execution + SUPERSEDE expectations!")
+            except Exception as awareness_error:
+                logger.error(f"   ❌ Situational Awareness error: {awareness_error}")
+            
             # 🎯 INITIALIZE ENRICHED SIGNAL SYSTEM - Adds ALL vital info!
             try:
                 from ENRICHED_SIGNAL_SYSTEM import initialize_enriched_signal_system
