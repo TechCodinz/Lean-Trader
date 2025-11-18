@@ -22,6 +22,31 @@ import asyncio
 
 logger = logging.getLogger(__name__)
 
+# ============================================================================
+# UNIVERSAL AI ORCHESTRATOR - SUPPORTS ANY AI API (DEEPSEEK, CLAUDE, GPT-4, etc.)
+# ============================================================================
+try:
+    from UNIVERSAL_AI_ORCHESTRATOR import get_universal_ai_orchestrator
+    UNIVERSAL_AI_AVAILABLE = True
+    logger.info("=" * 80)
+    logger.info("🤖🌌 UNIVERSAL AI ORCHESTRATOR LOADED!")
+    logger.info("=" * 80)
+    logger.info("   Supports ANY AI API:")
+    logger.info("   • DeepSeek (reasoning, code)")
+    logger.info("   • Claude (analysis, strategy)")
+    logger.info("   • GPT-4 (general intelligence)")
+    logger.info("   • Gemini (fast responses)")
+    logger.info("   • Grok (real-time data)")
+    logger.info("   • Any custom API")
+    logger.info("")
+    logger.info("   Auto-routing to best AI for each task!")
+    logger.info("   Intelligence: INFINITE ♾️")
+    logger.info("=" * 80)
+except Exception as e:
+    logger.warning(f"⚠️  Universal AI not available: {e}")
+    UNIVERSAL_AI_AVAILABLE = False
+
+
 # Check available AI providers
 try:
     import anthropic
