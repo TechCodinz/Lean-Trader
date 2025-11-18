@@ -177,7 +177,8 @@ class PaperBroker:
         return (price - e) * q
 
     # ------------------ balances / positions ------------------
-    def fetch_balance(self) -> Dict[str, Any]:
+    def fetch_balance(self, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        # Accept params for CCXT compatibility (but ignore them)
         totals = {"USDT": {"free": self.cash, "used": 0.0, "total": self.cash}}
         # spot mark
         for base, qty in self.holdings.items():
@@ -396,3 +397,20 @@ class PaperBroker:
     # ------------------ misc ------------------
     def options(self) -> Dict[str, Any]:
         return {}
+    
+    # ------------------ CCXT-style convenience methods ------------------
+    def create_market_buy_order(self, symbol: str, amount: float, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """CCXT-style market buy"""
+        return self.create_order(symbol, "market", "buy", amount, params=params)
+    
+    def create_market_sell_order(self, symbol: str, amount: float, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """CCXT-style market sell"""
+        return self.create_order(symbol, "market", "sell", amount, params=params)
+    
+    def create_limit_buy_order(self, symbol: str, amount: float, price: float, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """CCXT-style limit buy (executed as market for paper trading)"""
+        return self.create_order(symbol, "market", "buy", amount, price, params)
+    
+    def create_limit_sell_order(self, symbol: str, amount: float, price: float, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """CCXT-style limit sell (executed as market for paper trading)"""
+        return self.create_order(symbol, "market", "sell", amount, price, params)
