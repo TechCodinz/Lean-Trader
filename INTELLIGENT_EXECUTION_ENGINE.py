@@ -819,7 +819,7 @@ class IntelligentExecutionEngine:
                 
                 # MANAGEMENT
                 'max_hold_time_minutes': max_hold,
-                'review_interval_seconds': self._get_review_interval(timeframe),
+                'review_interval_seconds': self._get_check_interval(timeframe),
                 're_evaluate_on': ['volatility_spike', 'news_event', 'trend_reversal'],
                 
                 # INTELLIGENCE CONTEXT (from ALL engines!)
