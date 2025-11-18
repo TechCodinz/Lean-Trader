@@ -35,6 +35,15 @@ import os
 
 logger = logging.getLogger(__name__)
 
+# Import MT5 forex integration
+try:
+    from MT5_FOREX_ENGINE_INTEGRATION import get_mt5_forex_integration
+    MT5_FOREX_INTEGRATION_AVAILABLE = True
+    logger.info("✅ MT5 FOREX INTEGRATION available (automated forex pair routing)")
+except Exception as e:
+    MT5_FOREX_INTEGRATION_AVAILABLE = False
+    logger.warning(f"⚠️ MT5 FOREX INTEGRATION not available: {e}")
+
 # Import advanced execution components
 try:
     from OMNISCIENT_EXECUTION_ENGINE import OmniscientExecutionEngine
@@ -109,15 +118,31 @@ class IntelligentExecutionEngine:
         """
         Check if symbol should be skipped on current exchange
         
-        PaperBroker/crypto exchanges only support USDT pairs
-        Forex (USD/JPY) and TradFi (GOLD) will be routed to MT5 when added
+        Uses MT5 forex integration for intelligent routing:
+        - Forex pairs → MT5 (when available, skip for now)
+        - Crypto USDT → Crypto exchanges (trade now!)
+        - Everything else → Skip
         """
+        # Use MT5 integration if available
+        if self.mt5_forex and MT5_FOREX_INTEGRATION_AVAILABLE:
+            routing = self.mt5_forex.get_routing_info(symbol)
+            
+            # If it's forex but MT5 not connected, skip for now
+            if routing['exchange_type'] == 'mt5':
+                # TODO: When MT5 is connected, route to MT5 instead of skipping
+                logger.debug(f"⏭️  {symbol} is forex - will route to MT5 when connected")
+                return True  # Skip for now (no MT5 yet)
+            
+            # If it's crypto USDT, trade it!
+            if routing['market_type'] == 'spot' and '/USDT' in symbol:
+                return False  # Trade it!
+            
+            # Everything else, skip
+            return True
+        
+        # Fallback if MT5 integration not available
         # Forex patterns (3-letter currency codes)
         forex_codes = ['USD', 'EUR', 'GBP', 'JPY', 'CHF', 'CAD', 'AUD', 'NZD', 'CNY', 'HKD']
-        
-        # TradFi symbols (commodities, indices without /)
-        tradfi_symbols = ['GOLD', 'SILVER', 'OIL', 'GAS', 'SUGAR', 'COFFEE', 'WHEAT', 'CORN', 
-                         'COPPER', 'PLATINUM', 'NATGAS', 'BRENT']
         
         # Check if it's a symbol without '/' (forex or TradFi)
         if '/' not in symbol:
@@ -128,7 +153,7 @@ class IntelligentExecutionEngine:
         if len(parts) == 2:
             base, quote = parts
             # If both parts are forex codes, it's a forex pair
-            if base in forex_codes and quote in forex_codes:
+            if base.replace('+', '') in forex_codes and quote.replace('+', '') in forex_codes:
                 return True  # Skip - needs MT5
         
         # Check if it's not a USDT pair
@@ -144,6 +169,15 @@ class IntelligentExecutionEngine:
         self.exchanges = exchanges or {}  # All available exchanges (for router)
         self.mode = mode
         self.actual_balance = balance or 1000.0  # Store actual balance!
+        
+        # MT5 Forex integration
+        self.mt5_forex = None
+        if MT5_FOREX_INTEGRATION_AVAILABLE:
+            try:
+                self.mt5_forex = get_mt5_forex_integration()
+                logger.info(f"✅ MT5 Forex: {len(self.mt5_forex.forex_symbols)} pairs available")
+            except Exception as e:
+                logger.warning(f"⚠️  Could not load MT5 forex integration: {e}")
         
         # Multi-timeframe tracking
         self.active_trades_by_tf = defaultdict(list)  # {symbol: [{'tf': '1m', 'id': ...}, ...]}
