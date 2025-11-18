@@ -188,6 +188,14 @@ from INTELLIGENT_BALANCE_MANAGER import IntelligentBalanceManager, initialize_ba
 from ULTIMATE_AUTONOMOUS_INTELLIGENCE import UltimateAutonomousIntelligence, initialize_ultimate_intelligence
 from AUTONOMOUS_MASTER_COORDINATOR import AutonomousMasterCoordinator, initialize_coordinator
 
+# Import SAFE MICRO GROWTH - For micro balance growth ($5 → $10k)
+try:
+    from SAFE_MICRO_GROWTH_ENGINE import SafeMicroGrowthEngine
+    SAFE_MICRO_GROWTH_AVAILABLE = True
+except ImportError:
+    SAFE_MICRO_GROWTH_AVAILABLE = False
+    logger.warning("SAFE_MICRO_GROWTH_ENGINE not available")
+
 # Import EXCHANGE MASTERY - Complete exchange knowledge!
 try:
     from ULTIMATE_EXCHANGE_MASTERY import UltimateExchangeMastery, initialize_exchange_mastery
@@ -609,6 +617,21 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                 self.swarm_intelligence = None
         else:
             self.swarm_intelligence = None
+        
+        # 10. SAFE MICRO GROWTH - Ultra-safe micro balance growth
+        if SAFE_MICRO_GROWTH_AVAILABLE:
+            logger.info("\n💎 Safe Micro Growth Engine...")
+            try:
+                # Get current balance for initialization
+                current_bal = self.balance_manager.total_balance.get('bybit_testnet', 10.0) if hasattr(self, 'balance_manager') and self.balance_manager else 10.0
+                self.safe_micro_growth = SafeMicroGrowthEngine(initial_balance=current_bal)
+                logger.info(f"✅ 💎 Safe Micro Growth initialized with ${current_bal:.2f}")
+                logger.info("   Ultra-safe growth: $5 → $10,000 without blowing up!")
+            except Exception as e:
+                logger.warning(f"Safe Micro Growth: {e}")
+                self.safe_micro_growth = None
+        else:
+            self.safe_micro_growth = None
         
         logger.info("\n✅ Ultimate Intelligence Systems initialized")
         
