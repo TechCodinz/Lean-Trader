@@ -2194,7 +2194,7 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             self.compound_engine.set_initial_balance(initial_capital)
             self.partial_tp = PartialTPManager()
             self.emergency_stop = EmergencyStop()
-            self.funding_arb = FundingArbitrage(min_spread=0.001)
+            self.funding_arb = FundingArbitrage()
             self.volume_analyzer = VolumeProfileAnalyzer()
             
             # Store in advanced orchestrators for easy access
