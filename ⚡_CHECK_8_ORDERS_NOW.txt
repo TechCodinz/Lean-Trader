@@ -1,0 +1,38 @@
+=============================================================================
+⚡ CHECK WHAT HAPPENED TO THE 8 ORDERS - RUN THESE COMMANDS
+=============================================================================
+
+cd ~/bot
+
+# 1. Show all 8 Order IDs:
+grep "Order ID:" bot.log
+
+# 2. What pairs were the orders for?
+grep "Order ID:" bot.log -B 10 | grep "symbol\|EXECUTING"
+
+# 3. Did they execute successfully?
+grep "Order ID:" bot.log -A 5 | grep "success\|failed"
+
+# 4. Are they being monitored for profit?
+grep "Profit monitoring started\|Starting.*profit monitoring" bot.log | tail -10
+
+# 5. Did any close with profit?
+grep "PROFIT HIT\|TP.*HIT\|closed.*profit" bot.log
+
+# 6. Check if using PaperBroker (simulated):
+grep "PaperBroker" bot.log | head -5
+
+# 7. Show recent execution flow:
+tail -100 bot.log | grep "EXECUTING\|Order ID\|Balance\|open trades\|monitoring"
+
+=============================================================================
+💡 PASTE RESULTS BACK TO ME!
+=============================================================================
+
+The 8 orders were placed, but balance shows $0 in open trades.
+This means either:
+   1. Orders closed instantly (good!)
+   2. Using PaperBroker not tracking properly
+   3. Real orders but Bybit API not showing positions
+
+Run the commands above and paste output!

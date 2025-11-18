@@ -637,9 +637,15 @@ class IntelligentExecutionEngine:
             'trailing_distance_pct': 0.3,
             
             # MANAGEMENT - TIMEFRAME-SPECIFIC ULTRA-FAST CLOSES!
+            'timeframe': timeframe,  # Include timeframe in plan!
             'max_hold_time_minutes': self._get_max_hold_time(timeframe),
             'review_interval_seconds': self._get_check_interval(timeframe),
             're_evaluate_conditions': ['volatility_spike', 'news_event', 'trend_change'],
+            
+            # DEBUG: Log the values
+            '_debug_max_hold': self._get_max_hold_time(timeframe),
+            '_debug_check_interval': self._get_check_interval(timeframe),
+            '_debug_timeframe': timeframe,
             
             # INTELLIGENCE CONTEXT
             'engine_consensus': 12,  # How many engines agreed
@@ -663,10 +669,10 @@ class IntelligentExecutionEngine:
         try:
             symbol = signal.get('symbol', '')
             
-            # 📊 MULTI-TIMEFRAME: Use provided or determine from confidence
-            if timeframe:
-                # Explicit timeframe provided
-                pass
+            # 📊 MULTI-TIMEFRAME: Use provided or determine from signal
+            if not timeframe:
+                # Get from signal or default to 1m
+                timeframe = signal.get('timeframe', '1m')
             elif signal.get('timeframe'):
                 timeframe = signal.get('timeframe')
             else:
