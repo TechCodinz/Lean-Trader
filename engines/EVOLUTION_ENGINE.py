@@ -1217,16 +1217,74 @@ class ULTIMATE_EVOLUTION_ENGINE:
             'MEME/USDT',
         ]
 
-        # Forex pairs - DISABLED FOR TESTNET (crypto only)
-        # Will be enabled when MT5 is connected
-        self.forex_pairs = []  # Disabled - use MT5_FOREX_ENGINE_INTEGRATION instead
+        # Forex pairs - Will be routed to MT5 when connected
+        self.forex_pairs = [
+            'EUR/USD',
+            'GBP/USD',
+            'USD/JPY',
+            'USD/CHF',
+            'AUD/USD',
+            'USD/CAD',
+            'NZD/USD',
+            'EUR/GBP',
+            'EUR/JPY',
+            'GBP/JPY',
+            'CHF/JPY',
+            'AUD/JPY',
+            'CAD/JPY',
+            'NZD/JPY',
+            'EUR/AUD',
+            'EUR/CAD',
+            'EUR/NZD',
+            'GBP/AUD',
+            'GBP/CAD',
+            'GBP/NZD',
+        ]
 
-        # Stock symbols - DISABLED FOR TESTNET (crypto only)
-        self.stock_symbols = []  # Disabled - crypto exchanges don't trade stocks
+        # Stock symbols - For future stock exchange integration
+        self.stock_symbols = [
+            'AAPL',
+            'MSFT',
+            'GOOGL',
+            'AMZN',
+            'TSLA',
+            'META',
+            'NVDA',
+            'NFLX',
+            'AMD',
+            'INTC',
+            'CRM',
+            'ADBE',
+            'PYPL',
+            'UBER',
+            'LYFT',
+            'SQ',
+            'SPOT',
+            'TWTR',
+            'SNAP',
+            'PINS',
+            'ROKU',
+            'ZM',
+            'DOCU',
+            'OKTA',
+        ]
 
-        # Commodity symbols - DISABLED FOR TESTNET (crypto only)
-        # Will be enabled when MT5 is connected
-        self.commodity_symbols = []  # Disabled - use MT5 for commodities
+        # Commodity symbols - Will be routed to MT5 when connected
+        self.commodity_symbols = [
+            'GOLD',
+            'SILVER',
+            'OIL',
+            'GAS',
+            'COPPER',
+            'PLATINUM',
+            'PALLADIUM',
+            'WHEAT',
+            'CORN',
+            'SOYBEAN',
+            'SUGAR',
+            'COFFEE',
+            'COTTON',
+        ]
 
         print(
             f"✅ Market collectors initialized: {len(self.crypto_pairs)} crypto, {len(self.forex_pairs)} forex, {len(self.stock_symbols)} stocks, {len(self.commodity_symbols)} commodities"

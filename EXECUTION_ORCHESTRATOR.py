@@ -718,6 +718,11 @@ class ExecutionOrchestrator:
             if self.intelligent_engine:
                 logger.info(f"   🧠 Using INTELLIGENT EXECUTION ENGINE!")
                 
+                # 🔧 INTELLIGENT ROUTING: Check if symbol is supported BEFORE creating plan!
+                if self.intelligent_engine._should_skip_symbol(symbol):
+                    logger.debug(f"⏭️  Skipping {symbol} - Not supported by current exchange (will route to MT5 when added)")
+                    return False
+                
                 # ♾️ INFINITE TRADING - NO DUPLICATE CHECKS!
                 # With 490 models, trade as much as profitable!
                 # Each signal is unique (different timeframe, strategy, confidence)
@@ -734,7 +739,7 @@ class ExecutionOrchestrator:
                 trade_plan = await self.intelligent_engine.create_complete_trade_plan(signal)
                 
                 if not trade_plan:
-                    logger.error("Failed to create intelligent trade plan!")
+                    logger.debug(f"⏭️  Could not create trade plan for {symbol} (may not be available)")
                     return False
                 
                 # 2. Execute the intelligent trade
