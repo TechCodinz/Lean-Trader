@@ -1,0 +1,41 @@
+=============================================================================
+⚡ REDEPLOY WITH DEBUG LOGGING - COPY & PASTE
+=============================================================================
+
+cd ~/bot
+git pull origin continue-from-micro-fix --no-edit
+pkill -f COMPLETE_ULTIMATE_ORCHESTRATOR
+sleep 3
+nohup python3 COMPLETE_ULTIMATE_ORCHESTRATOR.py > bot.log 2>&1 &
+sleep 15
+
+echo "✅ Redeployed with debug logging!"
+echo ""
+echo "📊 CHECKING TIMEFRAME SETTINGS..."
+echo ""
+grep "DEBUG: TF=" bot.log | tail -5
+echo ""
+echo "📊 CHECKING MONITORING SETTINGS..."
+echo ""
+grep "Max hold.*Check every" bot.log | tail -5
+echo ""
+echo "📊 WAITING FOR NEXT ORDER..."
+echo ""
+tail -f bot.log | grep --line-buffered "DEBUG\|Order ID\|PROFIT"
+
+=============================================================================
+🎯 WHAT TO LOOK FOR:
+=============================================================================
+
+CORRECT (Fixed):
+   🔍 DEBUG: TF=1m, Hold=1.0, Check=1.0
+   ⚡ Max hold: 1.0 min | Check every: 1.0s
+
+WRONG (Still broken):
+   🔍 DEBUG: TF=5m, Hold=5.0, Check=3.0
+   ⚡ Max hold: 5.0 min | Check every: 30.0s
+   (Debug shows 3s but actual is 30s!)
+
+=============================================================================
+💡 IF STILL WRONG - PASTE OUTPUT & I'LL FIX IMMEDIATELY!
+=============================================================================
