@@ -36,15 +36,16 @@ async def monitor_trade_for_profit(exchange, trade_plan: Dict, orchestrator=None
     stop_loss = trade_plan['stop_loss']
     tp_levels = trade_plan['take_profit_levels']
     max_hold_min = trade_plan['max_hold_time_minutes']
+    check_interval = trade_plan.get('review_interval_seconds', 10)
+    timeframe = trade_plan.get('timeframe', '1m')
     
-    logger.info(f"💰 Starting profit monitoring: {symbol}")
+    logger.info(f"💰 Starting ULTRA-FAST profit monitoring: {symbol} ({timeframe})")
     logger.info(f"   Entry: ${entry_price:.6f}")
     logger.info(f"   TP1: ${tp_levels[0]['price']:.6f}")
     logger.info(f"   SL: ${stop_loss:.6f}")
-    logger.info(f"   Max hold: {max_hold_min} min")
+    logger.info(f"   ⚡ Max hold: {max_hold_min} min | Check every: {check_interval}s")
     
     start_time = datetime.now()
-    check_interval = 10  # Check every 10 seconds
     
     try:
         while True:
@@ -74,19 +75,20 @@ async def monitor_trade_for_profit(exchange, trade_plan: Dict, orchestrator=None
                 else:
                     pnl_pct = (entry_price - current_price) / entry_price
                 
-                # Check TP levels
+                # ⚡ AGGRESSIVE PROFIT-TAKING: Close at FIRST TP hit!
                 for i, tp_level in enumerate(tp_levels):
                     tp_price = tp_level['price']
                     
                     if (side == 'buy' and current_price >= tp_price) or \
                        (side == 'sell' and current_price <= tp_price):
-                        logger.info(f"🎯 TP{i+1} HIT: {symbol} (+{pnl_pct:.2%})")
+                        logger.info(f"🎯 TP{i+1} HIT: {symbol} (+{pnl_pct:.2%}) - CLOSING FAST!")
                         logger.info(f"   Entry: ${entry_price:.6f}")
                         logger.info(f"   Exit: ${current_price:.6f}")
                         logger.info(f"   💰 PROFIT: +{pnl_pct:.2%}")
+                        logger.info(f"   ⚡ Held for: {elapsed_min:.2f} min → Freeing capital!")
                         
                         await close_position_at_market(exchange, symbol, entry_price, side, pnl_pct, orchestrator)
-                        return  # Exit monitoring
+                        return  # ⚡ EXIT IMMEDIATELY - Free capital for next trade!
                 
                 # Check stop loss
                 if (side == 'buy' and current_price <= stop_loss) or \
@@ -97,9 +99,23 @@ async def monitor_trade_for_profit(exchange, trade_plan: Dict, orchestrator=None
                     await close_position_at_market(exchange, symbol, entry_price, side, pnl_pct)
                     return  # Exit monitoring
                 
-                # Log current status every minute
-                if int(elapsed_min) % 1 == 0 and check_interval == 10:
-                    logger.debug(f"📊 {symbol}: {pnl_pct:+.2%} (monitoring...)")
+                # ⚡ INSTANT PROFIT-TAKING: Close at 0.5% profit on 1m (ultra-fast recycling!)
+                if timeframe == '1m' and pnl_pct >= 0.005:  # 0.5% profit
+                    logger.info(f"⚡ FAST PROFIT HIT: {symbol} (+{pnl_pct:.2%}) - Closing in {elapsed_min*60:.0f}s!")
+                    logger.info(f"   💰 Quick profit secured → Freeing capital for next trade!")
+                    await close_position_at_market(exchange, symbol, entry_price, side, pnl_pct, orchestrator)
+                    return
+                
+                # 🚀 FAST PROFIT-TAKING: Close at 0.8% on 5m
+                if timeframe == '5m' and pnl_pct >= 0.008:  # 0.8% profit
+                    logger.info(f"⚡ FAST PROFIT HIT: {symbol} (+{pnl_pct:.2%}) - Closing in {elapsed_min:.1f}m!")
+                    logger.info(f"   💰 Quick profit secured → Freeing capital for next trade!")
+                    await close_position_at_market(exchange, symbol, entry_price, side, pnl_pct, orchestrator)
+                    return
+                
+                # Log current status
+                if int(elapsed_min * 60) % 30 == 0:  # Every 30 seconds
+                    logger.debug(f"   📊 {symbol}: P&L {pnl_pct:+.2%} | Held: {elapsed_min*60:.0f}s")
                 
             except Exception as e:
                 logger.debug(f"Price check error for {symbol}: {e}")

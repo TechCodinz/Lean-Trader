@@ -114,6 +114,55 @@ class IntelligentExecutionEngine:
     13. ALL 116+ engines in harmony
     """
     
+    def _get_max_hold_time(self, timeframe: str) -> float:
+        """
+        Get ULTRA-FAST hold time based on timeframe
+        
+        1m → 1 minute (60 seconds!)
+        5m → 5 minutes
+        15m → 15 minutes
+        1h → 60 minutes
+        
+        GOAL: FAST PROFIT-TAKING → FREE CAPITAL → MORE TRADES → EXPONENTIAL GROWTH!
+        """
+        timeframe_to_minutes = {
+            '1m': 1.0,      # ⚡ 60 seconds max hold!
+            '3m': 3.0,
+            '5m': 5.0,
+            '15m': 15.0,
+            '30m': 30.0,
+            '1h': 60.0,
+            '2h': 120.0,
+            '4h': 240.0,
+            '1d': 1440.0,
+            '1w': 10080.0
+        }
+        return timeframe_to_minutes.get(timeframe, 30.0)
+    
+    def _get_check_interval(self, timeframe: str) -> float:
+        """
+        Get ULTRA-FAST check interval based on timeframe
+        
+        1m → Check every 1 second!
+        5m → Check every 3 seconds
+        15m → Check every 10 seconds
+        
+        GOAL: INSTANT PROFIT DETECTION → CLOSE FAST → RECYCLE CAPITAL!
+        """
+        timeframe_to_interval = {
+            '1m': 1.0,      # ⚡ Check every second!
+            '3m': 2.0,
+            '5m': 3.0,
+            '15m': 10.0,
+            '30m': 15.0,
+            '1h': 30.0,
+            '2h': 60.0,
+            '4h': 120.0,
+            '1d': 300.0,
+            '1w': 600.0
+        }
+        return timeframe_to_interval.get(timeframe, 10.0)
+    
     def _should_skip_symbol(self, symbol: str) -> bool:
         """
         Check if symbol should be skipped on current exchange
@@ -587,9 +636,9 @@ class IntelligentExecutionEngine:
             'trailing_stop': True,
             'trailing_distance_pct': 0.3,
             
-            # MANAGEMENT
-            'max_hold_time_minutes': 30,
-            'review_interval_seconds': 10,
+            # MANAGEMENT - TIMEFRAME-SPECIFIC ULTRA-FAST CLOSES!
+            'max_hold_time_minutes': self._get_max_hold_time(timeframe),
+            'review_interval_seconds': self._get_check_interval(timeframe),
             're_evaluate_conditions': ['volatility_spike', 'news_event', 'trend_change'],
             
             # INTELLIGENCE CONTEXT
