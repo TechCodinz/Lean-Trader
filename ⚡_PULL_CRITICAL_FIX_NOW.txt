@@ -1,0 +1,37 @@
+#!/bin/bash
+# 🔧 CRITICAL FIX: Non-blocking AI + Smart Balance Management
+# This fixes the "Insufficient balance" errors and AI timeouts!
+
+cd ~/bot
+
+# 1. Save current state (no destructive commands!)
+git stash
+
+# 2. Pull the fix
+git pull origin continue-from-micro-fix --no-edit
+
+# 3. Restart bot
+pkill -f COMPLETE_ULTIMATE_ORCHESTRATOR
+sleep 2
+nohup python3 COMPLETE_ULTIMATE_ORCHESTRATOR.py > bot.log 2>&1 &
+
+# 4. Monitor
+tail -f bot.log
+
+echo "✅ FIXES APPLIED:"
+echo "1. AI Consultation is now NON-BLOCKING (2-second timeout)"
+echo "   - Bot continues with ultra engines if AI fails"
+echo "   - No more waiting for 401/timeout errors"
+echo ""
+echo "2. Smart Balance Management"
+echo "   - Checks FREE balance before placing orders"
+echo "   - Accounts for balance used in open trades"
+echo "   - Auto-reduces order size if insufficient"
+echo "   - Skips if less than \$5 available"
+echo ""
+echo "3. Better Logging"
+echo "   - Shows: free / total (used in trades)"
+echo "   - Shows why orders are skipped"
+echo ""
+echo "🎉 RESULT: Bot will place orders efficiently without balance errors!"
+echo "   True hybrid system - AI enhances but doesn't block!"
