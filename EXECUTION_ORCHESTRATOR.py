@@ -643,6 +643,22 @@ class ExecutionOrchestrator:
                 logger.debug(f"Invalid signal: missing symbol or side")
                 return False
             
+            # 🎯 CRITICAL FILTER: Skip forex and leveraged tokens for crypto exchanges!
+            # Forex pairs (no / or : in symbol)
+            if '/' not in symbol and ':' not in symbol:
+                logger.debug(f"   ⏭️ Skipping FOREX pair: {symbol} (route to MT5 when added)")
+                return False
+            
+            # Leveraged tokens (3S, 3L, 5S, 5L - not on testnet)
+            if '3S/' in symbol or '3L/' in symbol or '5S/' in symbol or '5L/' in symbol:
+                logger.debug(f"   ⏭️ Skipping leveraged token: {symbol} (not available on testnet)")
+                return False
+            
+            # Only trade /USDT pairs on testnet
+            if self.mode == 'testnet' and '/USDT' not in symbol:
+                logger.debug(f"   ⏭️ Skipping non-USDT pair: {symbol} (testnet only supports USDT)")
+                return False
+            
             # Check risk management
             can_trade, reason = self.risk_manager.can_open_position(symbol, side)
             if not can_trade:
