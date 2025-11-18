@@ -1,0 +1,366 @@
+[
+  {
+    "symbol": "AUDCAD+",
+    "base_symbol": "AUDCAD",
+    "description": "AUDCAD Forex Pair",
+    "contract_size": "100000",
+    "leverage": "100",
+    "currency": "USD",
+    "source": "fallback",
+    "last_updated": "2025-11-18T14:56:18.992199",
+    "sources": [
+      "fallback"
+    ]
+  },
+  {
+    "symbol": "AUDCHF+",
+    "base_symbol": "AUDCHF",
+    "description": "AUDCHF Forex Pair",
+    "contract_size": "100000",
+    "leverage": "100",
+    "currency": "USD",
+    "source": "fallback",
+    "last_updated": "2025-11-18T14:56:18.992200",
+    "sources": [
+      "fallback"
+    ]
+  },
+  {
+    "symbol": "AUDJPY+",
+    "base_symbol": "AUDJPY",
+    "description": "AUDJPY Forex Pair",
+    "contract_size": "100000",
+    "leverage": "100",
+    "currency": "USD",
+    "source": "fallback",
+    "last_updated": "2025-11-18T14:56:18.992187",
+    "sources": [
+      "fallback"
+    ]
+  },
+  {
+    "symbol": "AUDNZD+",
+    "base_symbol": "AUDNZD",
+    "description": "AUDNZD Forex Pair",
+    "contract_size": "100000",
+    "leverage": "100",
+    "currency": "USD",
+    "source": "fallback",
+    "last_updated": "2025-11-18T14:56:18.992188",
+    "sources": [
+      "fallback"
+    ]
+  },
+  {
+    "symbol": "AUDUSD+",
+    "base_symbol": "AUDUSD",
+    "description": "AUDUSD Forex Pair",
+    "contract_size": "100000",
+    "leverage": "100",
+    "currency": "USD",
+    "source": "fallback",
+    "last_updated": "2025-11-18T14:56:18.992182",
+    "sources": [
+      "fallback"
+    ]
+  },
+  {
+    "symbol": "CADCHF+",
+    "base_symbol": "CADCHF",
+    "description": "CADCHF Forex Pair",
+    "contract_size": "100000",
+    "leverage": "100",
+    "currency": "USD",
+    "source": "fallback",
+    "last_updated": "2025-11-18T14:56:18.992201",
+    "sources": [
+      "fallback"
+    ]
+  },
+  {
+    "symbol": "CADJPY+",
+    "base_symbol": "CADJPY",
+    "description": "CADJPY Forex Pair",
+    "contract_size": "100000",
+    "leverage": "100",
+    "currency": "USD",
+    "source": "fallback",
+    "last_updated": "2025-11-18T14:56:18.992189",
+    "sources": [
+      "fallback"
+    ]
+  },
+  {
+    "symbol": "CHFJPY+",
+    "base_symbol": "CHFJPY",
+    "description": "CHFJPY Forex Pair",
+    "contract_size": "100000",
+    "leverage": "100",
+    "currency": "USD",
+    "source": "fallback",
+    "last_updated": "2025-11-18T14:56:18.992190",
+    "sources": [
+      "fallback"
+    ]
+  },
+  {
+    "symbol": "EURAUD+",
+    "base_symbol": "EURAUD",
+    "description": "EURAUD Forex Pair",
+    "contract_size": "100000",
+    "leverage": "100",
+    "currency": "USD",
+    "source": "fallback",
+    "last_updated": "2025-11-18T14:56:18.992191",
+    "sources": [
+      "fallback"
+    ]
+  },
+  {
+    "symbol": "EURCAD+",
+    "base_symbol": "EURCAD",
+    "description": "EURCAD Forex Pair",
+    "contract_size": "100000",
+    "leverage": "100",
+    "currency": "USD",
+    "source": "fallback",
+    "last_updated": "2025-11-18T14:56:18.992192",
+    "sources": [
+      "fallback"
+    ]
+  },
+  {
+    "symbol": "EURCHF+",
+    "base_symbol": "EURCHF",
+    "description": "EURCHF Forex Pair",
+    "contract_size": "100000",
+    "leverage": "100",
+    "currency": "USD",
+    "source": "fallback",
+    "last_updated": "2025-11-18T14:56:18.992185",
+    "sources": [
+      "fallback"
+    ]
+  },
+  {
+    "symbol": "EURGBP+",
+    "base_symbol": "EURGBP",
+    "description": "EURGBP Forex Pair",
+    "contract_size": "100000",
+    "leverage": "100",
+    "currency": "USD",
+    "source": "fallback",
+    "last_updated": "2025-11-18T14:56:18.992184",
+    "sources": [
+      "fallback"
+    ]
+  },
+  {
+    "symbol": "EURJPY+",
+    "base_symbol": "EURJPY",
+    "description": "EURJPY Forex Pair",
+    "contract_size": "100000",
+    "leverage": "100",
+    "currency": "USD",
+    "source": "fallback",
+    "last_updated": "2025-11-18T14:56:18.992183",
+    "sources": [
+      "fallback"
+    ]
+  },
+  {
+    "symbol": "EURNZD+",
+    "base_symbol": "EURNZD",
+    "description": "EURNZD Forex Pair",
+    "contract_size": "100000",
+    "leverage": "100",
+    "currency": "USD",
+    "source": "fallback",
+    "last_updated": "2025-11-18T14:56:18.992192",
+    "sources": [
+      "fallback"
+    ]
+  },
+  {
+    "symbol": "EURUSD+",
+    "base_symbol": "EURUSD",
+    "description": "EURUSD Forex Pair",
+    "contract_size": "100000",
+    "leverage": "100",
+    "currency": "USD",
+    "source": "fallback",
+    "last_updated": "2025-11-18T14:56:18.992167",
+    "sources": [
+      "fallback"
+    ]
+  },
+  {
+    "symbol": "GBPAUD+",
+    "base_symbol": "GBPAUD",
+    "description": "GBPAUD Forex Pair",
+    "contract_size": "100000",
+    "leverage": "100",
+    "currency": "USD",
+    "source": "fallback",
+    "last_updated": "2025-11-18T14:56:18.992193",
+    "sources": [
+      "fallback"
+    ]
+  },
+  {
+    "symbol": "GBPCAD+",
+    "base_symbol": "GBPCAD",
+    "description": "GBPCAD Forex Pair",
+    "contract_size": "100000",
+    "leverage": "100",
+    "currency": "USD",
+    "source": "fallback",
+    "last_updated": "2025-11-18T14:56:18.992194",
+    "sources": [
+      "fallback"
+    ]
+  },
+  {
+    "symbol": "GBPCHF+",
+    "base_symbol": "GBPCHF",
+    "description": "GBPCHF Forex Pair",
+    "contract_size": "100000",
+    "leverage": "100",
+    "currency": "USD",
+    "source": "fallback",
+    "last_updated": "2025-11-18T14:56:18.992195",
+    "sources": [
+      "fallback"
+    ]
+  },
+  {
+    "symbol": "GBPJPY+",
+    "base_symbol": "GBPJPY",
+    "description": "GBPJPY Forex Pair",
+    "contract_size": "100000",
+    "leverage": "100",
+    "currency": "USD",
+    "source": "fallback",
+    "last_updated": "2025-11-18T14:56:18.992187",
+    "sources": [
+      "fallback"
+    ]
+  },
+  {
+    "symbol": "GBPNZD+",
+    "base_symbol": "GBPNZD",
+    "description": "GBPNZD Forex Pair",
+    "contract_size": "100000",
+    "leverage": "100",
+    "currency": "USD",
+    "source": "fallback",
+    "last_updated": "2025-11-18T14:56:18.992196",
+    "sources": [
+      "fallback"
+    ]
+  },
+  {
+    "symbol": "GBPUSD+",
+    "base_symbol": "GBPUSD",
+    "description": "GBPUSD Forex Pair",
+    "contract_size": "100000",
+    "leverage": "100",
+    "currency": "USD",
+    "source": "fallback",
+    "last_updated": "2025-11-18T14:56:18.992177",
+    "sources": [
+      "fallback"
+    ]
+  },
+  {
+    "symbol": "NZDCAD+",
+    "base_symbol": "NZDCAD",
+    "description": "NZDCAD Forex Pair",
+    "contract_size": "100000",
+    "leverage": "100",
+    "currency": "USD",
+    "source": "fallback",
+    "last_updated": "2025-11-18T14:56:18.992203",
+    "sources": [
+      "fallback"
+    ]
+  },
+  {
+    "symbol": "NZDCHF+",
+    "base_symbol": "NZDCHF",
+    "description": "NZDCHF Forex Pair",
+    "contract_size": "100000",
+    "leverage": "100",
+    "currency": "USD",
+    "source": "fallback",
+    "last_updated": "2025-11-18T14:56:18.992204",
+    "sources": [
+      "fallback"
+    ]
+  },
+  {
+    "symbol": "NZDJPY+",
+    "base_symbol": "NZDJPY",
+    "description": "NZDJPY Forex Pair",
+    "contract_size": "100000",
+    "leverage": "100",
+    "currency": "USD",
+    "source": "fallback",
+    "last_updated": "2025-11-18T14:56:18.992197",
+    "sources": [
+      "fallback"
+    ]
+  },
+  {
+    "symbol": "NZDUSD+",
+    "base_symbol": "NZDUSD",
+    "description": "NZDUSD Forex Pair",
+    "contract_size": "100000",
+    "leverage": "100",
+    "currency": "USD",
+    "source": "fallback",
+    "last_updated": "2025-11-18T14:56:18.992183",
+    "sources": [
+      "fallback"
+    ]
+  },
+  {
+    "symbol": "USDCAD+",
+    "base_symbol": "USDCAD",
+    "description": "USDCAD Forex Pair",
+    "contract_size": "100000",
+    "leverage": "100",
+    "currency": "USD",
+    "source": "fallback",
+    "last_updated": "2025-11-18T14:56:18.992181",
+    "sources": [
+      "fallback"
+    ]
+  },
+  {
+    "symbol": "USDCHF+",
+    "base_symbol": "USDCHF",
+    "description": "USDCHF Forex Pair",
+    "contract_size": "100000",
+    "leverage": "100",
+    "currency": "USD",
+    "source": "fallback",
+    "last_updated": "2025-11-18T14:56:18.992180",
+    "sources": [
+      "fallback"
+    ]
+  },
+  {
+    "symbol": "USDJPY+",
+    "base_symbol": "USDJPY",
+    "description": "USDJPY Forex Pair",
+    "contract_size": "100000",
+    "leverage": "100",
+    "currency": "USD",
+    "source": "fallback",
+    "last_updated": "2025-11-18T14:56:18.992179",
+    "sources": [
+      "fallback"
+    ]
+  }
+]

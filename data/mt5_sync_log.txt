@@ -1,0 +1,42 @@
+
+================================================================================
+MT5 FOREX SYNC UPDATE
+Timestamp: 2025-11-18T14:56:18.992538
+================================================================================
+Total merged pairs: 28
+From Bybit MT5: 28
+From existing: 0
+Newly added: 28
+Updated: 0
+Unchanged: 0
+
+Newly added symbols:
+  • AUDCAD+
+  • AUDCHF+
+  • AUDJPY+
+  • AUDNZD+
+  • AUDUSD+
+  • CADCHF+
+  • CADJPY+
+  • CHFJPY+
+  • EURAUD+
+  • EURCAD+
+  • EURCHF+
+  • EURGBP+
+  • EURJPY+
+  • EURNZD+
+  • EURUSD+
+  • GBPAUD+
+  • GBPCAD+
+  • GBPCHF+
+  • GBPJPY+
+  • GBPNZD+
+  • GBPUSD+
+  • NZDCAD+
+  • NZDCHF+
+  • NZDJPY+
+  • NZDUSD+
+  • USDCAD+
+  • USDCHF+
+  • USDJPY+
+================================================================================

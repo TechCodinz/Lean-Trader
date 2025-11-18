@@ -391,24 +391,22 @@ class IntelligentExecutionEngine:
         try:
             # 🧠 TRY AUTONOMOUS COORDINATOR FIRST!
             try:
-                from COMPLETE_ULTIMATE_ORCHESTRATOR import get_orchestrator
-                orch = get_orchestrator()
-                
-                if not orch:
-                    logger.warning("   ⚠️  Orchestrator not available (autonomous sizing disabled)")
-                elif not hasattr(orch, 'master_coordinator'):
-                    logger.warning("   ⚠️  Orchestrator has no master_coordinator")
-                elif not orch.master_coordinator:
-                    logger.warning("   ⚠️  Master coordinator is None")
-                else:
-                    # Get balance
-                    exec_orch = orch.advanced_orchestrators.get('execution')
-                    if exec_orch and hasattr(exec_orch, 'position_sizer'):
-                        balance = exec_orch.position_sizer.balance
-                        logger.info(f"   💰 Got live balance: ${balance:.2f}")
+                # Try to get balance from exchange directly (avoid circular import)
+                if hasattr(self.exchange, 'fetch_balance'):
+                    bal_info = self.exchange.fetch_balance()
+                    if bal_info and 'total' in bal_info:
+                        usdt_bal = bal_info['total'].get('USDT', {})
+                        if isinstance(usdt_bal, dict):
+                            balance = usdt_bal.get('total', usdt_bal.get('free', self.actual_balance))
+                        else:
+                            balance = float(usdt_bal) if usdt_bal else self.actual_balance
+                        logger.info(f"   💰 Got exchange balance: ${balance:.2f}")
                     else:
-                        balance = 1000
-                        logger.warning(f"   ⚠️  Using fallback balance: ${balance}")
+                        balance = self.actual_balance
+                        logger.debug(f"   💰 Using default balance: ${balance:.2f}")
+                else:
+                    balance = self.actual_balance
+                    logger.debug(f"   💰 Using stored balance: ${balance:.2f}")
                     
                     # Let coordinator decide size using ALL systems!
                     size = orch.master_coordinator.calculate_optimal_position_size(signal, balance)
