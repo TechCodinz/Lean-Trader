@@ -35,9 +35,23 @@ async def monitor_trade_for_profit(exchange, trade_plan: Dict, orchestrator=None
     side = trade_plan['side']
     stop_loss = trade_plan['stop_loss']
     tp_levels = trade_plan['take_profit_levels']
-    max_hold_min = trade_plan['max_hold_time_minutes']
-    check_interval = trade_plan.get('review_interval_seconds', 10)
+    max_hold_min = trade_plan.get('max_hold_time_minutes', 5)
     timeframe = trade_plan.get('timeframe', '1m')
+    
+    # CRITICAL FIX: Get check_interval properly with timeframe-specific default
+    if 'review_interval_seconds' in trade_plan:
+        check_interval = trade_plan['review_interval_seconds']
+    else:
+        # Calculate from timeframe if not in plan
+        timeframe_intervals = {
+            '1m': 1.0,
+            '3m': 2.0,
+            '5m': 3.0,
+            '15m': 10.0,
+            '30m': 15.0,
+            '1h': 30.0
+        }
+        check_interval = timeframe_intervals.get(timeframe, 10)
     
     # DEBUG: Log what we received
     logger.info(f"💰 Starting ULTRA-FAST profit monitoring: {symbol} ({timeframe})")
@@ -45,10 +59,7 @@ async def monitor_trade_for_profit(exchange, trade_plan: Dict, orchestrator=None
     logger.info(f"   TP1: ${tp_levels[0]['price']:.6f}")
     logger.info(f"   SL: ${stop_loss:.6f}")
     logger.info(f"   ⚡ Max hold: {max_hold_min} min | Check every: {check_interval}s")
-    
-    # DEBUG: Show what was in trade plan
-    if '_debug_timeframe' in trade_plan:
-        logger.info(f"   🔍 DEBUG: TF={trade_plan['_debug_timeframe']}, Hold={trade_plan['_debug_max_hold']}, Check={trade_plan['_debug_check_interval']}")
+    logger.info(f"   🔍 Timeframe: {timeframe} → Checks every {check_interval}s for fast profit detection!")
     
     start_time = datetime.now()
     
