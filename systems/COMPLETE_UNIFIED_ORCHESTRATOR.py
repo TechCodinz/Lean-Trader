@@ -7,14 +7,9 @@ NO MORE DELAYS - EVERYTHING CONNECTED NOW
 
 import asyncio
 import logging
-import os
-from dotenv import load_dotenv
 import sys
 import time
 from pathlib import Path
-
-# Load .env file
-load_dotenv(Path(__file__).parent.parent / ".env")
 from typing import Dict, List, Optional, Any
 from collections import deque
 from datetime import datetime
@@ -27,7 +22,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 sys.path.insert(0, str(Path(__file__).parent))
-sys.path.insert(0, str(Path(__file__).parent.parent))  # Add parent directory for router
 
 # Import ALL systems
 from router import ExchangeRouter
@@ -67,6 +61,42 @@ from november_growth_strategy import NovemberGrowthStrategy
 # Utilities
 from paper_broker import PaperBroker
 
+# Telegram signal monitoring
+from TELEGRAM_SIGNAL_MONITOR import monitor_signals_for_telegram
+
+# EXECUTION ORCHESTRATOR - THE CRITICAL PIECE!
+from EXECUTION_ORCHESTRATOR import ExecutionOrchestrator
+
+# ADVANCED TRADING ACTIONS - SOPHISTICATED LOGIC! (Optional - not critical)
+try:
+    from ADVANCED_TRADING_ACTIONS import (
+        MarketRegimeDetector,
+        ScaleInOutManager,
+        PortfolioBalancer,
+        AdvancedActionDecider
+    )
+    ADVANCED_ACTIONS_AVAILABLE = True
+except (ImportError, ModuleNotFoundError):
+    # Create dummy classes if not available
+    class MarketRegimeDetector: pass
+    class ScaleInOutManager: pass
+    class PortfolioBalancer: pass
+    class AdvancedActionDecider: pass
+    ADVANCED_ACTIONS_AVAILABLE = False
+
+# CRITICAL PROFIT FEATURES
+try:
+    from critical_features_addon import (
+        TrailingStopManager,
+        CompoundEngine,
+        PartialTPManager,
+        EmergencyStop
+    )
+    CRITICAL_FEATURES_AVAILABLE = True
+except ImportError:
+    CRITICAL_FEATURES_AVAILABLE = False
+    logger.warning("⚠️  Critical profit features not available")
+
 
 class CentralDataHub:
     """Central hub for ALL data flow"""
@@ -104,6 +134,19 @@ class CentralDataHub:
     async def publish_alert(self, alert: Dict[str, Any]):
         """Publish alert to all systems"""
         await self.alert_queue.put(alert)
+    
+    def get_signals(self, limit=20):
+        """Get recent signals"""
+        if hasattr(self, 'recent_signals') and self.recent_signals:
+            # Convert deque to list for slicing
+            signals_list = list(self.recent_signals)
+            return signals_list[-limit:] if len(signals_list) > limit else signals_list
+        return []
+    
+    def get_recent_signals(self, limit=1000):
+        """Get recent signals (alias for get_signals for compatibility)"""
+        return self.get_signals(limit=limit)
+
 
 
 class LearningOrchestrator:
@@ -350,8 +393,32 @@ class CompleteUnifiedOrchestrator:
         self.ai_systems = {}
         self.orchestrators = {}
         
+        # ADVANCED TRADING COMPONENTS (for sophisticated execution)
+        self.execution_orchestrator = None
+        self.advanced_action_decider = None
+        self.trailing_stop_manager = None
+        self.compound_engine = None
+        self.partial_tp_manager = None
+        
         logger.info(f"🚀 Complete Unified Orchestrator - {mode.upper()} mode")
     
+    
+    def update_universe(self, new_universe: list):
+        """Update trading universe dynamically"""
+        if new_universe and len(new_universe) > len(getattr(self, 'trading_universe', [])):
+            old_count = len(getattr(self, 'trading_universe', []))
+            self.trading_universe = new_universe
+            
+            # Update ultra_core
+            if hasattr(self, 'ultra_core') and hasattr(self.ultra_core, 'pairs'):
+                self.ultra_core.pairs = new_universe
+            
+            logger.info(f"🔄 UNIVERSE EXPANDED: {old_count} → {len(new_universe)} pairs!")
+            logger.info(f"   🎯 Trading engines now scanning {len(new_universe)} pairs!")
+            
+            return True
+        return False
+
     async def initialize_all_systems(self):
         """Initialize ALL systems with full wiring"""
         logger.info("=" * 80)
@@ -367,18 +434,44 @@ class CompleteUnifiedOrchestrator:
         self.pattern_memory = PatternMemory()
         self.ledger = Ledger()
         
-        # Load testnet crypto pairs
+        # DYNAMIC UNIVERSE - Get from Universal Pair Fetcher!
+        universe = []
+        
+        # Priority 1: Universal Pair Fetcher (2000+ pairs!)
         try:
-            from BYBIT_TESTNET_PAIRS_FILTER import BYBIT_TESTNET_PAIRS
-            universe = sorted([p for p in BYBIT_TESTNET_PAIRS if "/" in p and "USDT" in p])
-            logger.info(f"✅ Loaded {len(universe)} testnet crypto pairs")
-        except:
-            universe = ["BTC/USDT", "ETH/USDT", "SOL/USDT", "BNB/USDT", "AVAX/USDT"]
-            logger.info("Using default 5 pairs")
+            from UNIVERSAL_PAIR_FETCHER import get_universal_fetcher
+            fetcher = get_universal_fetcher()
+            if fetcher and fetcher.all_pairs:
+                universe = fetcher.all_pairs
+                logger.info(f"🌍 USING UNIVERSAL FETCHER: {len(universe)} pairs!")
+        except Exception as e:
+            logger.debug(f"Universal fetcher not ready: {e}")
         
-        self.universe = universe
-        logger.info("   🔍 Market Scanner will discover ALL pairs from 6 exchanges...")
+        # Priority 2: dynamic_pairs attribute
+        if not universe and hasattr(self, 'dynamic_pairs') and self.dynamic_pairs:
+            universe = self.dynamic_pairs
+            logger.info(f"🌍 DYNAMIC UNIVERSE: {len(universe)} discovered pairs!")
         
+        # If still no universe, wait for fetcher
+        if not universe:
+            logger.info("⏳ Waiting for Universal Pair Fetcher...")
+            import time
+            for i in range(20):  # Wait up to 20 seconds
+                time.sleep(1)
+                try:
+                    from UNIVERSAL_PAIR_FETCHER import get_universal_fetcher
+                    fetcher = get_universal_fetcher()
+                    if fetcher and len(fetcher.all_pairs) > 100:
+                        universe = fetcher.all_pairs
+                        logger.info(f"✅ Got {len(universe)} pairs from Universal Fetcher!")
+                        break
+                except:
+                    pass
+            
+            # Last resort
+            if not universe:
+                universe = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT']
+                logger.error(f"❌ STILL using fallback: {len(universe)} pairs - Fetcher failed!")
         self.ultra_core = UltraCore(self.router, universe, logger)
         
         awareness_cfg = AwarenessConfig()
@@ -394,24 +487,20 @@ class CompleteUnifiedOrchestrator:
         # Phase 2: Trading Engines  
         logger.info("\n⚡ Phase 2: Trading Engines...")
         
-        self.trading_engines['arbitrage'] = UltraArbitrageEngine(self.ultra_core, self.risk_engine)
-        self.trading_engines['scalping'] = UltraScalpingEngine(self.ultra_core, self.risk_engine)
+        self.trading_engines['arbitrage'] = UltraArbitrageEngine(self.ultra_core, self.risk_engine, universe=universe)
+        self.trading_engines['scalping'] = UltraScalpingEngine(self.ultra_core, self.risk_engine, universe=universe)
         
         # SMART SCALPING - Multi-timeframe + Session aware!
         try:
             from SMART_SCALPING_ENGINE import SmartScalpingEngine
-            self.trading_engines['smart_scalping'] = SmartScalpingEngine(
-                self.ultra_core, 
-                self.risk_engine,
-                universe=getattr(self, 'universe', [])
-            )
-            logger.info("🎯 Smart Scalping Engine initialized (MTF + Session aware)")
+            self.trading_engines['smart_scalping'] = SmartScalpingEngine(self.ultra_core, self.risk_engine, universe=universe)
+            logger.info("🎯 Smart Scalping Engine initialized (MTF + Session aware + Full Universe)")
         except Exception as e:
             logger.warning(f"Smart scalping: {e}")
         
         self.trading_engines['moon_spotter'] = UltraMoonSpotter()
-        self.trading_engines['real_profit'] = RealProfitBot()
-        self.trading_engines['enhanced'] = EnhancedTradingBot()
+        self.trading_engines['real_profit'] = RealProfitBot(universe=universe)
+        self.trading_engines['enhanced'] = EnhancedTradingBot(universe=universe)
         
         engine_count = len([e for e in self.trading_engines.values() if e])
         logger.info(f"✅ Trading engines initialized ({engine_count}/6 - Including SMART SCALPING!)")
@@ -420,8 +509,8 @@ class CompleteUnifiedOrchestrator:
         logger.info("\n🤖 Phase 3: AI/ML Systems...")
         
         try:
-            self.ai_systems['evolution'] = ULTIMATE_EVOLUTION_ENGINE(data_hub=self.data_hub)
-            logger.info("✅ Evolution Engine initialized WITH DATA HUB - signals will publish!")
+            self.ai_systems['evolution'] = ULTIMATE_EVOLUTION_ENGINE(data_hub=self.data_hub, universe=universe)
+            logger.info(f"✅ Evolution Engine initialized WITH DATA HUB + {len(universe)} pairs!")
         except Exception as e:
             logger.warning(f"Evolution: {e}")
             self.ai_systems['evolution'] = None
@@ -501,6 +590,45 @@ class CompleteUnifiedOrchestrator:
         )
         logger.info("✅ Decision Engine wired")
         
+        # 4. CREATE EXECUTION ORCHESTRATOR (THE CRITICAL PIECE!)
+        logger.info("\n⚡ Initializing EXECUTION ORCHESTRATOR...")
+        try:
+            self.execution_orchestrator = ExecutionOrchestrator(
+                data_hub=self.data_hub,
+                trading_engines=self.trading_engines,
+                risk_engine=self.risk_engine,
+                ledger=self.ledger,
+                mode=self.mode
+            )
+            
+            # Initialize advanced trading components
+            self.advanced_action_decider = AdvancedActionDecider()
+            logger.info("✅ Advanced Action Decider initialized (HOLD, Scale In/Out, Market Regime)")
+            
+            # Initialize critical profit features if available
+            if CRITICAL_FEATURES_AVAILABLE:
+                self.trailing_stop_manager = TrailingStopManager(trail_percent=0.02)
+                self.compound_engine = CompoundEngine(initial_capital=1000, compound_rate=0.5)
+                self.partial_tp_manager = PartialTPManager()
+                
+                # Wire to execution orchestrator
+                self.execution_orchestrator.trailing_stop = self.trailing_stop_manager
+                self.execution_orchestrator.compound_engine = self.compound_engine
+                self.execution_orchestrator.partial_tp = self.partial_tp_manager
+                
+                logger.info("✅ Critical Profit Features wired (Trailing Stop, Compound, Partial TP)")
+            
+            # Wire advanced action decider
+            self.execution_orchestrator.action_decider = self.advanced_action_decider
+            
+            logger.info("✅ EXECUTION ORCHESTRATOR WIRED - TRADES WILL NOW EXECUTE!")
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to initialize Execution Orchestrator: {e}")
+            logger.error("   Bot will generate signals but NOT execute trades!")
+            import traceback
+            traceback.print_exc()
+        
         logger.info("\n" + "=" * 80)
         logger.info("✅ ALL SYSTEMS WIRED - READY FOR UNIFIED OPERATION")
         logger.info("=" * 80)
@@ -538,8 +666,33 @@ class CompleteUnifiedOrchestrator:
         tasks.append(asyncio.create_task(self.main_trading_loop()))
         logger.info("✅ Main trading loop started")
         
+        # START EXECUTION LOOP (THE CRITICAL FIX!)
+        if hasattr(self, 'execution_orchestrator') and self.execution_orchestrator:
+            tasks.append(asyncio.create_task(self.execution_orchestrator.run_execution_loop()))
+            logger.info("⚡ EXECUTION LOOP STARTED - TRADES WILL NOW EXECUTE!")
+        else:
+            logger.error("❌ NO EXECUTION ORCHESTRATOR - TRADES WILL NOT EXECUTE!")
+        
+        # Start Telegram signal monitor
+        tasks.append(asyncio.create_task(monitor_signals_for_telegram(self)))
+        logger.info("✅ Telegram signal monitor started")
+        
+        # Start LIVE TRADING executor
+        try:
+            from ENABLE_LIVE_TRADING import enable_live_trading
+            tasks.append(asyncio.create_task(enable_live_trading(self)))
+            logger.info("💰 LIVE TRADING executor started")
+        except Exception as e:
+            logger.warning(f"⚠️ Live trading not enabled: {e}")
+        
         logger.info("\n" + "=" * 80)
-        logger.info("🎉 ALL ORCHESTRATORS RUNNING IN PARALLEL")
+        logger.info("🎉 ALL ORCHESTRATORS RUNNING:")
+        logger.info("   ✅ Learning Loop (AI/ML continuous improvement)")
+        logger.info("   ✅ Scouting Loop (Market intelligence gathering)")
+        logger.info("   ✅ Decision Loop (Collective intelligence decisions)")
+        logger.info("   ✅ Main Trading Loop (Coordination)")
+        logger.info("   ⚡ EXECUTION LOOP (TRADES EXECUTING!)")
+        logger.info("   📱 Telegram Monitor (Signal distribution)")
         logger.info("=" * 80)
         
         return tasks

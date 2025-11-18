@@ -1217,7 +1217,7 @@ class ULTIMATE_EVOLUTION_ENGINE:
             'MEME/USDT',
         ]
 
-        # Forex pairs
+        # Forex pairs - Will be routed to MT5 when connected
         self.forex_pairs = [
             'EUR/USD',
             'GBP/USD',
@@ -1241,7 +1241,7 @@ class ULTIMATE_EVOLUTION_ENGINE:
             'GBP/NZD',
         ]
 
-        # Stock symbols
+        # Stock symbols - For future stock exchange integration
         self.stock_symbols = [
             'AAPL',
             'MSFT',
@@ -1269,7 +1269,7 @@ class ULTIMATE_EVOLUTION_ENGINE:
             'OKTA',
         ]
 
-        # Commodity symbols
+        # Commodity symbols - Will be routed to MT5 when connected
         self.commodity_symbols = [
             'GOLD',
             'SILVER',
