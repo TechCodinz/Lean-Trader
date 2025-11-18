@@ -2223,7 +2223,15 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
         if ULTRA_FEATURES_AVAILABLE:
             logger.info("\n🌟 Wiring ULTRA GOLDMINE FEATURES...")
             
-            self.ultra_goldmine = UltraGoldmineManager()
+            # Wire Ultra Goldmine features individually (no manager class)
+            self.gamma_detector = GammaSqueezeDetector()
+            self.whale_tracker = WhaleWalletTracker()
+            self.dark_pool = DarkPoolAnalyzer()
+            self.orderbook_imbalance = OrderBookImbalance()
+            self.sentiment = SentimentAnalyzer()
+            self.smart_money = SmartMoneyDetector()
+            
+            logger.info("✅ ULTRA GOLDMINE FEATURES wired!")
             self.advanced_orchestrators['ultra_goldmine'] = self.ultra_goldmine
             
             logger.info("✅ 🌟 ULTRA GOLDMINE FEATURES WIRED - Expected +200-500% profit boost!")
