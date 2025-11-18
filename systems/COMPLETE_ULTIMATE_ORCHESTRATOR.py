@@ -20,6 +20,31 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# ============================================================================
+# BOOTSTRAP PROFIT TRACKER - TRACK JOURNEY FROM $20 TO INFINITY!
+# ============================================================================
+try:
+    from BOOTSTRAP_PROFIT_TRACKER import get_bootstrap_tracker
+    BOOTSTRAP_TRACKER_AVAILABLE = True
+    logger.info("=" * 80)
+    logger.info("💰🚀 BOOTSTRAP PROFIT TRACKER LOADED!")
+    logger.info("=" * 80)
+    logger.info("   Starting Balance: $20")
+    logger.info("   Mission: Prove itself → Earn profits → Fund growth!")
+    logger.info("")
+    logger.info("   Milestones:")
+    logger.info("   • $10 profit → Fund DeepSeek API")
+    logger.info("   • $30 profit → Fund multiple AIs")
+    logger.info("   • $50 profit → Add voice interaction")
+    logger.info("   • $100 profit → Premium features")
+    logger.info("   • $200 profit → Full autonomy")
+    logger.info("   • $500 profit → Self-improvement system")
+    logger.info("=" * 80)
+except Exception as e:
+    logger.warning(f"⚠️  Bootstrap tracker not available: {e}")
+    BOOTSTRAP_TRACKER_AVAILABLE = False
+
+
 sys.path.insert(0, str(Path(__file__).parent))
 
 # ============================================================================
