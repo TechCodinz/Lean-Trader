@@ -2231,8 +2231,17 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             self.sentiment = SentimentAnalyzer()
             self.smart_money = SmartMoneyDetector()
             
+            # Store in advanced orchestrators
+            self.advanced_orchestrators['ultra_goldmine'] = {
+                'gamma_detector': self.gamma_detector,
+                'whale_tracker': self.whale_tracker,
+                'dark_pool': self.dark_pool,
+                'orderbook_imbalance': self.orderbook_imbalance,
+                'sentiment': self.sentiment,
+                'smart_money': self.smart_money
+            }
+            
             logger.info("✅ ULTRA GOLDMINE FEATURES wired!")
-            self.advanced_orchestrators['ultra_goldmine'] = self.ultra_goldmine
             
             logger.info("✅ 🌟 ULTRA GOLDMINE FEATURES WIRED - Expected +200-500% profit boost!")
         else:
