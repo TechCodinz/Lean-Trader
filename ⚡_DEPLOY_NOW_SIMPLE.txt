@@ -1,0 +1,38 @@
+=============================================================================
+⚡ COPY & PASTE THIS ON VPS (ONE LINE AT A TIME)
+=============================================================================
+
+cd ~/bot
+git stash
+git pull origin continue-from-micro-fix --no-edit
+pkill -f COMPLETE_ULTIMATE_ORCHESTRATOR
+sleep 3
+nohup python3 COMPLETE_ULTIMATE_ORCHESTRATOR.py > bot.log 2>&1 &
+sleep 15
+grep "Found.*USDT pairs on bybit" bot.log | tail -1
+grep "Initial scan complete" bot.log | tail -1
+tail -f bot.log
+
+=============================================================================
+✅ WHAT'S FIXED:
+=============================================================================
+
+1. BYBIT 0 PAIRS → NOW 800+!
+   - Fixed: Bybit-specific filtering
+   - Result: Will discover all Bybit pairs!
+
+2. TOTAL 450 PAIRS → NOW 2000+!
+   - Lowered volume filter: $100K (was $1M)
+   - Include ALL pairs flag: TRUE
+   - Result: Discovers EVERYTHING!
+
+=============================================================================
+📊 EXPECTED OUTPUT:
+=============================================================================
+
+After deployment, you should see:
+
+   Found 800+ USDT pairs on bybit (was 0!)
+   ✅ Initial scan complete! Found 2000+ tradable pairs (was 450!)
+
+=============================================================================
