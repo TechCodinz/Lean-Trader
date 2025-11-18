@@ -51,6 +51,7 @@ class CollectiveScanningDecision:
         # Default to balanced if no situational awareness
         situation_score = 0.70  # Default balanced
         mode = 'balanced'
+        awareness_active = False
         
         # 🧠 Get situational awareness assessment
         if situational_awareness:
@@ -58,12 +59,18 @@ class CollectiveScanningDecision:
                 assessment = await situational_awareness.assess_complete_situation()
                 situation_score = assessment.get('situation_score', 0.70)
                 mode = assessment.get('adaptive_state', {}).get('mode', 'balanced')
+                awareness_active = True
                 
-                logger.info(f"🧠 Collective Decision - Situation Score: {situation_score:.0%}")
+                logger.info(f"🧠 COLLECTIVE DECISION - Situation Score: {situation_score:.0%}")
                 logger.info(f"   Mode: {mode.upper()}")
                 
             except Exception as e:
-                logger.debug(f"Situational awareness error: {e}")
+                logger.warning(f"Situational awareness not available: {e}")
+                logger.info(f"🧠 COLLECTIVE DECISION - Using default: Situation Score: {situation_score:.0%}")
+                logger.info(f"   Mode: {mode.upper()} (default)")
+        else:
+            logger.info(f"🧠 COLLECTIVE DECISION - Situational awareness not wired yet")
+            logger.info(f"   Using default: Situation Score: {situation_score:.0%}, Mode: {mode.upper()}")
         
         # 🎯 ADAPTIVE PARAMETERS based on situation
         
