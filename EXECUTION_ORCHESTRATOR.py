@@ -42,6 +42,15 @@ except Exception as e:
     logger.warning(f"⚠️ COLLECTIVE CONSENSUS ENGINE not available: {e}")
     COLLECTIVE_CONSENSUS_AVAILABLE = False
 
+# 🎯 ENRICHED SIGNAL SYSTEM - Adds ALL vital info (WHAT, WHY, WHERE, HOW, RARE MEANS)!
+try:
+    from ENRICHED_SIGNAL_SYSTEM import EnrichedSignalSystem, get_enriched_signal_system
+    ENRICHED_SIGNAL_AVAILABLE = True
+    logger.info("🎯 ENRICHED SIGNAL SYSTEM loaded - Signals get ALL vital intelligence!")
+except Exception as e:
+    logger.warning(f"⚠️ ENRICHED SIGNAL SYSTEM not available: {e}")
+    ENRICHED_SIGNAL_AVAILABLE = False
+
 
 class SmartPositionSizer:
     """Smart position sizing based on account balance and risk"""
@@ -268,6 +277,9 @@ class ExecutionOrchestrator:
         
         # 🧠 COLLECTIVE CONSENSUS ENGINE - ALL engines work together!
         self.collective_consensus = None
+        
+        # 🎯 ENRICHED SIGNAL SYSTEM - ALL vital info!
+        self.enriched_signal_system = None
         
         if mode == "testnet":
             # 🧪 TESTNET MODE - Use Bybit testnet
@@ -574,6 +586,19 @@ class ExecutionOrchestrator:
                 logger.info(f"   💪 Collective confidence: {signal.get('collective_confidence', 0):.0%}")
             else:
                 logger.debug("   ⚠️ Collective consensus not available - proceeding without full scrutiny")
+            
+            # 🎯 STEP 2: ENRICH SIGNAL with ALL VITAL INFO (WHAT, WHY, WHERE, HOW, RARE MEANS)!
+            if self.enriched_signal_system:
+                logger.info(f"🎯 Enriching signal with ALL vital intelligence...")
+                signal = await self.enriched_signal_system.enrich_signal(signal)
+                logger.info(f"   ✅ Signal enriched with complete intelligence!")
+                logger.info(f"   📊 WHAT: {signal.get('what', {}).get('action')} @ {signal.get('what', {}).get('urgency')} urgency")
+                logger.info(f"   🧠 WHY: {signal.get('why', {}).get('primary_reason')}")
+                logger.info(f"   📍 WHERE: {signal.get('where', {}).get('exchange')} {signal.get('where', {}).get('market_type')}")
+                logger.info(f"   🎯 HOW: {signal.get('how', {}).get('execution_strategy')}")
+                logger.info(f"   💎 RARE MEANS: {len(signal.get('rare_precious_means', {}).get('hidden_opportunities', []))} opportunities")
+            else:
+                logger.debug("   ⚠️ Enriched signal system not available")
             
             # 🎯 STEP 2: DETECT SIGNAL TYPE - Standard or Special Strategy
             signal_type = signal.get('type', 'standard')
