@@ -49,16 +49,11 @@ except Exception as e:
 try:
     from ULTRA_GOLDMINE_FEATURES import (
         GammaSqueezeDetector,
-        WhaleTracker,
-        OrderBookToxicityScanner,
-        LatencyArbitrageEngine,
-        MEVProtectionLayer,
-        FuturesBasisArbitrage,
-        AdaptiveRegimeSizer,
-        MultiTimeframeConfluence,
-        SocialMomentumPredictor,
-        NetworkEffectAnalyzer,
-        UltraGoldmineManager
+        WhaleWalletTracker,
+        DarkPoolAnalyzer,
+        OrderBookImbalance,
+        SentimentAnalyzer,
+        SmartMoneyDetector
     )
     ULTRA_FEATURES_AVAILABLE = True
     logger.info("✅ ULTRA GOLDMINE FEATURES LOADED - Ready for +200-500% boost!")
@@ -143,12 +138,12 @@ except Exception as e:
 # ============================================================================
 try:
     from DIVINE_INTELLIGENCE_FEATURES import (
-        QuantumEntanglementCorrelator,
-        FractalDimensionAnalyzer,
-        InformationEntropyTracker,
-        NashEquilibriumPredictor,
-        ChaosTheoryAttractorMapper,
-        DivineIntelligenceManager
+        DivineIntelligenceManager,
+        QuantumMarketAnalyzer,
+        ChaosTheoryDetector,
+        GameTheoryOptimizer,
+        InformationTheoryAnalyzer,
+        FractalGeometryAnalyzer
     )
     DIVINE_FEATURES_AVAILABLE = True
     logger.info("✅ DIVINE INTELLIGENCE FEATURES LOADED - Consciousness-level trading!")

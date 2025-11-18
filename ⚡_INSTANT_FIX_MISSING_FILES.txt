@@ -1,0 +1,46 @@
+============================================================================
+⚡ INSTANT FIX - COPY & PASTE THIS NOW!
+============================================================================
+
+cd ~/bot && pkill -f ORCHESTRATOR && git fetch origin continue-from-micro-fix && git checkout origin/continue-from-micro-fix -- router.py paper_broker.py mt5_forex_sync.py MT5_FOREX_ENGINE_INTEGRATION.py BOOTSTRAP_PROFIT_TRACKER.py ULTRA_GOLDMINE_FEATURES.py DIVINE_INTELLIGENCE_FEATURES.py ULTRASONIC_INTEGRATION_COMPLETE.py ULTRASONIC_RARE_STRATEGIES.py SUPREME_CONSCIOUSNESS_CORE.py UNIVERSAL_AI_ORCHESTRATOR.py INTELLIGENT_EXECUTION_ENGINE.py EXECUTION_ORCHESTRATOR.py HYBRID_INTELLIGENCE_COORDINATOR.py && cp COMPLETE_UNIFIED_ORCHESTRATOR.py systems/ && python3 systems/COMPLETE_ULTIMATE_ORCHESTRATOR.py > bot.log 2>&1 & sleep 15 && tail -80 bot.log
+
+============================================================================
+✅ THIS WILL:
+============================================================================
+1. Stop the bot
+2. Fetch latest from repository
+3. Checkout ALL missing files (router.py and others)
+4. Copy COMPLETE_UNIFIED_ORCHESTRATOR to systems folder
+5. Start bot
+6. Show startup logs
+
+============================================================================
+📊 WHAT TO LOOK FOR:
+============================================================================
+
+GOOD (Should see):
+✅ No "ModuleNotFoundError: No module named 'router'"
+✅ "✅ MT5 FOREX INTEGRATION available"
+✅ "✅ BOOTSTRAP PROFIT TRACKER LOADED"
+✅ "⚡ EXECUTING: BUY/SELL *USDT"
+✅ Bot trading crypto USDT pairs
+
+BAD (Should NOT see):
+❌ ModuleNotFoundError
+❌ "bybit does not have market symbol EUR/GBP"
+❌ Traceback
+
+============================================================================
+🔍 AFTER RUNNING, MONITOR:
+============================================================================
+
+# Watch for crypto trades:
+tail -f bot.log | grep "EXECUTING.*USDT"
+
+# Check for module errors:
+tail -f bot.log | grep "ModuleNotFoundError"
+
+# Full activity:
+tail -f bot.log
+
+============================================================================
