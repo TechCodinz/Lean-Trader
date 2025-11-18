@@ -642,6 +642,11 @@ class IntelligentExecutionEngine:
             'review_interval_seconds': self._get_check_interval(timeframe),
             're_evaluate_conditions': ['volatility_spike', 'news_event', 'trend_change'],
             
+            # DEBUG: Log the values
+            '_debug_max_hold': self._get_max_hold_time(timeframe),
+            '_debug_check_interval': self._get_check_interval(timeframe),
+            '_debug_timeframe': timeframe,
+            
             # INTELLIGENCE CONTEXT
             'engine_consensus': 12,  # How many engines agreed
             'confidence_breakdown': {

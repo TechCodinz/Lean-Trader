@@ -39,11 +39,16 @@ async def monitor_trade_for_profit(exchange, trade_plan: Dict, orchestrator=None
     check_interval = trade_plan.get('review_interval_seconds', 10)
     timeframe = trade_plan.get('timeframe', '1m')
     
+    # DEBUG: Log what we received
     logger.info(f"💰 Starting ULTRA-FAST profit monitoring: {symbol} ({timeframe})")
     logger.info(f"   Entry: ${entry_price:.6f}")
     logger.info(f"   TP1: ${tp_levels[0]['price']:.6f}")
     logger.info(f"   SL: ${stop_loss:.6f}")
     logger.info(f"   ⚡ Max hold: {max_hold_min} min | Check every: {check_interval}s")
+    
+    # DEBUG: Show what was in trade plan
+    if '_debug_timeframe' in trade_plan:
+        logger.info(f"   🔍 DEBUG: TF={trade_plan['_debug_timeframe']}, Hold={trade_plan['_debug_max_hold']}, Check={trade_plan['_debug_check_interval']}")
     
     start_time = datetime.now()
     
