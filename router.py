@@ -107,8 +107,16 @@ class ExchangeRouter:
             )
             self.live = False
 
-        api_key = _env("API_KEY") or _env(f"{self.id.upper()}_API_KEY")
-        api_sec = _env("API_SECRET") or _env(f"{self.id.upper()}_API_SECRET")
+        # CRITICAL FIX: Use testnet-specific keys when BYBIT_TESTNET=true!
+        if self.testnet and self.id == "bybit":
+            # Use BYBIT_TESTNET_API_KEY for testnet
+            api_key = _env("BYBIT_TESTNET_API_KEY") or _env("API_KEY")
+            api_sec = _env("BYBIT_TESTNET_API_SECRET") or _env("API_SECRET")
+            _log.info("🔑 Using BYBIT_TESTNET_API_KEY for testnet connection")
+        else:
+            # Use regular keys
+            api_key = _env("API_KEY") or _env(f"{self.id.upper()}_API_KEY")
+            api_sec = _env("API_SECRET") or _env(f"{self.id.upper()}_API_SECRET")
 
         # If user insisted on live mode via envs, require API credentials to avoid accidental live execution.
         if self.live and not (api_key and api_sec):
