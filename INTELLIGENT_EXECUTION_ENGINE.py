@@ -1275,20 +1275,26 @@ class IntelligentExecutionEngine:
             except Exception as e:
                 logger.warning(f"   ⚠️  Could not check balance: {e}")
             
+            # CRITICAL FIX: Calculate quantity in COINS, not USD!
+            # Bybit needs amount in BASE currency (BTC, ETH, SOL, etc.)
+            quantity = lot_size / entry_price if entry_price > 0 else 0.001
+            
+            logger.info(f"   💰 Order: {quantity:.8f} {symbol.split('/')[0]} (${lot_size:.2f} @ ${entry_price:.2f})")
+            
             if side == 'buy':
                 params = {'createMarketBuyOrderRequiresPrice': False}
                 order = await asyncio.to_thread(
                     self.exchange.create_market_buy_order,
                     symbol,
-                    lot_size,
+                    quantity,  # Changed from lot_size to quantity!
                     params
                 )
             else:
-                quantity = lot_size / entry_price if entry_price > 0 else 0.01
                 order = await asyncio.to_thread(
                     self.exchange.create_market_sell_order,
                     symbol,
-                    quantity
+                    quantity,
+                    {}  # Add empty params dict
                 )
             
             # Record in multi-timeframe tracker
