@@ -235,7 +235,7 @@ echo "✅ Fixes applied!"
 echo "   Next: Edit .env file with your API keys"
 """
     
-    fix_path = Path("/workspace/AUTO_FIX_ALL_ISSUES.sh")
+    fix_path = Path("AUTO_FIX_ALL_ISSUES.sh")
     with open(fix_path, 'w') as f:
         f.write(fix_script)
     

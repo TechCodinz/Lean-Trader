@@ -13,8 +13,8 @@ from typing import Dict, List, Set, Tuple
 import re
 
 class EngineDiagnostic:
-    def __init__(self):
-        self.workspace = Path("/workspace")
+    def __init__(self, workspace_path=None):
+        self.workspace = Path(workspace_path) if workspace_path else Path.cwd()
         self.all_python_files = []
         self.engine_files = []
         self.imported_engines = set()
