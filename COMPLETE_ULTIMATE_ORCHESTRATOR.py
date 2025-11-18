@@ -3699,7 +3699,9 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                 
                 while True:
                     try:
-                        for symbol in ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'BNB/USDT']:
+                        # Get pairs from universal fetcher
+                        symbols = await self._get_tradable_pairs()
+                        for symbol in symbols[:10]:  # Top 10 pairs
                             try:
                                 ohlcv = await asyncio.to_thread(self.trading_engines[self.mode].fetch_ohlcv, symbol, '1m', None, 100)
                                 if not ohlcv or len(ohlcv) < 50:
@@ -3732,7 +3734,8 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                 
                 while True:
                     try:
-                        for symbol in ['BTC/USDT', 'ETH/USDT', 'SOL/USDT']:
+                        symbols = await self._get_tradable_pairs()
+                        for symbol in symbols[:5]:  # Top 5 pairs
                             try:
                                 def fetch_ohlcv_sync(timeframe, limit):
                                     import pandas as pd
@@ -3861,10 +3864,10 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                                         self.micro_wallet_grower.crypto_pairs = fetcher.top_volume_pairs[:50] if fetcher.top_volume_pairs else fetcher.all_pairs[:50]
                                         logger.info(f"✅ MICRO using {len(self.micro_wallet_grower.crypto_pairs)} pairs from Universal Fetcher!")
                                     else:
-                                        self.micro_wallet_grower.crypto_pairs = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT']
+                                        self.micro_wallet_grower.crypto_pairs = await self._get_tradable_pairs() or ['BTC/USDT', 'ETH/USDT', 'SOL/USDT']
                                         logger.warning("⚠️  Fetcher not ready yet")
                                 except Exception as e:
-                                    self.micro_wallet_grower.crypto_pairs = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT']
+                                    self.micro_wallet_grower.crypto_pairs = await self._get_tradable_pairs() or ['BTC/USDT', 'ETH/USDT', 'SOL/USDT']
                                     logger.error(f"❌ Fetcher error: {e}")
                         
                         # Get ACTUAL signals from data hub (with direction & confidence!)
@@ -4039,7 +4042,7 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                         
                         if not symbols:
                             # Fallback to popular pairs
-                            symbols = ['BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'SOL/USDT', 'AVAX/USDT']
+                            symbols = await self._get_tradable_pairs() or ['BTC/USDT', 'ETH/USDT']  # Minimal fallback
                         
                         # Scan ALL money printing strategies
                         money_signals = await self.money_printer.scan_all_money_printers(symbols, balance)
@@ -4117,7 +4120,7 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                             symbols = list(self.market_scanner.active_pairs)[:20]
                         
                         if not symbols:
-                            symbols = ['BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'SOL/USDT', 'AVAX/USDT']
+                            symbols = await self._get_tradable_pairs() or ['BTC/USDT', 'ETH/USDT']  # Minimal fallback
                         
                         # Scan ALL arbitrage strategies
                         arb_opportunities = await self.single_arb.scan_all_arbitrage(symbols)
@@ -4466,7 +4469,8 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                     try:
                         # Get market data for quantum analysis
                         quantum_results = []
-                        for symbol in ['BTC/USDT', 'ETH/USDT', 'SOL/USDT']:
+                        symbols = await self._get_tradable_pairs()
+                        for symbol in symbols[:5]:  # Top 5 pairs
                             market_data = {'price_change_pct': 0, 'volume_change_pct': 0, 'volatility': 0.02, 'rsi': 50}
                             quantum_pred = await self.advanced_orchestrators['quantum'].quantum_market_prediction(market_data)
                             if quantum_pred and quantum_pred.get('confidence', 0) > 0:
@@ -4491,7 +4495,8 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                 if ULTRA_FEATURES_AVAILABLE and hasattr(self, 'ultra_goldmine') and self.ultra_goldmine:
                     try:
                         goldmine_count = 0
-                        for symbol in ['BTC/USDT', 'ETH/USDT', 'SOL/USDT']:
+                        symbols = await self._get_tradable_pairs()
+                        for symbol in symbols[:5]:  # Top 5 pairs
                             # FIXED: ultra_goldmine.get_all_signals not needed
                             goldmine_signals = {}  # Placeholder
                             if goldmine_signals:
