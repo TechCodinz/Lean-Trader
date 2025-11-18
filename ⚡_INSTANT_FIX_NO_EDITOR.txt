@@ -1,0 +1,66 @@
+================================================================================
+⚡ INSTANT FIX - NO EDITOR, NO WAITING! ⚡
+================================================================================
+
+Your git pull opened an editor and got stuck!
+
+COPY & PASTE THIS NOW (bypasses editor):
+
+
+================================================================================
+🔥 ONE-COMMAND INSTANT FIX
+================================================================================
+
+cd ~/bot && \
+pkill -f ORCHESTRATOR && \
+pkill -f vim && pkill -f nano && \
+sleep 2 && \
+git merge --abort 2>/dev/null ; \
+git stash 2>/dev/null ; \
+git fetch origin continue-from-micro-fix && \
+git reset --hard origin/continue-from-micro-fix && \
+source apex_venv/bin/activate && \
+nohup python3 systems/COMPLETE_ULTIMATE_ORCHESTRATOR.py > bot.log 2>&1 & \
+sleep 10 && \
+echo "✅ Bot is starting..." && \
+tail -20 bot.log
+
+
+This will:
+1. Kill any stuck editors
+2. Abort any stuck merges
+3. Force update to latest code
+4. Start bot fresh
+5. Show you the log
+
+NO EDITOR, NO WAITING! ⚡
+
+
+================================================================================
+AFTER IT RUNS:
+================================================================================
+
+Check if bot is running:
+ps aux | grep ORCHESTRATOR
+
+Watch logs:
+tail -f bot.log
+
+Check for trades:
+grep -i "trade\|profit" bot.log | tail -20
+
+
+================================================================================
+WHY THIS WORKS:
+================================================================================
+
+Instead of trying to merge (which opens editor), this:
+- Uses git reset --hard to force update
+- Replaces your local files with latest from GitHub
+- No merge conflicts, no editor
+- Clean start!
+
+
+================================================================================
+🔥 COPY THE COMMAND ABOVE AND RUN IT NOW!
+================================================================================
