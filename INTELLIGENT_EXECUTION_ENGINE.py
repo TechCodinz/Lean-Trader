@@ -500,13 +500,13 @@ class IntelligentExecutionEngine:
             if balance < 100:
                 base_size = 3.0
             elif balance < 1000:
-                base_size = 10.0
+                base_size = 5.0  # Reduced from 10
             elif balance < 10000:
-                base_size = 50.0  # ✅ $50 for $8K balance!
+                base_size = 10.0  # REDUCED from 50! Avoid "Insufficient balance"
                 if balance > 5000:
-                    logger.info(f"   🎯 Using ${base_size} base for ${balance:.0f} balance!")
+                    logger.info(f"   🎯 Using ${base_size} base for ${balance:.0f} balance (conservative!)")
             else:
-                base_size = 100.0
+                base_size = 20.0  # Reduced from 100
             
             # 1. CONFIDENCE MULTIPLIER (50-150%)
             confidence_mult = 0.5 + (confidence * 1.0)  # 0.5x to 1.5x

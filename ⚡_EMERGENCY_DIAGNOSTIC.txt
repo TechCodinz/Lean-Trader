@@ -1,0 +1,39 @@
+=============================================================================
+⚡ EMERGENCY DIAGNOSTIC - RUN THIS NOW!
+=============================================================================
+
+cd ~/bot
+
+echo "1️⃣ Is bot running?"
+ps aux | grep "[C]OMPLETE_ULTIMATE_ORCHESTRATOR"
+
+echo ""
+echo "2️⃣ How long has it been running?"
+stat -c %y bot.log
+
+echo ""
+echo "3️⃣ Are orders being placed?"
+grep -c "Order ID:" bot.log
+grep "Order ID:" bot.log | tail -3
+
+echo ""
+echo "4️⃣ Is profit monitoring starting?"
+grep -c "Profit monitoring started\|Starting.*profit monitoring" bot.log
+grep "Profit monitoring started" bot.log | tail -3
+
+echo ""
+echo "5️⃣ Are signals being generated?"
+grep "Signal.*APPROVED\|EXECUTING.*TRADE" bot.log | tail -10
+
+echo ""
+echo "6️⃣ Any execution errors?"
+grep "Intelligent execution error\|execution.*failed" bot.log | tail -10
+
+echo ""
+echo "7️⃣ What's happening in last 100 lines?"
+tail -100 bot.log
+
+echo ""
+echo "============================================================================"
+echo "💡 PASTE ALL OUTPUT ABOVE!"
+echo "============================================================================"
