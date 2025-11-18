@@ -1,0 +1,78 @@
+=============================================================================
+⚡ REDEPLOY WITH IMPROVED LOGGING
+=============================================================================
+
+cd ~/bot
+git pull origin continue-from-micro-fix --no-edit
+pkill -f COMPLETE_ULTIMATE_ORCHESTRATOR
+sleep 3
+nohup python3 COMPLETE_ULTIMATE_ORCHESTRATOR.py > bot.log 2>&1 &
+sleep 10
+echo ""
+echo "✅ Redeployed with better logging!"
+echo ""
+echo "Checking collective decisions..."
+grep "COLLECTIVE DECISION" bot.log | tail -10
+echo ""
+echo "Checking situation scores..."
+grep "Situation Score" bot.log | tail -10
+echo ""
+echo "Checking mode..."
+grep "Mode:" bot.log | tail -10
+echo ""
+tail -f bot.log
+
+=============================================================================
+📊 CURRENT STATUS (From your logs):
+=============================================================================
+
+✅ WORKING:
+   - Collective scanning decisions: YES
+   - Adaptive mode: BALANCED (correct for 70% default score)
+   - Scanner finding pairs: YES
+   - No errors: GOOD!
+
+📊 EXPECTED AFTER REDEPLOY:
+   You should now see:
+   
+   🧠 COLLECTIVE DECISION - Situation Score: 70%
+      Mode: BALANCED (default)
+   📊 Scanning Parameters: BALANCED: Standard filtering
+      Min Volume: $100,000
+      Include All: False
+      Max Pairs: 2,000
+
+=============================================================================
+🎯 WHAT THE MODES MEAN:
+=============================================================================
+
+CURRENT: BALANCED Mode (Score: 70%)
+   - This is GOOD for normal conditions!
+   - Min Volume: $100K (quality filtering)
+   - Will find 1500-2000 pairs
+   - Conservative but effective
+
+IF Score reaches 80%+: FLAWLESS Mode
+   - Min Volume: $50K (more aggressive)
+   - Include All: TRUE
+   - Will find 2500-3000 pairs
+
+IF Score reaches 90%+: SUPERSEDE Mode
+   - Min Volume: $10K (maximum aggression!)
+   - Include All: TRUE
+   - Will find 4000-5000 pairs!
+
+=============================================================================
+📋 MONITORING:
+=============================================================================
+
+# See full collective decision:
+grep "COLLECTIVE DECISION\|Situation Score\|Mode:\|Scanning Parameters" bot.log | tail -20
+
+# See what mode is active:
+grep "BALANCED\|FLAWLESS\|SUPERSEDE" bot.log | tail -5
+
+# See pairs discovered:
+grep "Initial scan complete" bot.log | tail -3
+
+=============================================================================
