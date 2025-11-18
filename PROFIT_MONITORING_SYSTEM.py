@@ -60,6 +60,10 @@ async def monitor_trade_for_profit(exchange, trade_plan: Dict, orchestrator=None
     logger.info(f"   SL: ${stop_loss:.6f}")
     logger.info(f"   ⚡ Max hold: {max_hold_min} min | Check every: {check_interval}s")
     logger.info(f"   🔍 Timeframe: {timeframe} → Checks every {check_interval}s for fast profit detection!")
+    logger.info(f"   🔍 DEBUG: Has 'review_interval_seconds' key? {'review_interval_seconds' in trade_plan}")
+    if 'review_interval_seconds' in trade_plan:
+        logger.info(f"   🔍 DEBUG: Value in plan: {trade_plan['review_interval_seconds']}")
+    logger.info(f"   🔍 DEBUG: Timeframe in plan: {trade_plan.get('timeframe', 'MISSING')}")
     
     start_time = datetime.now()
     
