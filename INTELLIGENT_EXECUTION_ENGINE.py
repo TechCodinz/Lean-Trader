@@ -1034,6 +1034,12 @@ class IntelligentExecutionEngine:
             timeframe = trade_plan['timeframe']
             confidence = trade_plan.get('confidence', 0.5)
             
+            # 🔧 INTELLIGENT ROUTING: Check if symbol is supported by current exchange
+            # Skip forex (USD/JPY, EUR/GBP) and TradFi (GOLD, SUGAR) if using crypto exchange
+            if self._should_skip_symbol(symbol):
+                logger.debug(f"⏭️  Skipping {symbol} - Not supported by current exchange (will route to MT5 when added)")
+                return {'success': False, 'reason': 'symbol_not_supported', 'symbol': symbol}
+            
             logger.info(f"🚀 EXECUTING ULTRA-ADVANCED INTELLIGENT TRADE:")
             logger.info(f"   {symbol} {side.upper()} on {timeframe}")
             logger.info(f"   Strategy: {trade_plan['strategy']}")
