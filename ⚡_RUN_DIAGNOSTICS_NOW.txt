@@ -1,0 +1,68 @@
+=============================================================================
+⚡ RUN THESE DIAGNOSTIC COMMANDS ON YOUR VPS NOW
+=============================================================================
+
+# OPTION 1: Run the diagnostic script (recommended)
+cd ~/bot
+bash ⚡_CHECK_PROFIT_STATUS_NOW.sh
+
+# OR OPTION 2: Run these commands manually:
+
+echo "1️⃣ BOT STATUS:"
+ps aux | grep "[C]OMPLETE_ULTIMATE_ORCHESTRATOR"
+
+echo "2️⃣ ORDERS PLACED:"
+grep -c "Order ID:" bot.log
+grep "Order ID:" bot.log | tail -5
+
+echo "3️⃣ PROFIT CLOSES:"
+grep -c "FAST PROFIT HIT\|TP.*HIT" bot.log
+grep "FAST PROFIT HIT\|TP.*HIT.*+" bot.log | tail -5
+
+echo "4️⃣ BALANCE:"
+grep "Balance:" bot.log | tail -3
+
+echo "5️⃣ ACTIVE TRADES:"
+grep "Active trades on" bot.log | tail -10
+
+echo "6️⃣ ERRORS:"
+grep -c "ERROR\|Insufficient balance" bot.log
+grep "ERROR" bot.log | tail -10
+
+echo "7️⃣ COLLECTIVE SYSTEMS:"
+grep "COLLECTIVE DECISION\|Signal APPROVED\|Signal REJECTED" bot.log | tail -10
+
+echo "8️⃣ PAIRS DISCOVERED:"
+grep "Initial scan complete" bot.log | tail -1
+grep "Found.*USDT pairs on" bot.log | tail -10
+
+echo "9️⃣ SIGNALS:"
+grep "Signal generated\|EXECUTING.*TRADE" bot.log | tail -10
+
+echo "🔟 RECENT ACTIVITY:"
+tail -50 bot.log
+
+=============================================================================
+📊 WHAT TO LOOK FOR:
+=============================================================================
+
+✅ WORKING INDICATORS:
+   - Order IDs being generated
+   - Active trades on multiple pairs
+   - Balance being checked
+   - Signals being approved
+   - Pairs being discovered
+
+❌ FAILING INDICATORS:
+   - "Insufficient balance" errors
+   - "Signal REJECTED" (too many)
+   - No orders placed
+   - High ERROR count
+   - 0 profit closes after long time
+
+⚠️ PENDING INDICATORS:
+   - Orders placed but no closes yet (normal if just started)
+   - Few active trades (warming up)
+   - Scanner still discovering pairs
+
+=============================================================================
