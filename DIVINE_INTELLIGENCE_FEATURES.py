@@ -68,6 +68,28 @@ class DivineIntelligenceManager:
             'components': results,
             'divine_signal': 'strong' if overall_confidence > 0.7 else 'moderate' if overall_confidence > 0.4 else 'weak'
         }
+    
+    async def get_divine_signals(self, market_data: Dict) -> List[Dict]:
+        """
+        Get divine intelligence signals
+        
+        Returns:
+            List of divine signals with insights
+        """
+        # Run the analysis
+        analysis = self.analyze(market_data)
+        
+        # Convert components to signal format
+        signals = []
+        for feature, result in analysis['components'].items():
+            signals.append({
+                'feature': feature,
+                'insight': result.get('confidence', 0),
+                'signal_strength': analysis['divine_signal'],
+                'data': result
+            })
+        
+        return signals
 
 
 class QuantumMarketAnalyzer:
