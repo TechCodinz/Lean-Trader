@@ -1,0 +1,75 @@
+================================================================================
+🔍 COMPLETE DIAGNOSTIC - CHECK EVERYTHING
+================================================================================
+
+COPY & PASTE THESE COMMANDS ON YOUR VPS:
+
+
+================================================================================
+1️⃣ CHECK BOT PROCESS
+================================================================================
+
+ps aux | grep ORCHESTRATOR | grep -v grep && \
+lsof -p $(pgrep -f ORCHESTRATOR | head -1) 2>/dev/null | grep cwd
+
+
+================================================================================
+2️⃣ CHECK WHICH DIRECTORY HAS WHAT FILES
+================================================================================
+
+echo "=== ~/bot ===" && \
+ls -la ~/bot/mt5_forex_sync.py ~/bot/MT5_FOREX_ENGINE_INTEGRATION.py ~/bot/INTELLIGENT_EXECUTION_ENGINE.py 2>&1 && \
+echo "" && \
+echo "=== ~/apex_bot ===" && \
+ls -la ~/apex_bot/mt5_forex_sync.py ~/apex_bot/MT5_FOREX_ENGINE_INTEGRATION.py ~/apex_bot/INTELLIGENT_EXECUTION_ENGINE.py 2>&1
+
+
+================================================================================
+3️⃣ CHECK CURRENT ERRORS IN LOG
+================================================================================
+
+cd ~/apex_bot && tail -200 bot.log | grep ERROR | tail -15
+
+
+================================================================================
+4️⃣ CHECK WHY TRADE PLANS FAIL
+================================================================================
+
+cd ~/apex_bot && tail -500 bot.log | grep -B5 "Failed to create intelligent trade plan" | head -30
+
+
+================================================================================
+5️⃣ CHECK IF BOT IS FINDING OPPORTUNITIES
+================================================================================
+
+cd ~/apex_bot && tail -200 bot.log | grep -i "trending.*USDT\|opportunity.*USDT" | head -10
+
+
+================================================================================
+6️⃣ CHECK WHAT'S BEING ANALYZED
+================================================================================
+
+cd ~/apex_bot && tail -100 bot.log | grep -i "analyzing\|scouting\|scanning" | head -10
+
+
+================================================================================
+7️⃣ CHECK GIT STATUS IN BOTH DIRECTORIES
+================================================================================
+
+echo "=== ~/bot git ===" && \
+cd ~/bot && git log -1 --oneline && git status --short && \
+echo "" && \
+echo "=== ~/apex_bot git ===" && \
+cd ~/apex_bot && git log -1 --oneline 2>&1 && git status --short 2>&1 | head -10
+
+
+================================================================================
+SHARE ALL OUTPUT FROM THESE 7 COMMANDS!
+================================================================================
+
+Then I'll know:
+✅ Where bot is running
+✅ Which files are missing
+✅ Why trade plans fail
+✅ What's blocking trades
+✅ How to fix it all!
