@@ -35,18 +35,28 @@ class DynamicMarketScanner:
         self.trending_pairs = deque(maxlen=50)  # Top 50 trending
         self.volume_leaders = deque(maxlen=30)  # Top 30 by volume
         
-        # Scanning config - RELAXED for more opportunities
-        self.min_24h_volume_usd = 1_000_000  # $1M minimum (was $5M)
-        self.min_price_change_pct = 1.5  # 1.5% move (was 3%)
-        self.rescan_interval = 3600  # 1 hour
+        # Scanning config - ADAPTIVE (determined by situational awareness)
+        # NO HARDCODED VALUES - All determined collectively!
+        self.min_24h_volume_usd = None  # Set by situational awareness
+        self.min_price_change_pct = None  # Set by situational awareness
+        self.rescan_interval = 3600  # 1 hour base (adjusted by system)
+        self.include_all_pairs = None  # Decided collectively by engines
+        
+        # Adaptive mode - gets set by SUPREME SITUATIONAL AWARENESS
+        self.adaptive_mode = 'balanced'  # balanced/aggressive/conservative
+        
+        # Collective decision system
+        self.situational_awareness = None  # Will be wired
+        self.last_collective_decision = None
         
         # Stats
         self.last_scan = None
         self.scan_count = 0
         
         logger.info("🔍 Dynamic Market Scanner initialized")
-        logger.info(f"   Min volume: ${self.min_24h_volume_usd:,}")
-        logger.info(f"   Min price change: {self.min_price_change_pct}%")
+        logger.info(f"   Mode: ADAPTIVE (collective decision-making)")
+        logger.info(f"   Settings: Determined by situational awareness")
+        logger.info(f"   Hybrid: No hardcoded gating!")
     
     async def run_continuous_scanning(self):
         """Main scanning loop - runs forever"""
@@ -85,6 +95,9 @@ class DynamicMarketScanner:
         if not self.exchanges:
             logger.warning("⚠️  No exchanges connected for dynamic scanning")
             return
+        
+        # 🧠 STEP 1: Get collective decision on scanning parameters
+        await self._get_collective_scanning_decision()
         
         new_opportunities = set()
         all_pairs_found = []
@@ -128,10 +141,20 @@ class DynamicMarketScanner:
                     continue
                 
                 # Filter for USDT pairs only
-                usdt_pairs = {
-                    symbol: ticker for symbol, ticker in tickers.items()
-                    if '/USDT' in symbol and ':' not in symbol  # Exclude futures
-                }
+                # FIXED: More flexible filtering for different exchange formats
+                usdt_pairs = {}
+                for symbol, ticker in tickers.items():
+                    # Include if it's a USDT pair
+                    if '/USDT' in symbol:
+                        # Exclude futures/perps ONLY if they have specific markers
+                        # Bybit uses different notation, so be more selective
+                        if exchange_name == 'bybit':
+                            # Bybit: Include all /USDT pairs (spot and linear)
+                            usdt_pairs[symbol] = ticker
+                        else:
+                            # Other exchanges: Exclude if has : (futures notation)
+                            if ':' not in symbol:
+                                usdt_pairs[symbol] = ticker
                 
                 logger.info(f"   Found {len(usdt_pairs)} USDT pairs on {exchange_name}")
                 all_pairs_found.extend(list(usdt_pairs.keys()))
@@ -143,9 +166,9 @@ class DynamicMarketScanner:
                         volume_24h = ticker.get('quoteVolume', 0)  # Volume in USDT
                         price_change_pct = ticker.get('percentage', 0)
                         
-                        # Check if it meets criteria
-                        if volume_24h >= self.min_24h_volume_usd:
-                            # High volume pair
+                        # ULTRA-RELAXED: Include ALL pairs OR check volume
+                        if self.include_all_pairs or volume_24h >= self.min_24h_volume_usd:
+                            # Add to opportunities
                             new_opportunities.add(symbol)
                             
                             # Track as volume leader
@@ -209,6 +232,27 @@ class DynamicMarketScanner:
             reverse=True
         )
         return list(sorted_volume)[:limit]
+    
+    async def _get_collective_scanning_decision(self):
+        """
+        🧠 Get scanning parameters from COLLECTIVE intelligence
+        No hardcoded values - all adaptive!
+        """
+        from COLLECTIVE_SCANNING_DECISION import CollectiveScanningDecision
+        
+        # Get parameters from collective decision
+        params = await CollectiveScanningDecision.get_scanning_parameters(
+            self.situational_awareness
+        )
+        
+        # Apply to scanner (adaptive, not hardcoded!)
+        self.adaptive_mode = params['mode']
+        self.min_24h_volume_usd = params['min_volume_usd']
+        self.min_price_change_pct = params['min_price_change_pct']
+        self.include_all_pairs = params['include_all_pairs']
+        self.last_collective_decision = params
+        
+        return params
     
     def _extract_ccxt_exchanges(self) -> Dict:
         """Extract actual ccxt exchange objects from engines"""
