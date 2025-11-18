@@ -142,6 +142,10 @@ class CentralDataHub:
             signals_list = list(self.recent_signals)
             return signals_list[-limit:] if len(signals_list) > limit else signals_list
         return []
+    
+    def get_recent_signals(self, limit=1000):
+        """Get recent signals (alias for get_signals for compatibility)"""
+        return self.get_signals(limit=limit)
 
 
 
