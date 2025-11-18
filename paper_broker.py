@@ -147,9 +147,21 @@ class PaperBroker:
 
     # ------------------ helpers ------------------
     def _split(self, symbol: str) -> Tuple[str, str]:
-        base, quote = symbol.split("/")
+        # Handle symbols with or without '/'
+        if "/" not in symbol:
+            # Forex/TradFi symbols without slash - skip them gracefully
+            raise ValueError(f"PaperBroker: Symbol '{symbol}' must contain '/' (e.g., BTC/USDT)")
+        
+        parts = symbol.split("/")
+        if len(parts) != 2:
+            raise ValueError(f"PaperBroker: Invalid symbol format '{symbol}'")
+        
+        base, quote = parts
         if quote != "USDT":
-            raise ValueError("PaperBroker supports USDT quote only")
+            # Allow other quotes but warn
+            import logging
+            logging.getLogger("paper_broker").debug(f"PaperBroker: Non-USDT pair '{symbol}' - skipping")
+            raise ValueError(f"PaperBroker: Only USDT pairs supported, got '{symbol}'")
         return base, quote
 
     def _fut(self, symbol: str) -> Dict[str, float]:
