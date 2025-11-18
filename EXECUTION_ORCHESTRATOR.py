@@ -33,6 +33,15 @@ except Exception as e:
     logger.warning(f"⚠️ INTELLIGENT EXECUTION ENGINE not available: {e}")
     INTELLIGENT_EXECUTION_AVAILABLE = False
 
+# 🧠 COLLECTIVE CONSENSUS ENGINE - ALL engines scrutinize together!
+try:
+    from COLLECTIVE_CONSENSUS_ENGINE import CollectiveConsensusEngine, get_collective_consensus
+    COLLECTIVE_CONSENSUS_AVAILABLE = True
+    logger.info("🧠 COLLECTIVE CONSENSUS ENGINE loaded - ALL 205+ engines work in sync!")
+except Exception as e:
+    logger.warning(f"⚠️ COLLECTIVE CONSENSUS ENGINE not available: {e}")
+    COLLECTIVE_CONSENSUS_AVAILABLE = False
+
 
 class SmartPositionSizer:
     """Smart position sizing based on account balance and risk"""
@@ -256,6 +265,9 @@ class ExecutionOrchestrator:
         
         # 🧠 INTELLIGENT EXECUTION ENGINE - THE MISSING PIECE!
         self.intelligent_engine = None
+        
+        # 🧠 COLLECTIVE CONSENSUS ENGINE - ALL engines work together!
+        self.collective_consensus = None
         
         if mode == "testnet":
             # 🧪 TESTNET MODE - Use Bybit testnet
@@ -545,7 +557,25 @@ class ExecutionOrchestrator:
         - Market Making (bid/ask spreads)
         """
         try:
-            # 🎯 DETECT SIGNAL TYPE - Standard or Special Strategy
+            # 🧠 STEP 1: COLLECTIVE CONSENSUS - ALL 205+ engines scrutinize together!
+            if self.collective_consensus:
+                logger.info(f"🔍 Sending signal to COLLECTIVE CONSENSUS for scrutiny...")
+                signal = await self.collective_consensus.scrutinize_signal(signal)
+                
+                # Check if collective approved the signal
+                if not signal.get('approved', False):
+                    logger.warning(f"   ❌ Signal REJECTED by collective consensus!")
+                    logger.warning(f"   Agreement: {signal.get('collective_agreement', 0):.0%} (needed {self.collective_consensus.min_agreement_pct:.0%})")
+                    logger.warning(f"   Confidence: {signal.get('collective_confidence', 0):.0%} (needed {self.collective_consensus.min_confidence_collective:.0%})")
+                    return False
+                
+                logger.info(f"   ✅ Signal APPROVED by collective consensus!")
+                logger.info(f"   🤝 Agreement: {signal.get('collective_agreement', 0):.0%}")
+                logger.info(f"   💪 Collective confidence: {signal.get('collective_confidence', 0):.0%}")
+            else:
+                logger.debug("   ⚠️ Collective consensus not available - proceeding without full scrutiny")
+            
+            # 🎯 STEP 2: DETECT SIGNAL TYPE - Standard or Special Strategy
             signal_type = signal.get('type', 'standard')
             
             # ============================================================

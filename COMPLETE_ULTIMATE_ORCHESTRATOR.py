@@ -2088,6 +2088,46 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
         
         # Router will be initialized AFTER arb_exchanges is created (line ~2090)
         
+        # 🧠 INITIALIZE COLLECTIVE CONSENSUS ENGINE - ALL engines scrutinize together!
+        try:
+            from COLLECTIVE_CONSENSUS_ENGINE import initialize_collective_consensus
+            
+            # Collect ALL engines from the orchestrator
+            all_engines = {}
+            
+            # Add all trading engines
+            if hasattr(self, 'trading_engines'):
+                for name, engine in self.trading_engines.items():
+                    all_engines[f"trading_{name}"] = engine
+            
+            # Add all advanced systems
+            if hasattr(self, 'advanced_systems'):
+                for name, system in self.advanced_systems.items():
+                    all_engines[f"advanced_{name}"] = system
+            
+            # Add specific engine instances
+            if hasattr(self, 'evolution_engine'): all_engines['evolution'] = self.evolution_engine
+            if hasattr(self, 'brain_system'): all_engines['brain'] = self.brain_system
+            if hasattr(self, 'hivemind'): all_engines['hivemind'] = self.hivemind
+            if hasattr(self, 'revolutionary_master'): all_engines['revolutionary'] = self.revolutionary_master
+            if hasattr(self, 'ultra_rare_orchestrator'): all_engines['ultra_rare'] = self.ultra_rare_orchestrator
+            if hasattr(self, 'divine_intelligence'): all_engines['divine'] = self.divine_intelligence
+            if hasattr(self, 'supreme_consciousness'): all_engines['supreme'] = self.supreme_consciousness
+            
+            # Initialize collective consensus
+            collective_consensus = initialize_collective_consensus(all_engines)
+            
+            # Wire to execution orchestrator
+            self.advanced_orchestrators['execution'].collective_consensus = collective_consensus
+            
+            logger.info(f"🧠 ✅ COLLECTIVE CONSENSUS ENGINE initialized!")
+            logger.info(f"   📊 {len(all_engines)} engines working in SYNC!")
+            logger.info(f"   🔍 ALL signals scrutinized collectively before routing!")
+            logger.info(f"   🎯 Precision + Accuracy + Steady Profits ENABLED!")
+        except Exception as e:
+            logger.error(f"   ❌ Collective Consensus error: {e}")
+            logger.error(f"   Proceeding without collective scrutiny")
+        
         # ✨ WIRE TESTNET EXCHANGE TO EXECUTION ORCHESTRATOR
         if self.mode == 'testnet' and hasattr(self, 'testnet_bybit'):
             logger.info("\n🔗 Wiring Bybit testnet to ExecutionOrchestrator...")
