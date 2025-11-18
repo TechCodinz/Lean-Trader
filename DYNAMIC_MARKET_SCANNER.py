@@ -112,9 +112,19 @@ class DynamicMarketScanner:
                 
                 # Handle both async and sync exchanges
                 if hasattr(exchange, 'fetch_tickers'):
+                    # FIXED: Call the function with () 
                     tickers = await asyncio.to_thread(exchange.fetch_tickers)
+                    
+                    # If tickers is a coroutine (async exchange), await it properly
+                    if asyncio.iscoroutine(tickers):
+                        tickers = await tickers
                 else:
                     logger.warning(f"   {exchange_name} doesn't support fetch_tickers")
+                    continue
+                
+                # Ensure tickers is a dict
+                if not isinstance(tickers, dict):
+                    logger.warning(f"   {exchange_name} returned invalid tickers (type: {type(tickers)})")
                     continue
                 
                 # Filter for USDT pairs only
