@@ -1113,37 +1113,49 @@ class IntelligentExecutionEngine:
             logger.info(f"   Size: ${lot_size:.2f} @ {trade_plan['leverage']}x")
             logger.info(f"   TP Levels: {len(trade_plan['take_profit_levels'])}")
             
-            # 🤖 CONSULT AI for very high-confidence trades (THROTTLED!)
+            # 🤖 CONSULT AI for very high-confidence trades (NON-BLOCKING!)
             ai_insights = None
-            if self.ai_consultation and confidence >= 0.88:  # ✅ Changed from 75% to 88% to reduce queries!
-                logger.info(f"   🤖 VERY HIGH CONFIDENCE ({confidence:.0%}) - Consulting AI...")
-                ai_context = {
-                    'symbol': symbol,
-                    'signal': side,
-                    'confidence': confidence,
-                    'timeframe': timeframe,
-                    'current_price': entry_price,
-                    'market_data': {
-                        'strategy': trade_plan['strategy'],
-                        'session': trade_plan['session'],
-                        'volatility': trade_plan.get('volatility', 0),
-                        'leverage': trade_plan['leverage']
-                    }
-                }
-                ai_insights = await self.ai_consultation.consult_strategy(ai_context)
+            if self.ai_consultation and confidence >= 0.88:  # Only for 88%+ confidence
+                logger.info(f"   🤖 VERY HIGH CONFIDENCE ({confidence:.0%}) - Consulting AI (non-blocking)...")
                 
-                if ai_insights and ai_insights.get('ai_consensus') == 'bearish' and side == 'buy':
-                    logger.warning(f"   ⚠️ AI CONSENSUS: BEARISH (conflicts with BUY signal!)")
-                    logger.warning(f"   🤖 Consider reducing size or skipping trade")
-                    # Reduce size by 30% if AI disagrees
-                    lot_size = lot_size * 0.7
-                    logger.info(f"   📉 Size reduced to ${lot_size:.2f} due to AI caution")
-                elif ai_insights and ai_insights.get('ai_consensus') == 'bullish':
-                    logger.info(f"   ✅ AI CONSENSUS: BULLISH (confirms signal!)")
-                    # Can boost size by 10-20% if AI strongly agrees
-                    if ai_insights.get('unanimous'):
-                        lot_size = lot_size * 1.15
-                        logger.info(f"   📈 Size boosted to ${lot_size:.2f} (AI unanimous!)")
+                # 🔥 NON-BLOCKING: Try AI with 2-second timeout, continue if unavailable
+                try:
+                    ai_context = {
+                        'symbol': symbol,
+                        'signal': side,
+                        'confidence': confidence,
+                        'timeframe': timeframe,
+                        'current_price': entry_price,
+                        'market_data': {
+                            'strategy': trade_plan['strategy'],
+                            'session': trade_plan['session'],
+                            'volatility': trade_plan.get('volatility', 0),
+                            'leverage': trade_plan['leverage']
+                        }
+                    }
+                    
+                    # ⏱️ 2-second timeout - if AI doesn't respond, continue without it
+                    ai_insights = await asyncio.wait_for(
+                        self.ai_consultation.consult_strategy(ai_context),
+                        timeout=2.0
+                    )
+                    
+                    if ai_insights and ai_insights.get('ai_consensus') == 'bearish' and side == 'buy':
+                        logger.warning(f"   ⚠️ AI CONSENSUS: BEARISH (conflicts with BUY signal!)")
+                        # Reduce size by 30% if AI disagrees
+                        lot_size = lot_size * 0.7
+                        logger.info(f"   📉 Size reduced to ${lot_size:.2f} due to AI caution")
+                    elif ai_insights and ai_insights.get('ai_consensus') == 'bullish':
+                        logger.info(f"   ✅ AI CONSENSUS: BULLISH (confirms signal!)")
+                        # Boost size by 15% if AI strongly agrees
+                        if ai_insights.get('unanimous'):
+                            lot_size = lot_size * 1.15
+                            logger.info(f"   📈 Size boosted to ${lot_size:.2f} (AI unanimous!)")
+                
+                except asyncio.TimeoutError:
+                    logger.debug(f"   ⏭️ AI timeout - continuing with ultra engines")
+                except Exception as e:
+                    logger.debug(f"   ⏭️ AI unavailable - using ultra engines: {e}")
             
             # 🔥 CHOOSE OPTIMAL EXCHANGE AND MARKET TYPE
             optimal = self._get_optimal_exchange_and_market(symbol, confidence, timeframe, lot_size)
@@ -1180,13 +1192,26 @@ class IntelligentExecutionEngine:
                 logger.error("No exchange available!")
                 return None
             
-            # 🔍 DEBUG: Check balance BEFORE placing order
+            # 🔍 CRITICAL: Check balance BEFORE placing order
             try:
                 current_balance = await asyncio.to_thread(self.exchange.fetch_balance)
                 usdt_free = current_balance.get('USDT', {}).get('free', 0)
                 usdt_total = current_balance.get('USDT', {}).get('total', 0)
-                logger.info(f"   💰 Current balance: ${usdt_free:.2f} free / ${usdt_total:.2f} total")
-                logger.info(f"   📊 Attempting order: ${lot_size:.2f} on {optimal['market_type']}")
+                usdt_used = usdt_total - usdt_free
+                
+                logger.info(f"   💰 Balance: ${usdt_free:.2f} free / ${usdt_total:.2f} total (${usdt_used:.2f} in open trades)")
+                
+                # 🚨 CRITICAL CHECK: Ensure sufficient free balance
+                if usdt_free < lot_size:
+                    logger.warning(f"   ⚠️ Insufficient free balance! Need ${lot_size:.2f}, have ${usdt_free:.2f}")
+                    logger.info(f"   💡 Reducing order size to ${usdt_free * 0.8:.2f} (80% of available)")
+                    lot_size = usdt_free * 0.8  # Use 80% of available (keep 20% buffer)
+                    
+                    if lot_size < 5.0:  # Minimum $5 order
+                        logger.warning(f"   ⏭️ Skipping - insufficient balance (${usdt_free:.2f} available)")
+                        return {'success': False, 'reason': 'insufficient_balance', 'available': usdt_free}
+                
+                logger.info(f"   📊 Placing order: ${lot_size:.2f} on {optimal['market_type']}")
             except Exception as e:
                 logger.warning(f"   ⚠️  Could not check balance: {e}")
             
