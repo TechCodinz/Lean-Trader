@@ -275,6 +275,71 @@ class ExchangeRouter:
             "n_markets": len(self.markets),
         }
 
+
+    # ========================================================================
+    # DELEGATED METHODS - Pass through to underlying exchange
+    # ========================================================================
+    
+    def fetch_balance(self, params=None):
+        """Fetch balance from exchange"""
+        if hasattr(self, 'ex') and self.ex:
+            return self.ex.fetch_balance(params)
+        raise AttributeError("Exchange not initialized")
+    
+    def create_market_buy_order(self, symbol: str, amount: float, params=None):
+        """Create market buy order"""
+        if hasattr(self, 'ex') and self.ex:
+            return self.ex.create_market_buy_order(symbol, amount, params)
+        raise AttributeError("Exchange not initialized")
+    
+    def create_market_sell_order(self, symbol: str, amount: float, params=None):
+        """Create market sell order"""
+        if hasattr(self, 'ex') and self.ex:
+            return self.ex.create_market_sell_order(symbol, amount, params)
+        raise AttributeError("Exchange not initialized")
+    
+    def create_limit_buy_order(self, symbol: str, amount: float, price: float, params=None):
+        """Create limit buy order"""
+        if hasattr(self, 'ex') and self.ex:
+            return self.ex.create_limit_buy_order(symbol, amount, price, params)
+        raise AttributeError("Exchange not initialized")
+    
+    def create_limit_sell_order(self, symbol: str, amount: float, price: float, params=None):
+        """Create limit sell order"""
+        if hasattr(self, 'ex') and self.ex:
+            return self.ex.create_limit_sell_order(symbol, amount, price, params)
+        raise AttributeError("Exchange not initialized")
+    
+    def cancel_order(self, order_id: str, symbol: str = None, params=None):
+        """Cancel an order"""
+        if hasattr(self, 'ex') and self.ex:
+            return self.ex.cancel_order(order_id, symbol, params)
+        raise AttributeError("Exchange not initialized")
+    
+    def fetch_order(self, order_id: str, symbol: str = None, params=None):
+        """Fetch order status"""
+        if hasattr(self, 'ex') and self.ex:
+            return self.ex.fetch_order(order_id, symbol, params)
+        raise AttributeError("Exchange not initialized")
+    
+    def fetch_open_orders(self, symbol: str = None, since=None, limit=None, params=None):
+        """Fetch open orders"""
+        if hasattr(self, 'ex') and self.ex:
+            return self.ex.fetch_open_orders(symbol, since, limit, params)
+        raise AttributeError("Exchange not initialized")
+    
+    def fetch_ticker(self, symbol: str, params=None):
+        """Fetch ticker"""
+        if hasattr(self, 'ex') and self.ex:
+            return self.ex.fetch_ticker(symbol, params)
+        raise AttributeError("Exchange not initialized")
+    
+    def fetch_ohlcv(self, symbol: str, timeframe='1m', since=None, limit=None, params=None):
+        """Fetch OHLCV candles"""
+        if hasattr(self, 'ex') and self.ex:
+            return self.ex.fetch_ohlcv(symbol, timeframe, since, limit, params)
+        raise AttributeError("Exchange not initialized")
+
     def spot_symbols(self, quote: str = "USDT") -> List[str]:
         out: List[str] = []
         for sym, m in self.markets.items():  # ALWAYS .items()

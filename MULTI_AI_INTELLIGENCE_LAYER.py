@@ -79,7 +79,7 @@ class MultiAIIntelligence:
             },
             'gemini': {
                 'api_key': os.getenv('GOOGLE_API_KEY'),
-                'model': 'gemini-pro',
+                'model': 'gemini-1.5-flash',
                 'enabled': False
             },
             'raiziom': {

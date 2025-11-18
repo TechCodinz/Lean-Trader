@@ -129,7 +129,7 @@ class AIConsultationSystem:
         if 'google' in self.api_keys and GOOGLE_AVAILABLE:
             try:
                 genai.configure(api_key=self.api_keys['google'])
-                clients['gemini'] = genai.GenerativeModel('gemini-pro')
+                clients['gemini'] = genai.GenerativeModel('gemini-1.5-flash')
                 logger.info("   ✅ Gemini (Google) client initialized")
             except Exception as e:
                 logger.error(f"   ❌ Gemini init failed: {e}")

@@ -182,7 +182,7 @@ class AIConsultationService:
         if GEMINI_AVAILABLE and api_key:
             try:
                 genai.configure(api_key=api_key)
-                self.clients['gemini'] = genai.GenerativeModel('gemini-pro')
+                self.clients['gemini'] = genai.GenerativeModel('gemini-1.5-flash')
                 logger.info("✅ Google Gemini initialized")
             except Exception as e:
                 logger.debug(f"Gemini init failed: {e}")
