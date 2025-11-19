@@ -603,6 +603,9 @@ class ExecutionOrchestrator:
             # 🎯 STEP 2: DETECT SIGNAL TYPE - Standard or Special Strategy
             signal_type = signal.get('type', 'standard')
             
+            # DEBUG: Log signal type
+            logger.debug(f"   🔍 Signal type: '{signal_type}'")
+            
             # ============================================================
             # SPECIAL STRATEGY EXECUTION
             # ============================================================
