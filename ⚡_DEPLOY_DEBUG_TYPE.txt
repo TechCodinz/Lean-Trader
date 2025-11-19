@@ -1,0 +1,8 @@
+cd ~/bot
+git pull origin continue-from-micro-fix --no-edit
+pkill -f COMPLETE_ULTIMATE_ORCHESTRATOR
+sleep 3
+nohup python3 COMPLETE_ULTIMATE_ORCHESTRATOR.py > bot.log 2>&1 &
+sleep 30
+grep "Signal type:" bot.log | tail -10
+grep "TRIANGULAR ARBITRAGE\|Skipping:" bot.log | tail -10
