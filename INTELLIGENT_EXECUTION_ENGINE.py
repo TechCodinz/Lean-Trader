@@ -1282,7 +1282,13 @@ class IntelligentExecutionEngine:
             
             # CRITICAL FIX: Calculate quantity in COINS, not USD!
             # Bybit needs amount in BASE currency (BTC, ETH, SOL, etc.)
-            quantity = lot_size / entry_price if entry_price > 0 else 0.001
+            
+            # Safety check: Ensure entry_price is valid!
+            if not entry_price or entry_price <= 0:
+                logger.error(f"   ❌ Invalid entry price for {symbol}: {entry_price}, SKIPPING!")
+                return {'success': False, 'reason': 'invalid_price', 'price': entry_price}
+            
+            quantity = lot_size / entry_price
             
             logger.info(f"   💰 Order: {quantity:.8f} {symbol.split('/')[0]} (${lot_size:.2f} @ ${entry_price:.2f})")
             
