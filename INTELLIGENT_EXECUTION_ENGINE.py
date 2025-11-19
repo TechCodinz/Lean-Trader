@@ -819,7 +819,7 @@ class IntelligentExecutionEngine:
                 
                 # MANAGEMENT
                 'max_hold_time_minutes': max_hold,
-                'review_interval_seconds': self._get_review_interval(timeframe),
+                'review_interval_seconds': self._get_check_interval(timeframe),
                 're_evaluate_on': ['volatility_spike', 'news_event', 'trend_reversal'],
                 
                 # INTELLIGENCE CONTEXT (from ALL engines!)
@@ -1101,9 +1101,14 @@ class IntelligentExecutionEngine:
         return base_hold
     
     def _get_review_interval(self, timeframe: str) -> int:
-        """How often to review this position (seconds)"""
-        intervals = {
-            '1m': 10,   # Review every 10 seconds
+        """DEPRECATED - Use _get_check_interval() instead!"""
+        # This method should not be used anymore!
+        logger.warning(f"⚠️ _get_review_interval called (DEPRECATED)! Use _get_check_interval instead!")
+        return self._get_check_interval(timeframe)  # Redirect to correct method
+        
+        # OLD WRONG VALUES (kept for reference):
+        intervals_old = {
+            '1m': 10,   # OLD: Review every 10 seconds (TOO SLOW!)
             '5m': 30,   # Every 30 seconds
             '15m': 60,  # Every minute
             '1h': 300,  # Every 5 minutes
