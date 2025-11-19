@@ -801,7 +801,7 @@ class IntelligentExecutionEngine:
                 
                 # ENTRY
                 'entry_type': entry_strategy['type'],
-                'entry_price': entry_price,
+                'entry_price': entry_price,  # Using fetched live price!
                 'entry_condition': entry_strategy['condition'],
                 'entry_wait_max_seconds': entry_strategy.get('max_wait', 60),
                 
@@ -1302,14 +1302,20 @@ class IntelligentExecutionEngine:
                     {}  # Add empty params dict
                 )
             
+            # Get actual executed price from order response
+            actual_price = order.get('average', order.get('price', trade_plan['entry_price']))
+            
             # Record in multi-timeframe tracker
             trade_record = {
                 **trade_plan,
                 'order_id': order.get('id'),
+                'entry_price': actual_price,  # OVERRIDE with actual executed price!
                 'executed_at': datetime.utcnow().isoformat(),
                 'status': 'open',
                 'timeframe': timeframe
             }
+            
+            logger.info(f"   📊 Trade Record Entry Price: ${actual_price:.6f} (from order response)")
             
             self.active_trades_by_tf[symbol].append(trade_record)
             
