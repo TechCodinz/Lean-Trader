@@ -46,7 +46,10 @@ _global_engine = None
 
 # 🔥 PHASE B: DARWINISM INTEGRATION
 try:
-    from DARWINISM_WRAPPER import record_signal_safe, record_trade_safe, get_engine_influence_safe
+    try:
+        from DARWINISM_WRAPPER import record_signal_safe, record_trade_safe, get_engine_influence_safe
+    except ImportError:
+        from utils.helpers.DARWINISM_WRAPPER import record_signal_safe, record_trade_safe, get_engine_influence_safe
     DARWINISM_INTEGRATED = True
     logger.info("🧠 DARWINISM integrated - Adaptive learning ACTIVE!")
 except Exception as e:
@@ -55,7 +58,10 @@ except Exception as e:
 
 # Import MT5 forex integration
 try:
-    from MT5_FOREX_ENGINE_INTEGRATION import get_mt5_forex_integration
+    try:
+        from MT5_FOREX_ENGINE_INTEGRATION import get_mt5_forex_integration
+    except ImportError:
+        from utils.helpers.MT5_FOREX_ENGINE_INTEGRATION import get_mt5_forex_integration
     MT5_FOREX_INTEGRATION_AVAILABLE = True
     logger.info("[OK] MT5 FOREX INTEGRATION available (automated forex pair routing)")
 except Exception as e:
@@ -64,7 +70,10 @@ except Exception as e:
 
 # Import advanced execution components
 try:
-    from OMNISCIENT_EXECUTION_ENGINE import OmniscientExecutionEngine
+    try:
+        from OMNISCIENT_EXECUTION_ENGINE import OmniscientExecutionEngine
+    except ImportError:
+        from engines.execution.OMNISCIENT_EXECUTION_ENGINE import OmniscientExecutionEngine
     OMNISCIENT_AVAILABLE = True
     logger.info("[OK] OMNISCIENT EXECUTION ENGINE available (multi-exchange, multi-market)")
 except Exception as e:
@@ -72,7 +81,10 @@ except Exception as e:
     logger.warning(f" OMNISCIENT EXECUTION ENGINE not available: {e}")
 
 try:
-    from PERFECT_EXECUTION_SYSTEM import PerfectEntryTimer, TrailingProfitManager
+    try:
+        from PERFECT_EXECUTION_SYSTEM import PerfectEntryTimer, TrailingProfitManager
+    except ImportError:
+        from engines.execution.PERFECT_EXECUTION_SYSTEM import PerfectEntryTimer, TrailingProfitManager
     PERFECT_ENTRY_AVAILABLE = True
     logger.info("[OK] PERFECT EXECUTION SYSTEM available (perfect entry, trailing)")
 except Exception as e:
@@ -80,7 +92,10 @@ except Exception as e:
     logger.warning(f" PERFECT EXECUTION SYSTEM not available: {e}")
 
 try:
-    from SIGNAL_AGGREGATOR import SignalAggregator
+    try:
+        from SIGNAL_AGGREGATOR import SignalAggregator
+    except ImportError:
+        from utils.helpers.SIGNAL_AGGREGATOR import SignalAggregator
     SIGNAL_AGGREGATOR_AVAILABLE = True
     logger.info("[OK] SIGNAL AGGREGATOR available (intelligent signal combining)")
 except Exception as e:
@@ -96,7 +111,13 @@ except Exception as e:
     logger.warning(f" MOON SPOTTER not available: {e}")
 
 try:
-    from ADAPTIVE_EXCHANGE_INTELLIGENCE import AdaptiveExchangeIntelligence
+    try:
+        from ADAPTIVE_EXCHANGE_INTELLIGENCE import AdaptiveExchangeIntelligence
+    except ImportError:
+        try:
+            from ai.intelligence.ADAPTIVE_EXCHANGE_INTELLIGENCE import AdaptiveExchangeIntelligence
+        except ImportError:
+            from utils.helpers.ADAPTIVE_EXCHANGE_INTELLIGENCE import AdaptiveExchangeIntelligence
     ADAPTIVE_INTELLIGENCE_AVAILABLE = True
     logger.info("[OK] ADAPTIVE EXCHANGE INTELLIGENCE available (multi-exchange awareness)")
 except Exception as e:
@@ -104,7 +125,13 @@ except Exception as e:
     logger.warning(f" ADAPTIVE EXCHANGE INTELLIGENCE not available: {e}")
 
 try:
-    from AI_CONSULTATION_SYSTEM import AIConsultationSystem
+    try:
+        from AI_CONSULTATION_SYSTEM import AIConsultationSystem
+    except ImportError:
+        try:
+            from ai.intelligence.AI_CONSULTATION_SYSTEM import AIConsultationSystem
+        except ImportError:
+            from utils.helpers.AI_CONSULTATION_SYSTEM import AIConsultationSystem
     AI_CONSULTATION_AVAILABLE = True
     logger.info("[OK] AI CONSULTATION SYSTEM available (Claude, GPT-4, Gemini)")
 except Exception as e:

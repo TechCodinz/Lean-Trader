@@ -14,7 +14,10 @@ Features:
 
 import asyncio
 import logging
-from TRAILING_PROFIT_MANAGER import TrailingProfitManager
+try:
+    from TRAILING_PROFIT_MANAGER import TrailingProfitManager
+except ImportError:
+    from utils.helpers.TRAILING_PROFIT_MANAGER import TrailingProfitManager
 from typing import Dict, List, Optional
 from datetime import datetime, timedelta
 from collections import deque
