@@ -29,27 +29,45 @@ import threading
 logger = logging.getLogger(__name__)
 
 try:
-    from NEUROTRANSMITTER_SYSTEM import NeurotransmitterSystem, NeurotransmitterType
+    try:
+        from NEUROTRANSMITTER_SYSTEM import NeurotransmitterSystem, NeurotransmitterType
+    except ImportError:
+        from utils.helpers.NEUROTRANSMITTER_SYSTEM import NeurotransmitterSystem, NeurotransmitterType
     NEUROTRANSMITTER_AVAILABLE = True
-except:
+except Exception:
     NEUROTRANSMITTER_AVAILABLE = False
 
 try:
-    from HIGH_VOLTAGE_NERVOUS_SYSTEM import HighVoltageNervousSystem
+    try:
+        from HIGH_VOLTAGE_NERVOUS_SYSTEM import HighVoltageNervousSystem
+    except ImportError:
+        from utils.helpers.HIGH_VOLTAGE_NERVOUS_SYSTEM import HighVoltageNervousSystem
     HIGH_VOLTAGE_AVAILABLE = True
-except:
+except Exception:
     HIGH_VOLTAGE_AVAILABLE = False
 
 try:
-    from CONSCIOUSNESS_HARMONIZER import get_consciousness_harmonizer
+    try:
+        from CONSCIOUSNESS_HARMONIZER import get_consciousness_harmonizer
+    except ImportError:
+        try:
+            from ai.intelligence.CONSCIOUSNESS_HARMONIZER import get_consciousness_harmonizer
+        except ImportError:
+            from utils.helpers.CONSCIOUSNESS_HARMONIZER import get_consciousness_harmonizer
     CONSCIOUSNESS_AVAILABLE = True
-except:
+except Exception:
     CONSCIOUSNESS_AVAILABLE = False
 
 try:
-    from INTELLIGENT_EXCHANGE_ROUTER import IntelligentExchangeRouter
+    try:
+        from INTELLIGENT_EXCHANGE_ROUTER import IntelligentExchangeRouter
+    except ImportError:
+        try:
+            from utils.helpers.INTELLIGENT_EXCHANGE_ROUTER import IntelligentExchangeRouter
+        except ImportError:
+            from engines.execution.INTELLIGENT_EXCHANGE_ROUTER import IntelligentExchangeRouter
     INTELLIGENT_ROUTER_AVAILABLE = True
-except:
+except Exception:
     INTELLIGENT_ROUTER_AVAILABLE = False
 
 
