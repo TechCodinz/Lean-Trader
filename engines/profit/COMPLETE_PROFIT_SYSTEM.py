@@ -32,11 +32,18 @@ logger = logging.getLogger(__name__)
 
 # Professional Risk Management
 try:
-    from PROFESSIONAL_RISK_MANAGEMENT import (
-        get_risk_manager,
-        initialize_risk_management,
-        ProfessionalRiskManager
-    )
+    try:
+        from safety.risk.PROFESSIONAL_RISK_MANAGEMENT import (
+            get_risk_manager,
+            initialize_risk_management,
+            ProfessionalRiskManager
+        )
+    except ImportError:
+        from PROFESSIONAL_RISK_MANAGEMENT import (
+            get_risk_manager,
+            initialize_risk_management,
+            ProfessionalRiskManager
+        )
     RISK_MANAGEMENT_AVAILABLE = True
 except ImportError:
     RISK_MANAGEMENT_AVAILABLE = False
@@ -51,7 +58,10 @@ except ImportError:
 APEX_SYSTEMS_AVAILABLE = {}
 
 try:
-    from HIGH_VOLTAGE_NERVOUS_SYSTEM import HighVoltageNervousSystem, NeuralSpike
+    try:
+        from HIGH_VOLTAGE_NERVOUS_SYSTEM import HighVoltageNervousSystem, NeuralSpike
+    except ImportError:
+        from utils.helpers.HIGH_VOLTAGE_NERVOUS_SYSTEM import HighVoltageNervousSystem, NeuralSpike
     APEX_SYSTEMS_AVAILABLE['neural'] = True
     logger.info("[OK] HIGH VOLTAGE NERVOUS SYSTEM loaded - Lightning-fast decisions!")
 except Exception as e:
@@ -59,7 +69,10 @@ except Exception as e:
     logger.warning(f" Neural system unavailable: {e}")
 
 try:
-    from OMNISCIENT_MARKET_SENSOR import scan_market_omniscient, initialize_omniscient_sensor
+    try:
+        from OMNISCIENT_MARKET_SENSOR import scan_market_omniscient, initialize_omniscient_sensor
+    except ImportError:
+        from utils.helpers.OMNISCIENT_MARKET_SENSOR import scan_market_omniscient, initialize_omniscient_sensor
     APEX_SYSTEMS_AVAILABLE['omniscient'] = True
     logger.info("[OK] OMNISCIENT MARKET SENSOR loaded - Sees EVERYTHING!")
 except Exception as e:
@@ -67,7 +80,10 @@ except Exception as e:
     logger.warning(f" Omniscient sensor unavailable: {e}")
 
 try:
-    from PREDICTIVE_NEXT_MOVE_ENGINE import PredictiveNextMoveEngine
+    try:
+        from PREDICTIVE_NEXT_MOVE_ENGINE import PredictiveNextMoveEngine
+    except ImportError:
+        from utils.helpers.PREDICTIVE_NEXT_MOVE_ENGINE import PredictiveNextMoveEngine
     APEX_SYSTEMS_AVAILABLE['predictive'] = True
     logger.info("[OK] PREDICTIVE NEXT-MOVE ENGINE loaded - Knows the future!")
 except Exception as e:
@@ -75,7 +91,10 @@ except Exception as e:
     logger.warning(f" Predictive engine unavailable: {e}")
 
 try:
-    from STRATEGY_EVOLUTION_ENGINE import StrategyEvolutionEngine
+    try:
+        from STRATEGY_EVOLUTION_ENGINE import StrategyEvolutionEngine
+    except ImportError:
+        from utils.helpers.STRATEGY_EVOLUTION_ENGINE import StrategyEvolutionEngine
     APEX_SYSTEMS_AVAILABLE['evolution'] = True
     logger.info("[OK] STRATEGY EVOLUTION ENGINE loaded - Creates strategies!")
 except Exception as e:
@@ -83,7 +102,10 @@ except Exception as e:
     logger.warning(f" Evolution engine unavailable: {e}")
 
 try:
-    from INFINITE_GROWTH_ENGINE import InfiniteGrowthEngine
+    try:
+        from INFINITE_GROWTH_ENGINE import InfiniteGrowthEngine
+    except ImportError:
+        from utils.helpers.INFINITE_GROWTH_ENGINE import InfiniteGrowthEngine
     APEX_SYSTEMS_AVAILABLE['infinite'] = True
     logger.info("[OK] INFINITE GROWTH ENGINE loaded - Scales to INFINITY!")
 except Exception as e:
@@ -91,7 +113,10 @@ except Exception as e:
     logger.warning(f" Infinite growth unavailable: {e}")
 
 try:
-    from DYNAMIC_LEVERAGE_OPTIMIZER import DynamicLeverageOptimizer
+    try:
+        from DYNAMIC_LEVERAGE_OPTIMIZER import DynamicLeverageOptimizer
+    except ImportError:
+        from utils.helpers.DYNAMIC_LEVERAGE_OPTIMIZER import DynamicLeverageOptimizer
     APEX_SYSTEMS_AVAILABLE['leverage'] = True
     logger.info("[OK] DYNAMIC LEVERAGE OPTIMIZER loaded - 1x-100x power!")
 except Exception as e:
@@ -100,10 +125,16 @@ except Exception as e:
 
 # QUANTUM ENHANCEMENTS - The final 15%!
 try:
-    from QUANTUM_ENHANCEMENTS import (
-        initialize_quantum_enhancements,
-        get_quantum_coordinator
-    )
+    try:
+        from QUANTUM_ENHANCEMENTS import (
+            initialize_quantum_enhancements,
+            get_quantum_coordinator
+        )
+    except ImportError:
+        from utils.helpers.QUANTUM_ENHANCEMENTS import (
+            initialize_quantum_enhancements,
+            get_quantum_coordinator
+        )
     APEX_SYSTEMS_AVAILABLE['quantum'] = True
     logger.info("🌌 QUANTUM ENHANCEMENTS loaded - Pushing to 88%!")
 except Exception as e:
