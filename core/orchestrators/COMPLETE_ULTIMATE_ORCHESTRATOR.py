@@ -237,6 +237,20 @@ except Exception as e:
     logger.error(f"[X] NEXT-GEN ADDITIONS FAILED TO LOAD: {e}")
     NEXT_GEN_ADDITIONS_AVAILABLE = False
 
+# ============================================================================
+# 🛡️ SUPER-HUMAN STEADY PROFIT ENHANCEMENTS (Phase Transition, Yield Harvester, Sub-Visual Dissector, Capital Shield)
+# ============================================================================
+try:
+    from engines.profit.MARKET_PHASE_TRANSITION_ENGINE import MarketPhaseTransitionEngine
+    from engines.profit.STEADY_YIELD_HARVESTER import SteadyYieldHarvester
+    from ultra_rare.goldmine.SUB_VISUAL_MICROSTRUCTURE_DISSECTOR import SubVisualMicrostructureDissector
+    from safety.risk.STEADY_CAPITAL_SHIELD import SteadyCapitalShield
+    STEADY_PROFIT_ENHANCEMENTS_AVAILABLE = True
+    logger.info("[OK] 🛡️ SUPER-HUMAN STEADY PROFIT ENHANCEMENTS LOADED (Phase Transition, Yield Harvester, Dissector, Shield)!")
+except Exception as e:
+    logger.error(f"[X] STEADY PROFIT ENHANCEMENTS FAILED TO LOAD: {e}")
+    STEADY_PROFIT_ENHANCEMENTS_AVAILABLE = False
+
 # Warn if features are missing
 if not CRITICAL_FEATURES_AVAILABLE:
     logger.warning("Running without CRITICAL PROFIT FEATURES - Missing +50-100% profit potential!")
@@ -1532,6 +1546,28 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                 logger.info("     📊 Real-Time Web Telemetry Dashboard (http://localhost:8080)")
         except Exception as e:
             logger.warning(f"  Next-Gen Additions: {e}")
+        
+        # 🛡️ SUPER-HUMAN STEADY PROFIT ENHANCEMENTS
+        try:
+            if STEADY_PROFIT_ENHANCEMENTS_AVAILABLE:
+                datahub_ref = getattr(self, 'data_hub', None)
+                self.phase_transition = MarketPhaseTransitionEngine()
+                self.yield_harvester = SteadyYieldHarvester(data_hub=datahub_ref)
+                self.subvisual_dissector = SubVisualMicrostructureDissector()
+                self.capital_shield = SteadyCapitalShield()
+
+                self.advanced_systems['phase_transition'] = self.phase_transition
+                self.advanced_systems['yield_harvester'] = self.yield_harvester
+                self.advanced_systems['subvisual_dissector'] = self.subvisual_dissector
+                self.advanced_systems['capital_shield'] = self.capital_shield
+
+                logger.info("[OK] 🛡️ SUPER-HUMAN STEADY PROFIT ENHANCEMENTS ONLINE!")
+                logger.info("     🌡️ Market Phase Transition Engine")
+                logger.info("     🌾 Steady Yield Harvester (Delta-Neutral)")
+                logger.info("     🔬 Sub-Visual Microstructure Dissector (1ms Icebergs)")
+                logger.info("     🛡️ Neuro-Adaptive Steady Capital Shield")
+        except Exception as e:
+            logger.warning(f"  Steady Profit Enhancements: {e}")
         
         # ====================================================================
         # CRITICAL MISSING SYSTEMS - Online Learning, News, Alpha, Awareness
