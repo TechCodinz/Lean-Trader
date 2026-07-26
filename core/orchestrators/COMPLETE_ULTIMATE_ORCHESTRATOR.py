@@ -223,6 +223,20 @@ except Exception as e:
     logger.error(f"[X] APEX PREDATOR INTELLIGENCE FAILED TO LOAD: {e}")
     APEX_PREDATOR_AVAILABLE = False
 
+# ============================================================================
+# 🚀 NEXT-GENERATION INSTITUTIONAL ADDITIONS (WS Streamer, AI Copilot, MEV Guard, Web Telemetry)
+# ============================================================================
+try:
+    from engines.scanners.WEBSOCKET_DEPTH_STREAMER import LowLatencyWebsocketStreamer
+    from ai.intelligence.AI_MACRO_COPILOT import AIMacroCopilot
+    from safety.risk.ONCHAIN_MEV_GUARD import OnChainMEVGuard
+    from diagnostics.LIVE_DASHBOARD_SERVER import LiveDashboardServer
+    NEXT_GEN_ADDITIONS_AVAILABLE = True
+    logger.info("[OK] 🚀 NEXT-GEN INSTITUTIONAL ADDITIONS LOADED (WS Streamer, AI Copilot, MEV Guard, Telemetry)!")
+except Exception as e:
+    logger.error(f"[X] NEXT-GEN ADDITIONS FAILED TO LOAD: {e}")
+    NEXT_GEN_ADDITIONS_AVAILABLE = False
+
 # Warn if features are missing
 if not CRITICAL_FEATURES_AVAILABLE:
     logger.warning("Running without CRITICAL PROFIT FEATURES - Missing +50-100% profit potential!")
@@ -1495,6 +1509,29 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
         except Exception as e:
             logger.warning(f"  Apex Predator: {e}")
             self.apex_predator = None
+        
+        # 🚀 NEXT-GENERATION INSTITUTIONAL ADDITIONS
+        try:
+            if NEXT_GEN_ADDITIONS_AVAILABLE:
+                datahub_ref = getattr(self, 'data_hub', None)
+                self.ws_streamer = LowLatencyWebsocketStreamer(data_hub=datahub_ref)
+                self.ai_copilot = AIMacroCopilot(data_hub=datahub_ref)
+                self.mev_guard = OnChainMEVGuard()
+                self.telemetry_server = LiveDashboardServer(orchestrator=self, port=8080)
+                self.telemetry_server.start_server_background()
+
+                self.advanced_systems['ws_streamer'] = self.ws_streamer
+                self.advanced_systems['ai_copilot'] = self.ai_copilot
+                self.advanced_systems['mev_guard'] = self.mev_guard
+                self.advanced_systems['telemetry_server'] = self.telemetry_server
+
+                logger.info("[OK] 🚀 NEXT-GEN INSTITUTIONAL ADDITIONS ONLINE!")
+                logger.info("     ⚡ Low-Latency WebSocket Depth Streamer")
+                logger.info("     🤖 Multi-LLM AI Macro Co-Pilot")
+                logger.info("     🛡️ On-Chain MEV Guard & Private RPC Router")
+                logger.info("     📊 Real-Time Web Telemetry Dashboard (http://localhost:8080)")
+        except Exception as e:
+            logger.warning(f"  Next-Gen Additions: {e}")
         
         # ====================================================================
         # CRITICAL MISSING SYSTEMS - Online Learning, News, Alpha, Awareness
