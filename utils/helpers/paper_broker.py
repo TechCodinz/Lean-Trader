@@ -1,0 +1,428 @@
+# paper_broker.py
+import json
+import pathlib
+import random
+import time
+from typing import Optional, Dict, Any, List, Tuple
+
+class PaperBroker:
+    """
+    CCXT-like paper broker
+      • Spot: USDT-quoted pairs (e.g., BTC/USDT)
+      • Futures: Linear USDT-perps (qty in base coin), cross margin, leverage
+      • PnL: mark-to-market, realized on reduce; margin reserved on opens
+
+    Persisted state (runtime/paper_state.json) allows processes to share holdings.
+    """
+
+    # ------------------ lifecycle / account / markets ------------------
+    def __init__(self, start_cash: float = 5000.0):
+        # path for persisted state
+        self._state_path = pathlib.Path("runtime") / "paper_state.json"
+
+        # attempt to load persisted state
+        state = None
+        try:
+            if self._state_path.exists():
+                state = json.loads(self._state_path.read_text(encoding="utf-8"))
+        except Exception:
+            state = None
+
+        # Ensure default universe and prices exist early so partially-constructed
+        # instances or other modules referencing these attributes won't crash.
+        self._symbols = [
+            "BTC/USDT",
+            "ETH/USDT",
+            "SOL/USDT",
+            "XRP/USDT",
+            "DOGE/USDT",
+        ]
+        self._px: Dict[str, float] = {
+            "BTC/USDT": 100000.0,
+            "ETH/USDT": 3500.0,
+            "SOL/USDT": 150.0,
+            "XRP/USDT": 0.6,
+            "DOGE/USDT": 0.12,
+        }
+
+        # account
+        if state:
+            self.cash: float = float(state.get("cash", float(start_cash)))
+            self.history: List[Dict[str, Any]] = state.get("history", [])
+            self.holdings: Dict[str, float] = state.get("holdings", {})
+            self.fut_pos: Dict[str, Dict[str, float]] = state.get("fut_pos", {})
+            # Merge persisted prices/universe with defaults so keys exist
+            self._px = {**self._px, **state.get("_px", {})}
+            # ensure _symbols exists for older persisted state formats
+            persisted_syms = state.get("_symbols") or []
+            if isinstance(persisted_syms, list) and persisted_syms:
+                self._symbols = persisted_syms
+        else:
+            self.cash: float = float(start_cash)  # free USDT
+            self.history: List[Dict[str, Any]] = []
+
+            # spot holdings: base -> qty
+            self.holdings: Dict[str, float] = {}
+
+            # futures positions: sym -> {qty, entry, lev, mode}
+            self.fut_pos: Dict[str, Dict[str, float]] = {}  # qty (base), entry (USDT), lev (int)
+
+            # simple universe + synthetic prices
+            self._symbols = ["BTC/USDT", "ETH/USDT", "SOL/USDT", "XRP/USDT", "DOGE/USDT"]
+            self._px: Dict[str, float] = {
+                "BTC/USDT": 100000.0,
+                "ETH/USDT": 3500.0,
+                "SOL/USDT": 150.0,
+                "XRP/USDT": 0.6,
+                "DOGE/USDT": 0.12,
+            }
+
+    def _persist(self):
+        try:
+            self._state_path.parent.mkdir(parents=True, exist_ok=True)
+            state = {
+                "cash": self.cash,
+                "history": self.history,
+                "holdings": self.holdings,
+                "fut_pos": self.fut_pos,
+                "_px": self._px,
+                "_symbols": self._symbols,
+            }
+            self._state_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
+        except Exception:
+            # best-effort persistence, ignore failures
+            pass
+
+    def load_markets(self) -> Dict[str, Any]:
+        return {s: {"symbol": s, "quote": "USDT"} for s in self._symbols}
+
+    # ------------------ market data (synthetic) ------------------
+    def _price(self, symbol: str) -> float:
+        p = self._px.get(symbol, 1.0)
+        p *= 1.0 + random.uniform(-0.0015, 0.0015)  # ±0.15% drift
+        p = max(1e-8, p)
+        self._px[symbol] = p
+        # persist evolving price so other processes see recent prices
+        try:
+            self._persist()
+        except Exception:
+            pass
+        return p
+
+    def fetch_ticker(self, symbol: str) -> Dict[str, Any]:
+        last = self._price(symbol)
+        return {"symbol": symbol, "last": last, "timestamp": int(time.time() * 1000)}
+
+    def fetch_ohlcv(
+        self, symbol: str, timeframe: str = "1m", limit: int = 120
+    ) -> List[List[float]]:
+        ms = 60_000
+        now = int(time.time() // 60 * 60) * 1000
+        out, p = [], self._px.get(symbol, 1.0)
+        for i in range(limit):
+            base = max(1e-8, p * (1 + random.uniform(-0.002, 0.002)))
+            high = base * (1 + random.uniform(0, 0.001))
+            low = base * (1 - random.uniform(0, 0.001))
+            open_ = base * (1 + random.uniform(-0.0005, 0.0005))
+            close = base * (1 + random.uniform(-0.0005, 0.0005))
+            vol = abs(random.gauss(1.0, 0.25))
+            out.append(
+                [
+                    now - (limit - i) * ms,
+                    float(open_),
+                    float(high),
+                    float(low),
+                    float(close),
+                    float(vol),
+                ]
+            )
+            p = close
+        self._px[symbol] = p
+        # persist price update as minimal shared state
+        try:
+            self._persist()
+        except Exception:
+            pass
+        return out
+
+    # ------------------ helpers ------------------
+    def _split(self, symbol: str) -> Tuple[str, str]:
+        # Handle symbols with or without '/'
+        if "/" not in symbol:
+            # Forex/TradFi symbols without slash - skip them gracefully
+            raise ValueError(f"PaperBroker: Symbol '{symbol}' must contain '/' (e.g., BTC/USDT)")
+        
+        parts = symbol.split("/")
+        if len(parts) != 2:
+            raise ValueError(f"PaperBroker: Invalid symbol format '{symbol}'")
+        
+        base, quote = parts
+        if quote != "USDT":
+            # Allow other quotes but warn
+            import logging
+            logging.getLogger("paper_broker").debug(f"PaperBroker: Non-USDT pair '{symbol}' - skipping")
+            raise ValueError(f"PaperBroker: Only USDT pairs supported, got '{symbol}'")
+        return base, quote
+
+    def _fut(self, symbol: str) -> Dict[str, float]:
+        if symbol not in self.fut_pos:
+            self.fut_pos[symbol] = {"qty": 0.0, "entry": 0.0, "lev": 1}
+        return self.fut_pos[symbol]
+
+    # -------- margin / pnl (linear perp, cross) --------
+    def _fut_notional(self, symbol: str, price: float, qty: float) -> float:
+        return abs(qty) * price
+
+    def _fut_used_margin(self, symbol: str, price: float) -> float:
+        pos = self._fut(symbol)
+        if pos["qty"] == 0:
+            return 0.0
+        notional = self._fut_notional(symbol, price, pos["qty"])
+        return notional / max(1, int(pos["lev"]))
+
+    def _fut_unrealized(self, symbol: str, price: float) -> float:
+        pos = self._fut(symbol)
+        q, e = pos["qty"], pos["entry"]
+        if q == 0:
+            return 0.0
+        # long: (px - entry) * qty ; short: (entry - px) * |qty|
+        return (price - e) * q
+
+    # ------------------ balances / positions ------------------
+    def fetch_balance(self, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        # Accept params for CCXT compatibility (but ignore them)
+        totals = {"USDT": {"free": self.cash, "used": 0.0, "total": self.cash}}
+        # spot mark
+        for base, qty in self.holdings.items():
+            sym = f"{base}/USDT"
+            px = self._price(sym)
+            totals[base] = {"free": qty, "used": 0.0, "total": qty}
+            totals["USDT"]["total"] += qty * px
+
+        # futures margin + PnL
+        used_margin, unreal = 0.0, 0.0
+        for sym, pos in self.fut_pos.items():
+            px = self._price(sym)
+            used_margin += self._fut_used_margin(sym, px)
+            unreal += self._fut_unrealized(sym, px)
+
+        equity = self.cash + unreal
+        free_cash = max(0.0, self.cash - used_margin)  # cross: margin reserved from cash
+
+        return {
+            "info": {},
+            "total": totals,
+            "futures": {
+                "used_margin": used_margin,
+                "unrealized_pnl": unreal,
+                "equity": equity,
+                "free_cash": free_cash,
+            },
+        }
+
+    def fetch_positions(self) -> List[Dict[str, Any]]:
+        out = []
+        for sym, pos in self.fut_pos.items():
+            px = self._price(sym)
+            out.append(
+                {
+                    "symbol": sym,
+                    "contracts": pos["qty"],
+                    "entryPrice": pos["entry"],
+                    "leverage": int(pos["lev"]),
+                    "unrealizedPnl": self._fut_unrealized(sym, px),
+                    "margin": self._fut_used_margin(sym, px),
+                    "markPrice": px,
+                }
+            )
+        return out
+
+    # ------------------ trading ------------------
+    def create_order(
+        self,
+        symbol: str,
+        type: str,
+        side: str,
+        amount: float,
+        price: Optional[float] = None,
+        params: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        assert type == "market", "PaperBroker supports market orders only"
+        params = params or {}
+        int(time.time() * 1000)
+        base, _ = self._split(symbol)
+        px = self._price(symbol)
+
+        # spot vs futures (by reduceOnly presence or active futures pos/lev)
+        reduce_only = bool(params.get("reduceOnly"))
+        is_futures = reduce_only or (
+            symbol in self.fut_pos
+            and self._fut(symbol)["lev"] >= 1
+            and self._fut(symbol)["qty"] != 0
+        )
+
+        if (
+            not is_futures
+            and symbol in self.fut_pos
+            and self._fut(symbol)["lev"] >= 1
+            and params.get("futures", False)
+        ):
+            is_futures = True
+
+        if not is_futures and "mode" in params and params["mode"] == "futures":
+            is_futures = True
+
+        if is_futures:
+            ord_obj = self._exec_futures(symbol, side, amount, px, reduce_only)
+        else:
+            ord_obj = self._exec_spot(symbol, base, side, amount, px)
+
+        self.history.append(ord_obj)
+        # persist state after order
+        try:
+            self._persist()
+        except Exception:
+            pass
+        return ord_obj
+
+    def _exec_spot(
+        self, symbol: str, base: str, side: str, amount: float, px: float
+    ) -> Dict[str, Any]:
+        if side == "buy":
+            cost = amount * px
+            if cost > self.cash + 1e-9:
+                raise ValueError("insufficient USDT")
+            self.cash -= cost
+            self.holdings[base] = self.holdings.get(base, 0.0) + amount
+        else:
+            qty = self.holdings.get(base, 0.0)
+            if amount > qty + 1e-12:
+                raise ValueError("insufficient base qty")
+            self.holdings[base] = qty - amount
+            self.cash += amount * px
+
+        # persist state
+        try:
+            self._persist()
+        except Exception:
+            pass
+
+        return {
+            "id": f"paper-{int(time.time()*1000)}",
+            "symbol": symbol,
+            "side": side,
+            "type": "market",
+            "amount": float(amount),
+            "price": float(px),
+            "status": "closed",
+            "mode": "spot",
+        }
+
+    def _exec_futures(
+        self, symbol: str, side: str, amount: float, px: float, reduce_only: bool
+    ) -> Dict[str, Any]:
+        pos = self._fut(symbol)
+        q_old, e_old, lev = pos["qty"], pos["entry"], max(1, int(pos["lev"]))
+        q_delta = amount if side == "buy" else -amount
+        q_new = q_old
+
+        realized = 0.0
+
+        if reduce_only:
+            # move qty toward zero
+            if (q_old > 0 and q_delta < 0) or (q_old < 0 and q_delta > 0):
+                close_amt = min(abs(q_delta), abs(q_old))
+                realized += (px - e_old) * (close_amt if q_old > 0 else -close_amt)
+                q_new = q_old + (close_amt if q_old < 0 else -close_amt)
+            else:
+                # reduceOnly but direction doesn't reduce -> ignore open
+                q_delta = 0.0
+        else:
+            # allow flipping: first reduce opposite, then open remainder
+            if q_old != 0 and (q_old > 0 > q_delta or q_old < 0 < q_delta):
+                close_amt = min(abs(q_delta), abs(q_old))
+                realized += (px - e_old) * (close_amt if q_old > 0 else -close_amt)
+                q_old += close_amt if q_old < 0 else -close_amt
+                q_delta = (amount if side == "buy" else -amount) - (
+                    close_amt
+                    if (side == "buy" and q_old < 0) or (side == "sell" and q_old > 0)
+                    else -close_amt
+                )
+
+            # opening remainder
+            q_new = q_old + q_delta
+            if q_new != 0 and (q_new * q_old >= 0):  # same direction extend or fresh open
+                add = abs(q_delta)
+                if add > 0:
+                    # margin required for the incremental size
+                    add_margin = (add * px) / lev
+                    if add_margin > self.cash + 1e-9:
+                        raise ValueError("insufficient USDT for margin")
+                    self.cash -= add_margin
+                    # avg entry if same side extend; if fresh open from 0 => entry=px
+                    if q_old == 0 or (q_new * q_old > 0):
+                        w_old = abs(q_old)
+                        pos["entry"] = (
+                            (e_old * w_old + px * add) / (w_old + add) if w_old > 0 else px
+                        )
+
+        # update position
+        pos["qty"] = q_new
+        if q_new == 0:
+            pos["entry"] = 0.0  # fully flat releases entry ref
+
+        # release margin when reducing/closing
+        used_margin = self._fut_used_margin(symbol, px)
+        # free cash cannot be negative; realized PnL credited immediately
+        self.cash += realized
+        # (cross margin recalculates on next balance call; we keep it simple)
+
+        # persist state
+        try:
+            self._persist()
+        except Exception:
+            pass
+
+        return {
+            "id": f"paper-{int(time.time()*1000)}",
+            "symbol": symbol,
+            "side": side,
+            "type": "market",
+            "amount": float(abs(amount)),
+            "price": float(px),
+            "status": "closed",
+            "mode": "futures",
+            "reduceOnly": reduce_only,
+            "realizedPnl": realized,
+            "marginUsed": used_margin,
+            "leverage": lev,
+        }
+
+    # ------------------ futures controls (CCXT-like) ------------------
+    def set_leverage(self, lev: int, symbol: str):
+        self._fut(symbol)["lev"] = max(1, int(lev))
+
+    def set_margin_mode(self, mode: str, symbol: str):
+        # cross only (stub kept for compatibility)
+        return
+
+    # ------------------ misc ------------------
+    def options(self) -> Dict[str, Any]:
+        return {}
+    
+    # ------------------ CCXT-style convenience methods ------------------
+    def create_market_buy_order(self, symbol: str, amount: float, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """CCXT-style market buy"""
+        return self.create_order(symbol, "market", "buy", amount, params=params)
+    
+    def create_market_sell_order(self, symbol: str, amount: float, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """CCXT-style market sell"""
+        return self.create_order(symbol, "market", "sell", amount, params=params)
+    
+    def create_limit_buy_order(self, symbol: str, amount: float, price: float, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """CCXT-style limit buy (executed as market for paper trading)"""
+        return self.create_order(symbol, "market", "buy", amount, price, params)
+    
+    def create_limit_sell_order(self, symbol: str, amount: float, price: float, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """CCXT-style limit sell (executed as market for paper trading)"""
+        return self.create_order(symbol, "market", "sell", amount, price, params)

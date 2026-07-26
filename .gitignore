@@ -1,0 +1,49 @@
+# Environment & Credentials
+.env
+*.env
+api_config.json
+secrets*.json
+
+# Databases & Binary Archives
+*.db
+*.sqlite
+*.sqlite3
+*.zip
+*.tar.gz
+*.backup*
+
+# Logs & Runtime
+*.log
+*.txt
+ACTIVATION_LOG.txt
+DEDUPLICATION_LOG.txt
+MIGRATION_LOG.txt
+VPS_*_LOG.txt
+CHERRY_PICK_REPORT.txt
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Archives & Backup Vaults
+_BACKUP_VAULT_BEFORE_STITCH/
+_DUPLICATES_ARCHIVE/
+_DUPLICATES_BACKUP/
+_VPS_BACKUP_RAW/
+_VPS_BOT_CODE_ONLY/
+_VPS_COMPLETE_DOWNLOAD/
+_VPS_UNIQUE/
+archives/
+COMPLETE_AUDIT_REPORT.json
+COMPLETE_STRUCTURE_MANIFEST.json
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
