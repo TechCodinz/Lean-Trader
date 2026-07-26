@@ -35,7 +35,13 @@ logger = logging.getLogger(__name__)
 # UNIVERSAL AI ORCHESTRATOR - SUPPORTS ANY AI API (DEEPSEEK, CLAUDE, GPT-4, etc.)
 # ============================================================================
 try:
-    from UNIVERSAL_AI_ORCHESTRATOR import get_universal_ai_orchestrator
+    try:
+        from UNIVERSAL_AI_ORCHESTRATOR import get_universal_ai_orchestrator
+    except ImportError:
+        try:
+            from core.orchestrators.UNIVERSAL_AI_ORCHESTRATOR import get_universal_ai_orchestrator
+        except ImportError:
+            from utils.helpers.UNIVERSAL_AI_ORCHESTRATOR import get_universal_ai_orchestrator
     UNIVERSAL_AI_AVAILABLE = True
     logger.info("=" * 80)
     logger.info("🤖🌌 UNIVERSAL AI ORCHESTRATOR LOADED!")
