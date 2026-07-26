@@ -251,6 +251,19 @@ except Exception as e:
     logger.error(f"[X] STEADY PROFIT ENHANCEMENTS FAILED TO LOAD: {e}")
     STEADY_PROFIT_ENHANCEMENTS_AVAILABLE = False
 
+# ============================================================================
+# 🏆 3 FINAL APEX-LEVEL ENHANCEMENTS (Latency Arbitrage, DeepQ Brain, Telegram Portal)
+# ============================================================================
+try:
+    from ultra_rare.goldmine.CROSS_VENUE_LATENCY_ARBITRAGE import CrossVenueLatencyArbitrage
+    from ai.intelligence.DEEP_Q_SELF_CORRECTION_BRAIN import DeepQSelfCorrectionBrain
+    from utils.helpers.TELEGRAM_COMMAND_PORTAL import TelegramCommandPortal
+    FINAL_APEX_ENHANCEMENTS_AVAILABLE = True
+    logger.info("[OK] 🏆 3 FINAL APEX-LEVEL ENHANCEMENTS LOADED (Latency Arb, Deep-Q Brain, Telegram Portal)!")
+except Exception as e:
+    logger.error(f"[X] FINAL APEX ENHANCEMENTS FAILED TO LOAD: {e}")
+    FINAL_APEX_ENHANCEMENTS_AVAILABLE = False
+
 # Warn if features are missing
 if not CRITICAL_FEATURES_AVAILABLE:
     logger.warning("Running without CRITICAL PROFIT FEATURES - Missing +50-100% profit potential!")
@@ -1568,6 +1581,24 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
                 logger.info("     🛡️ Neuro-Adaptive Steady Capital Shield")
         except Exception as e:
             logger.warning(f"  Steady Profit Enhancements: {e}")
+
+        # 🏆 3 FINAL APEX-LEVEL ENHANCEMENTS
+        try:
+            if FINAL_APEX_ENHANCEMENTS_AVAILABLE:
+                self.latency_arbitrage = CrossVenueLatencyArbitrage()
+                self.deep_q_brain = DeepQSelfCorrectionBrain()
+                self.telegram_portal = TelegramCommandPortal()
+
+                self.advanced_systems['latency_arbitrage'] = self.latency_arbitrage
+                self.advanced_systems['deep_q_brain'] = self.deep_q_brain
+                self.advanced_systems['telegram_portal'] = self.telegram_portal
+
+                logger.info("[OK] 🏆 3 FINAL APEX-LEVEL ENHANCEMENTS INITIALIZED & ONLINE!")
+                logger.info("     ⚡ Institutional Cross-Venue Latency Arbitrage")
+                logger.info("     🧠 Reinforcement Deep-Q Self-Correction Brain")
+                logger.info("     📱 Telegram Remote Command & Telemetry Portal")
+        except Exception as e:
+            logger.warning(f"  Final Apex Enhancements: {e}")
         
         # ====================================================================
         # CRITICAL MISSING SYSTEMS - Online Learning, News, Alpha, Awareness
