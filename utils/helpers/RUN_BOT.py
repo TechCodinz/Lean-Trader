@@ -13,18 +13,30 @@ root_path = str(Path(__file__).resolve().parent.parent.parent)
 if root_path not in sys.path:
     sys.path.insert(0, root_path)
 
+# Windows Console UTF-8 Encoding Fix
+if sys.platform == 'win32':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='backslashreplace')
+        sys.stderr.reconfigure(encoding='utf-8', errors='backslashreplace')
+    except Exception:
+        pass
+
 # Load environment variables
 print("=" * 80)
 print(">> TRADING BOT LAUNCHER")
 print("=" * 80)
 print()
 
-# Load .env file
-env_file = Path(__file__).parent / '.env'
+# Load .env file (checks root directory and utils/helpers)
+env_file_helpers = Path(__file__).parent / '.env'
+env_file_root = Path(root_path) / '.env'
+
+env_file = env_file_root if env_file_root.exists() else env_file_helpers
+
 if env_file.exists():
-    print("📄 Loading environment variables...")
+    print(f"📄 Loading environment variables from {env_file.name}...")
     loaded = 0
-    with open(env_file, 'r') as f:
+    with open(env_file, 'r', encoding='utf-8', errors='ignore') as f:
         for line in f:
             line = line.strip()
             if line and not line.startswith('#') and '=' in line:
