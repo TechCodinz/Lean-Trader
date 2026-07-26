@@ -4177,14 +4177,15 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
             
             # 🔥 COLLECT ALL ENGINES - COMPREHENSIVE SYSTEM
             try:
-                from ALL_ENGINES_INITIALIZER import initialize_all_engines
-            except Exception:
-                pass
-            
-            # Initialize ALL engines (39+ working engines)
-            all_engines = initialize_all_engines()
-            
-            logger.info(f"   🔥 Initialized {len(all_engines)} engines via ALL_ENGINES_INITIALIZER")
+                try:
+                    from ALL_ENGINES_INITIALIZER import initialize_all_engines
+                except ImportError:
+                    from utils.helpers.ALL_ENGINES_INITIALIZER import initialize_all_engines
+                all_engines = initialize_all_engines()
+                logger.info(f"   🔥 Initialized {len(all_engines)} engines via ALL_ENGINES_INITIALIZER")
+            except Exception as e:
+                logger.warning(f"  ALL_ENGINES_INITIALIZER fallback: {e}")
+                all_engines = {}
             
             # Add orchestrator's existing engine instances
             if hasattr(self, 'trading_engines'):
