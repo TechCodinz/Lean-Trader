@@ -9,6 +9,7 @@ import asyncio
 import sys
 import os
 import signal
+from pathlib import Path
 from dotenv import load_dotenv
 
 # Add project root to path
