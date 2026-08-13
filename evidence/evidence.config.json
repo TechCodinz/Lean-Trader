@@ -1,0 +1,8 @@
+{
+  "schema": "techcodinz-evidence-config-v1",
+  "project": "LeanTrader",
+  "repositories": ["TechCodinz/Lean-Trader", "TechCodinz/LeanTrader-Bot", "TechCodinz/LeanBot-Trader"],
+  "sources": {"github": true, "public_web": true},
+  "track": ["releases", "deployments", "paper_test_runs", "testnet_runs", "strategy_benchmarks", "uptime", "users", "customers", "public_mentions"],
+  "rules": ["source-backed only", "preserve dated snapshots", "do not infer performance", "do not expose secrets"]
+}
