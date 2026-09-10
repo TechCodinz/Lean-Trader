@@ -7,6 +7,33 @@ import time
 
 STATE_PATH = Path(os.getenv("RISK_STATE_PATH", "runtime/risk_guard.json"))
 
+
+def position_size(equity: float, risk_cfg=None) -> float:
+    """Risk fraction to commit to one trade, as a fraction of equity.
+
+    Returns the midpoint of the configured per-trade risk band, clamped to that
+    band. ``equity`` is part of the established signature and is accepted for
+    call compatibility, but the current policy is equity-independent: callers
+    multiply the returned fraction by their own equity.
+
+    ``risk_cfg`` defaults to ``CFG.risk``, resolved on call rather than at
+    import so that this module stays importable without pydantic and picks up
+    configuration set after import. Both in-tree callers pass it explicitly.
+    """
+    if risk_cfg is None:
+        from ..config import CFG
+
+        risk_cfg = CFG.risk
+
+    return max(
+        min(
+            risk_cfg.per_trade_risk_max,
+            risk_cfg.per_trade_risk_min
+            + (risk_cfg.per_trade_risk_max - risk_cfg.per_trade_risk_min) * 0.5,
+        ),
+        risk_cfg.per_trade_risk_min,
+    )
+
 def _read() -> Dict:
     try:
         return json.loads(STATE_PATH.read_text(encoding="utf-8"))
