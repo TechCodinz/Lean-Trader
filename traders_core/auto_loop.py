@@ -3,6 +3,8 @@ import os
 import time
 
 from router import ExchangeRouter
+from traders_core.memory import Memory
+from traders_core.strategist import breakout_signal
 
 def pct(a: float, b: float) -> float:
     return (a - b) / b if b else 0.0

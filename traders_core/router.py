@@ -5,6 +5,9 @@ from pprint import pprint
 
 import ccxt
 
+from order_utils import place_market, safe_create_order
+from paper_broker import PaperBroker
+
 class ExchangeRouter:
     def __init__(self):
         self.mode = os.getenv("EXCHANGE_MODE", "spot").lower()  # spot | linear

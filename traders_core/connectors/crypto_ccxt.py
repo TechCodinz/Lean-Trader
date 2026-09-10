@@ -8,6 +8,8 @@ load_dotenv()
 
 import ccxt  # type: ignore  # noqa: E402
 
+from order_utils import place_market, safe_create_order
+
 def _mk_exchange(name: str, testnet: bool) -> Any:
     api_key = os.getenv("CRYPTO_API_KEY") or ""
     secret = os.getenv("CRYPTO_API_SECRET") or ""
