@@ -1,9 +1,10 @@
 """Read-only classification of residual Testnet inventory as non-executable dust.
 
-This module never invents cost basis and never submits an order. It may mark an
-unpriced position as quarantinable only when authenticated Testnet market
+This module never invents cost basis and never submits an order. It may mark a
+residual position as quarantinable only when authenticated Testnet market
 metadata/ticker evidence shows the residual is both economically tiny and below
-an exchange execution minimum.
+an exchange execution minimum. This applies even when cost basis is known,
+because non-executable dust should not become an endlessly retried RPB exit.
 """
 
 from __future__ import annotations
@@ -102,12 +103,12 @@ def inspect_authenticated_testnet_dust(symbol: str, quantity: float) -> Dict[str
 
 
 def annotate_unpriced_dust(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Annotate any residual position that is proven tiny and non-executable."""
     annotated: List[Dict[str, Any]] = []
     for original in rows or []:
         row = dict(original)
         qty = _f(row.get("quantity"))
-        missing_basis = _f(row.get("average_entry")) <= 0 or _f(row.get("entry_cost")) <= 0
-        if qty > 0 and missing_basis:
+        if qty > 0:
             try:
                 evidence = inspect_authenticated_testnet_dust(
                     str(row.get("symbol") or ""), qty
