@@ -106,8 +106,6 @@ text = text.replace(
     1,
 )
 
-text = text.replace("python rpb_adopt_positions.py \\\n", "python rpb_adopt_positions_windowed.py \\\n")
-
 old_tg = '''TELEGRAM_TOKEN="$(resolve_env TELEGRAM_BOT_TOKEN || true)"
 TELEGRAM_ADMIN="$(resolve_env TELEGRAM_ADMIN_CHAT_ID || true)"
 TELEGRAM_VIP="$(resolve_env TELEGRAM_VIP_CHAT_ID || true)"
@@ -181,6 +179,83 @@ old_mount = '-v "$SECRETS:/run/secrets:ro"'
 if old_mount not in text:
     raise SystemExit("ERROR: expected secrets mount missing from handoff script")
 text = text.replace(old_mount, '-v "$STAGED_SECRETS:/run/secrets:ro"')
+
+# Fresh cutover: the operator explicitly does not want old position bookkeeping
+# to block or define the new RPB runtime. Preserve legacy files for audit, but
+# do not import any historical position into the fresh RPB ledger.
+legacy_state_precheck = '[[ -f "$RUNTIME/vps_testnet_execution.json" ]] || fail "current Testnet execution state missing: $RUNTIME/vps_testnet_execution.json"\n'
+text = text.replace(
+    legacy_state_precheck,
+    '[[ -f "$RUNTIME/vps_testnet_execution.json" ]] || echo "LEGACY_TESTNET_STATE=ABSENT_FRESH_CUTOVER"\n',
+    1,
+)
+
+dry_run = '''say "DRY-RUN POSITION OWNERSHIP HANDOFF WHILE OLD OWNER IS STILL ACTIVE"
+docker run "${COMMON_ARGS[@]}" "${SECRET_ARGS[@]}" "$IMAGE" \\
+  python rpb_adopt_positions.py \\
+    --state /intelligence/runtime/vps_testnet_execution.json \\
+    --report /rpb-data/runtime/adoption-dry-run.json
+
+'''
+if dry_run not in text:
+    raise SystemExit("ERROR: expected legacy dry-run adoption block missing")
+text = text.replace(
+    dry_run,
+    '''say "FRESH RPB CUTOVER - LEGACY POSITION IMPORT DISABLED"
+if [[ -f "$RPB_DATA/runtime/rpb_positions.json" ]]; then
+  cp -a "$RPB_DATA/runtime/rpb_positions.json" "$SNAPSHOT/rpb_positions.before-fresh-cutover.json"
+  rm -f "$RPB_DATA/runtime/rpb_positions.json"
+fi
+rm -f "$RPB_DATA/runtime/adoption-dry-run.json" \\
+      "$RPB_DATA/runtime/adoption-applied.json" \\
+      "$RPB_DATA/runtime/rpb_quarantined_dust.json"
+echo "LEGACY_POSITION_IMPORT=DISABLED"
+echo "FRESH_RPB_LEDGER=READY"
+
+''',
+    1,
+)
+
+freeze_old = '''say "FREEZE CURRENT PRODUCTION EXECUTOR FOR CONSISTENT POSITION TRANSFER"
+docker update --restart=no "$OLD_EXEC_CONTAINER" >/dev/null 2>&1 || true
+docker stop -t 20 "$OLD_EXEC_CONTAINER" >/dev/null 2>&1 || true
+sleep 2
+is_running "$OLD_EXEC_CONTAINER" && { rollback_old_executor; fail "$OLD_EXEC_CONTAINER did not stop"; }
+cp -a "$RUNTIME/vps_testnet_execution.json" "$SNAPSHOT/vps_testnet_execution.final.json"
+
+say "APPLY IDEMPOTENT POSITION HANDOFF FROM FINAL FROZEN STATE"
+if ! docker run "${COMMON_ARGS[@]}" "${SECRET_ARGS[@]}" "$IMAGE" \\
+  python rpb_adopt_positions.py \\
+    --state /intelligence/runtime/vps_testnet_execution.json \\
+    --apply \\
+    --report /rpb-data/runtime/adoption-applied.json; then
+  rollback_old_executor
+  fail "position adoption failed; old executor restored"
+fi
+
+'''
+if freeze_old not in text:
+    raise SystemExit("ERROR: expected legacy position-transfer block missing")
+text = text.replace(
+    freeze_old,
+    '''say "STOP CURRENT PRODUCTION EXECUTOR - FRESH RPB TAKES AUTHORITY"
+docker update --restart=no "$OLD_EXEC_CONTAINER" >/dev/null 2>&1 || true
+docker stop -t 20 "$OLD_EXEC_CONTAINER" >/dev/null 2>&1 || true
+sleep 2
+is_running "$OLD_EXEC_CONTAINER" && { rollback_old_executor; fail "$OLD_EXEC_CONTAINER did not stop"; }
+[[ -f "$RUNTIME/vps_testnet_execution.json" ]] && \\
+  cp -a "$RUNTIME/vps_testnet_execution.json" "$SNAPSHOT/vps_testnet_execution.final.json" || true
+echo "OLD_POSITION_STATE=PRESERVED_NOT_IMPORTED"
+
+''',
+    1,
+)
+
+text = text.replace(
+    'echo "ADOPTION_REPORT=$RPB_DATA/runtime/adoption-applied.json"\n',
+    'echo "LEGACY_POSITION_IMPORT=DISABLED"\necho "RPB_LEDGER=$RPB_DATA/runtime/rpb_positions.json"\n',
+    1,
+)
 
 p.write_text(text, encoding="utf-8")
 PY
