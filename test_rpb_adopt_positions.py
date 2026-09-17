@@ -1,4 +1,5 @@
 from rpb_adopt_positions import (
+    build_report,
     extract_position_rows,
     reconstruct_cost_basis_from_trades,
 )
@@ -78,3 +79,46 @@ def test_reconstruct_cost_basis_refuses_incomplete_history():
     rebuilt = reconstruct_cost_basis_from_trades("DOT/USDT", 1.0, trades)
     assert rebuilt["ok"] is False
     assert rebuilt["reason"] == "trade_history_does_not_cover_inventory"
+
+
+def test_build_report_allows_explicit_authenticated_dust_quarantine():
+    rows = [
+        {
+            "symbol": "DOT/USDT",
+            "quantity": 0.0015,
+            "average_entry": 0.0,
+            "entry_cost": 0.0,
+            "basis_reconstruction_reason": "trade_history_does_not_cover_inventory",
+            "dust_quarantine": {
+                "ok": True,
+                "authenticated_total": 0.0015,
+                "price": 0.94,
+                "notional": 0.00141,
+                "min_notional": 1.0,
+                "reason": "authenticated_non_executable_dust",
+            },
+        }
+    ]
+    balance = {"total": {"DOT": 0.0015}}
+    report = build_report({}, balance, rows=rows)
+    assert report["ok"] is True
+    assert report["ambiguous"] == []
+    assert len(report["quarantined_dust"]) == 1
+    assert report["quarantined_dust"][0]["symbol"] == "DOT/USDT"
+
+
+def test_build_report_still_blocks_unpriced_material_inventory():
+    rows = [
+        {
+            "symbol": "DOT/USDT",
+            "quantity": 2.0,
+            "average_entry": 0.0,
+            "entry_cost": 0.0,
+            "basis_reconstruction_reason": "trade_history_does_not_cover_inventory",
+        }
+    ]
+    balance = {"total": {"DOT": 2.0}}
+    report = build_report({}, balance, rows=rows)
+    assert report["ok"] is False
+    assert len(report["ambiguous"]) == 1
+    assert report["quarantined_dust"] == []
