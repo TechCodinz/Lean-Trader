@@ -7,8 +7,8 @@ account still holds at least that quantity. When the production state retained
 inventory quantity but lost its basis fields, the utility may reconstruct the
 remaining basis from authenticated Bybit Testnet trade history. Explicitly
 verified non-executable dust may be quarantined outside the RPB PnL ledger; its
-basis is never invented. Extra exchange inventory is never assumed to belong
-to RPB.
+basis is never invented. Material residual inventory that is below an exchange
+minimum blocks handoff instead of becoming a position that RPB cannot close.
 """
 
 from __future__ import annotations
@@ -117,7 +117,6 @@ def extract_position_rows(state: Dict[str, Any]) -> List[Dict[str, Any]]:
 
 
 def _trade_fees(trade: Dict[str, Any], base: str, quote: str) -> tuple[float, float]:
-    """Return (base_fee, quote_fee) only when fee currency is explicit."""
     entries: List[Dict[str, Any]] = []
     fee = trade.get("fee")
     if isinstance(fee, dict):
@@ -150,12 +149,6 @@ def reconstruct_cost_basis_from_trades(
     target_quantity: float,
     trades: List[Dict[str, Any]],
 ) -> Dict[str, Any]:
-    """Rebuild remaining average-cost basis from authenticated spot fills.
-
-    The function refuses histories that begin with a SELL against inventory it
-    cannot account for. That keeps a truncated exchange history from being
-    silently treated as a complete cost basis.
-    """
     symbol = _symbol(symbol)
     target = _f(target_quantity)
     if target <= 0 or "/" not in symbol:
@@ -183,7 +176,6 @@ def reconstruct_cost_basis_from_trades(
             cost = amount * price
 
         base_fee, quote_fee = _trade_fees(trade, base, quote)
-
         if side == "buy":
             received = max(0.0, amount - base_fee)
             if received <= 0 or cost <= 0:
@@ -196,13 +188,7 @@ def reconstruct_cost_basis_from_trades(
 
         debit = amount + base_fee
         tolerance = max(1e-12, debit * 0.001)
-        if debit > quantity + tolerance:
-            return {
-                "ok": False,
-                "reason": "trade_history_does_not_cover_inventory",
-                "covered_trades": covered_trades,
-            }
-        if quantity <= 0:
+        if debit > quantity + tolerance or quantity <= 0:
             return {
                 "ok": False,
                 "reason": "trade_history_does_not_cover_inventory",
@@ -241,7 +227,6 @@ def reconstruct_cost_basis_from_trades(
 
 
 def fetch_authenticated_trade_history(symbol: str) -> List[Dict[str, Any]]:
-    """Read authenticated Bybit Testnet fills. This function submits no order."""
     from src.leantrader.execution.broker_ccxt import BrokerCCXT
 
     broker = BrokerCCXT(
@@ -328,6 +313,7 @@ def build_report(
         if symbol in existing:
             report["already_owned"].append(row)
             continue
+
         qty = _f(row["quantity"])
         avg = _f(row["average_entry"])
         cost = _f(row["entry_cost"])
@@ -354,6 +340,18 @@ def build_report(
             })
             continue
 
+        viability = row.get("execution_viability")
+        if (
+            isinstance(viability, dict)
+            and viability.get("below_exchange_minimum") is True
+        ):
+            report["ambiguous"].append({
+                **row,
+                "authenticated_total": held,
+                "reason": "material_position_below_exchange_minimum",
+            })
+            continue
+
         if qty <= 0 or avg <= 0 or cost <= 0:
             report["ambiguous"].append({
                 **row,
@@ -370,7 +368,6 @@ def build_report(
 
 
 def _adoption_record(row: Dict[str, Any]) -> Dict[str, Any]:
-    """Build an RPB ledger record without inheriting a zero/unknown hold clock."""
     stamp = _f(row.get("entry_timestamp"))
     if stamp <= 0:
         stamp = time.time()
