@@ -47,12 +47,10 @@ git -C "$CANONICAL_REPO" show \
   "origin/$BRANCH:deploy_rpb_unified_testnet_v2.sh" > "$TMP"
 chmod 700 "$TMP"
 
-# The runtime image executes as a non-root user while /workspace is a host git
-# worktree. Verification must therefore be completely read-only with respect to
-# source. Disable import bytecode writes, route any cache path to /tmp, disable
-# pytest's workspace cache, and replace py_compile (which explicitly writes
-# .pyc files) with compile(source, ..., 'exec'), which performs the same syntax
-# compilation check entirely in memory.
+# Adapt the historical handoff script to the actual VPS container boundary.
+# Source remains read-only; credentials remain file-mounted rather than being
+# exposed in docker inspect; RPB-owned runtime state is writable by the image
+# user; and legacy Telegram variable names are mapped without printing values.
 python3 - "$TMP" <<'PY'
 from pathlib import Path
 import sys
@@ -60,6 +58,7 @@ import sys
 p = Path(sys.argv[1])
 text = p.read_text(encoding="utf-8")
 
+# Python imports must never try to write into the host git worktree.
 needle = "  -e PYTHONPATH=/workspace \\\n"
 replacement = (
     "  -e PYTHONPATH=/workspace \\\n"
@@ -68,7 +67,7 @@ replacement = (
 )
 if needle not in text:
     raise SystemExit("ERROR: expected PYTHONPATH marker missing from handoff script")
-text = text.replace(needle, replacement, 1)
+text = text.replace(needle, replacement)
 
 old_compile = '''  python -m py_compile \\
     REAL_PROFIT_BOT.py \\
@@ -103,12 +102,94 @@ PYCOMPILE
 if old_compile not in text:
     raise SystemExit("ERROR: expected py_compile block missing from handoff script")
 text = text.replace(old_compile, new_compile, 1)
-
 text = text.replace(
     "python -m pytest -q \\\n",
     "python -m pytest -q -p no:cacheprovider \\\n",
     1,
 )
+
+# Map the Telegram names used by older LeanTrader deployments into the names
+# consumed by the unified RPB. Never print any token or chat id.
+old_tg = '''TELEGRAM_TOKEN="$(resolve_env TELEGRAM_BOT_TOKEN || true)"
+TELEGRAM_ADMIN="$(resolve_env TELEGRAM_ADMIN_CHAT_ID || true)"
+TELEGRAM_VIP="$(resolve_env TELEGRAM_VIP_CHAT_ID || true)"
+TELEGRAM_FREE="$(resolve_env TELEGRAM_FREE_CHAT_ID || true)"
+'''
+new_tg = '''TELEGRAM_TOKEN="$(resolve_env TELEGRAM_BOT_TOKEN || true)"
+[[ -n "$TELEGRAM_TOKEN" ]] || TELEGRAM_TOKEN="$(resolve_env TG_BOT_TOKEN || true)"
+[[ -n "$TELEGRAM_TOKEN" ]] || TELEGRAM_TOKEN="$(resolve_env TELEGRAM_TOKEN || true)"
+
+TELEGRAM_ADMIN="$(resolve_env TELEGRAM_ADMIN_CHAT_ID || true)"
+[[ -n "$TELEGRAM_ADMIN" ]] || TELEGRAM_ADMIN="$(resolve_env TG_ADMIN_CHAT_ID || true)"
+[[ -n "$TELEGRAM_ADMIN" ]] || TELEGRAM_ADMIN="$(resolve_env TELEGRAM_ADMIN_ID || true)"
+
+TELEGRAM_VIP="$(resolve_env TELEGRAM_VIP_CHAT_ID || true)"
+[[ -n "$TELEGRAM_VIP" ]] || TELEGRAM_VIP="$(resolve_env TG_VIP_CHAT_ID || true)"
+[[ -n "$TELEGRAM_VIP" ]] || TELEGRAM_VIP="$(resolve_env TELEGRAM_VIP_CHANNEL || true)"
+[[ -n "$TELEGRAM_VIP" ]] || TELEGRAM_VIP="$(resolve_env TELEGRAM_CHAT_ID || true)"
+
+TELEGRAM_FREE="$(resolve_env TELEGRAM_FREE_CHAT_ID || true)"
+[[ -n "$TELEGRAM_FREE" ]] || TELEGRAM_FREE="$(resolve_env TG_FREE_CHAT_ID || true)"
+[[ -n "$TELEGRAM_FREE" ]] || TELEGRAM_FREE="$(resolve_env TELEGRAM_FREE_CHANNEL || true)"
+'''
+if old_tg not in text:
+    raise SystemExit("ERROR: expected Telegram resolver block missing from handoff script")
+text = text.replace(old_tg, new_tg, 1)
+
+# Stage only the credential files referenced by the runtime. The existing VPS
+# files are root-readable, while the image runs as an unprivileged UID. Copying
+# them into an RPB-owned private directory with the image UID preserves the
+# file-secret model and avoids putting API secrets into docker inspect output.
+marker = '''SECRET_ARGS=()
+'''
+staging = r'''IMAGE_UID="$(docker run --rm --entrypoint sh "$IMAGE" -lc 'id -u' | tail -n 1)"
+IMAGE_GID="$(docker run --rm --entrypoint sh "$IMAGE" -lc 'id -g' | tail -n 1)"
+[[ "$IMAGE_UID" =~ ^[0-9]+$ && "$IMAGE_GID" =~ ^[0-9]+$ ]] || fail "could not resolve runtime image uid/gid"
+
+STAGED_SECRETS="$RPB_DATA/secrets"
+rm -rf "$STAGED_SECRETS"
+install -d -o "$IMAGE_UID" -g "$IMAGE_GID" -m 0500 "$STAGED_SECRETS"
+
+stage_secret_path() {
+  local configured="$1" src="" base=""
+  [[ -n "$configured" ]] || return 0
+  base="$(basename "$configured")"
+  case "$configured" in
+    /run/secrets/*) src="$SECRETS/${configured#/run/secrets/}" ;;
+    *) src="$configured" ;;
+  esac
+  [[ -f "$src" ]] || fail "configured credential file is missing on host: $base"
+  install -o "$IMAGE_UID" -g "$IMAGE_GID" -m 0400 "$src" "$STAGED_SECRETS/$base"
+  printf '/run/secrets/%s' "$base"
+}
+
+if [[ -n "$BYBIT_KEY_FILE" ]]; then BYBIT_KEY_FILE="$(stage_secret_path "$BYBIT_KEY_FILE")"; fi
+if [[ -n "$BYBIT_SECRET_FILE" ]]; then BYBIT_SECRET_FILE="$(stage_secret_path "$BYBIT_SECRET_FILE")"; fi
+
+# RPB ledger, online learner and alpha memory must survive restarts and be
+# writable by the same unprivileged image user.
+chown -R "$IMAGE_UID:$IMAGE_GID" "$RPB_DATA/runtime" "$RPB_DATA/reports"
+chmod 0750 "$RPB_DATA" "$RPB_DATA/runtime" "$RPB_DATA/reports"
+
+echo "RUNTIME_IMAGE_UID=$IMAGE_UID"
+echo "BYBIT_FILE_SECRETS_STAGED=$([[ -n "$BYBIT_KEY_FILE" && -n "$BYBIT_SECRET_FILE" ]] && echo yes || echo no)"
+echo "TELEGRAM_TOKEN_RESOLVED=$([[ -n "$TELEGRAM_TOKEN" ]] && echo yes || echo no)"
+echo "TELEGRAM_ADMIN_RESOLVED=$([[ -n "$TELEGRAM_ADMIN" ]] && echo yes || echo no)"
+echo "TELEGRAM_PREMIUM_RESOLVED=$([[ -n "$TELEGRAM_VIP" ]] && echo yes || echo no)"
+echo "TELEGRAM_FREE_RESOLVED=$([[ -n "$TELEGRAM_FREE" ]] && echo yes || echo no)"
+
+SECRET_ARGS=()
+'''
+if marker not in text:
+    raise SystemExit("ERROR: expected SECRET_ARGS marker missing from handoff script")
+text = text.replace(marker, staging, 1)
+
+# Both verification/adoption and the final RPB container must consume the
+# staged readable copy, never the root-only host directory directly.
+old_mount = '-v "$SECRETS:/run/secrets:ro"'
+if old_mount not in text:
+    raise SystemExit("ERROR: expected secrets mount missing from handoff script")
+text = text.replace(old_mount, '-v "$STAGED_SECRETS:/run/secrets:ro"')
 
 p.write_text(text, encoding="utf-8")
 PY
