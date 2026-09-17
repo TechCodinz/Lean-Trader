@@ -244,6 +244,29 @@ def verify_dust_quarantine_policy():
     print("VERIFY_AUTHENTICATED_DUST_QUARANTINE=PASS")
 
 
+def verify_stale_state_is_non_blocking():
+    from rpb_adopt_positions import build_report
+
+    stale = {
+        "symbol": "DOT/USDT",
+        "quantity": 0.0015,
+        "average_entry": 0.0,
+        "entry_cost": 0.0,
+        "basis_reconstruction_reason": "trade_history_does_not_cover_inventory",
+    }
+    report = build_report({}, {"total": {"DOT": 0.0}}, rows=[stale])
+    check(report.get("ok") is True, report)
+    check(not report.get("ambiguous"), report)
+    check(not report.get("mismatched"), report)
+    check(len(report.get("stale_state") or []) == 1, report)
+    check(
+        report["stale_state"][0].get("reason")
+        == "state_position_absent_from_authenticated_exchange_balance",
+        report,
+    )
+    print("VERIFY_STALE_STATE_NON_BLOCKING=PASS")
+
+
 def main():
     verify_scalping()
     verify_bridge()
@@ -251,6 +274,7 @@ def main():
     verify_adoption_parser_and_clock()
     verify_basis_reconstruction()
     verify_dust_quarantine_policy()
+    verify_stale_state_is_non_blocking()
     print("VERIFY_RPB_UNIFIED=PASS")
 
 
