@@ -135,11 +135,48 @@ def verify_adoption_parser_and_clock():
     print("VERIFY_POSITION_ADOPTION=PASS")
 
 
+def verify_basis_reconstruction():
+    from rpb_adopt_positions import reconstruct_cost_basis_from_trades
+
+    trades = [
+        {
+            "timestamp": 1,
+            "side": "buy",
+            "amount": 10.0,
+            "price": 2.0,
+            "cost": 20.0,
+            "fee": {"currency": "USDT", "cost": 0.02},
+        },
+        {
+            "timestamp": 2,
+            "side": "sell",
+            "amount": 4.0,
+            "price": 3.0,
+            "cost": 12.0,
+            "fee": {"currency": "USDT", "cost": 0.01},
+        },
+    ]
+    rebuilt = reconstruct_cost_basis_from_trades("DOT/USDT", 6.0, trades)
+    check(rebuilt.get("ok") is True, rebuilt)
+    check(abs(float(rebuilt.get("entry_cost")) - 12.012) < 1e-9, rebuilt)
+    check(abs(float(rebuilt.get("average_entry")) - 2.002) < 1e-9, rebuilt)
+
+    incomplete = reconstruct_cost_basis_from_trades(
+        "DOT/USDT",
+        1.0,
+        [{"timestamp": 1, "side": "sell", "amount": 1.0, "price": 4.0, "cost": 4.0}],
+    )
+    check(incomplete.get("ok") is False, incomplete)
+    check(incomplete.get("reason") == "trade_history_does_not_cover_inventory", incomplete)
+    print("VERIFY_AUTHENTICATED_BASIS_RECONSTRUCTION=PASS")
+
+
 def main():
     verify_scalping()
     verify_bridge()
     verify_ledger()
     verify_adoption_parser_and_clock()
+    verify_basis_reconstruction()
     print("VERIFY_RPB_UNIFIED=PASS")
 
 
