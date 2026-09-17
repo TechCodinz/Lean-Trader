@@ -47,6 +47,30 @@ git -C "$CANONICAL_REPO" show \
   "origin/$BRANCH:deploy_rpb_unified_testnet_v2.sh" > "$TMP"
 chmod 700 "$TMP"
 
+# The image runs as a non-root user while /workspace is a host git worktree.
+# Redirect bytecode/cache writes to /tmp so verification never mutates or needs
+# write permission on canonical source. Also disable pytest's workspace cache.
+python3 - "$TMP" <<'PY'
+from pathlib import Path
+import sys
+
+p = Path(sys.argv[1])
+text = p.read_text(encoding="utf-8")
+needle = "  -e PYTHONPATH=/workspace \\\n"
+replacement = (
+    "  -e PYTHONPATH=/workspace \\\n"
+    "  -e PYTHONPYCACHEPREFIX=/tmp/rpb-pycache \\\n"
+)
+if needle not in text:
+    raise SystemExit("ERROR: expected PYTHONPATH marker missing from handoff script")
+text = text.replace(needle, replacement)
+text = text.replace(
+    "python -m pytest -q \\\n",
+    "python -m pytest -q -p no:cacheprovider \\\n",
+)
+p.write_text(text, encoding="utf-8")
+PY
+
 # docker exec needs stdin attached for the final read-only authority probe.
 sed -i 's/docker exec "\$RPB_CONTAINER" python -/docker exec -i "\$RPB_CONTAINER" python -/' "$TMP"
 
