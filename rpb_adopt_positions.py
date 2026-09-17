@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 """Adopt authenticated production Testnet positions into the RPB ledger.
 
-The utility is deliberately idempotent and conservative. It imports only
-positions for which the previous production state has quantity plus cost-basis
-evidence and the authenticated Bybit Testnet account still holds at least that
-quantity. Extra exchange inventory is not assumed to belong to RPB.
+The utility is idempotent and conservative. It imports only positions with
+quantity plus cost-basis evidence and only when the authenticated Bybit Testnet
+account still holds at least that quantity. Extra exchange inventory is never
+assumed to belong to RPB.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import time
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -93,17 +94,19 @@ def extract_position_rows(state: Dict[str, Any]) -> List[Dict[str, Any]]:
         if average <= 0 and qty > 0 and cost > 0:
             average = cost / qty
 
-        rows.append(
-            {
-                "symbol": symbol,
-                "quantity": qty,
-                "average_entry": average,
-                "entry_cost": cost,
-                "entry_fee_quote": _f(item.get("entry_fee_quote") or item.get("entry_fee") or item.get("fee")),
-                "entry_timestamp": _f(item.get("entry_timestamp") or item.get("opened_at") or item.get("timestamp")),
-                "source": "vps_testnet_execution",
-            }
-        )
+        rows.append({
+            "symbol": symbol,
+            "quantity": qty,
+            "average_entry": average,
+            "entry_cost": cost,
+            "entry_fee_quote": _f(
+                item.get("entry_fee_quote") or item.get("entry_fee") or item.get("fee")
+            ),
+            "entry_timestamp": _f(
+                item.get("entry_timestamp") or item.get("opened_at") or item.get("timestamp")
+            ),
+            "source": "vps_testnet_execution",
+        })
 
     return rows
 
@@ -113,14 +116,22 @@ def _exchange_quantities(balance: Dict[str, Any]) -> Dict[str, float]:
     free = balance.get("free") if isinstance(balance.get("free"), dict) else {}
     result: Dict[str, float] = {}
     for base in set(totals) | set(free):
-        result[str(base).upper()] = _f(totals.get(base) if totals.get(base) is not None else free.get(base))
+        result[str(base).upper()] = _f(
+            totals.get(base) if totals.get(base) is not None else free.get(base)
+        )
     return result
 
 
 def build_report(state: Dict[str, Any], balance: Dict[str, Any], existing_symbols=None) -> Dict[str, Any]:
     existing = set(existing_symbols or [])
     holdings = _exchange_quantities(balance)
-    report = {"ok": True, "adoptable": [], "already_owned": [], "ambiguous": [], "mismatched": []}
+    report = {
+        "ok": True,
+        "adoptable": [],
+        "already_owned": [],
+        "ambiguous": [],
+        "mismatched": [],
+    }
 
     for row in extract_position_rows(state):
         symbol = row["symbol"]
@@ -137,13 +148,40 @@ def build_report(state: Dict[str, Any], balance: Dict[str, Any], existing_symbol
         held = _f(holdings.get(base))
         tolerance = max(1e-12, qty * 0.01)
         if held + tolerance < qty:
-            report["mismatched"].append({**row, "authenticated_total": held, "reason": "exchange_holds_less_than_recorded"})
+            report["mismatched"].append({
+                **row,
+                "authenticated_total": held,
+                "reason": "exchange_holds_less_than_recorded",
+            })
             continue
         report["adoptable"].append({**row, "authenticated_total": held})
 
     if report["ambiguous"] or report["mismatched"]:
         report["ok"] = False
     return report
+
+
+def _adoption_record(row: Dict[str, Any]) -> Dict[str, Any]:
+    """Build an RPB ledger record without inheriting a zero/unknown hold clock."""
+    stamp = _f(row.get("entry_timestamp"))
+    if stamp <= 0:
+        # Cost basis remains historical, but an unknown timestamp must not make
+        # the 30-second lifecycle treat the position as millions of seconds old
+        # and force an immediate timeout close at handoff.
+        stamp = time.time()
+    return {
+        "symbol": row["symbol"],
+        "remaining_quantity": row["quantity"],
+        "sellable_quantity": row["quantity"],
+        "average_entry": row["average_entry"],
+        "entry_cost": row["entry_cost"],
+        "entry_fee_quote": row.get("entry_fee_quote", 0.0),
+        "entry_timestamp": stamp,
+        "strategy": "adopted_production_position",
+        "confidence": 0.0,
+        "attribution": ["production_state_handoff"],
+        "session": "adopted",
+    }
 
 
 def main() -> int:
@@ -172,20 +210,7 @@ def main() -> int:
     if args.apply and report["ok"]:
         adopted = []
         for row in report["adoptable"]:
-            record = {
-                "symbol": row["symbol"],
-                "remaining_quantity": row["quantity"],
-                "sellable_quantity": row["quantity"],
-                "average_entry": row["average_entry"],
-                "entry_cost": row["entry_cost"],
-                "entry_fee_quote": row.get("entry_fee_quote", 0.0),
-                "entry_timestamp": row.get("entry_timestamp") or 0.0,
-                "strategy": "adopted_production_position",
-                "confidence": 0.0,
-                "attribution": [],
-                "session": "adopted",
-            }
-            if ledger.adopt_position(record):
+            if ledger.adopt_position(_adoption_record(row)):
                 adopted.append(row["symbol"])
         report["applied"] = adopted
 
