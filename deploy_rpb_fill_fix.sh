@@ -51,7 +51,7 @@ docker inspect "$BACKUP_CONTAINER" --format '{{range .Config.Env}}{{println .}}{
 
 # Verify the exact delayed-fill and epoch-recovery contracts in the runtime
 # image before restoring execution authority.
-docker run --rm \
+docker run --rm -i \
   --env-file "$ENV_FILE" \
   -v "$WORKTREE:/workspace:ro" \
   -w /workspace \
