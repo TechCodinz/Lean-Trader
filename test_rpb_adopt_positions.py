@@ -177,3 +177,22 @@ def test_build_report_still_blocks_unpriced_material_inventory():
     assert report["ok"] is False
     assert len(report["ambiguous"]) == 1
     assert report["quarantined_dust"] == []
+
+
+def test_build_report_drops_stale_state_when_authenticated_balance_is_zero():
+    rows = [
+        {
+            "symbol": "DOT/USDT",
+            "quantity": 0.0015,
+            "average_entry": 0.0,
+            "entry_cost": 0.0,
+            "basis_reconstruction_reason": "trade_history_does_not_cover_inventory",
+        }
+    ]
+    balance = {"total": {"DOT": 0.0}}
+    report = build_report({}, balance, rows=rows)
+    assert report["ok"] is True
+    assert report["mismatched"] == []
+    assert report["ambiguous"] == []
+    assert len(report["stale_state"]) == 1
+    assert report["stale_state"][0]["reason"] == "state_position_absent_from_authenticated_exchange_balance"
