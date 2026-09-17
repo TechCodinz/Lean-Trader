@@ -1,10 +1,11 @@
-"""Read-only classification of residual Testnet inventory as non-executable dust.
+"""Read-only classification of residual Testnet inventory execution viability.
 
-This module never invents cost basis and never submits an order. It may mark a
+This module never invents cost basis and never submits an order. It marks a
 residual position as quarantinable only when authenticated Testnet market
 metadata/ticker evidence shows the residual is both economically tiny and below
-an exchange execution minimum. This applies even when cost basis is known,
-because non-executable dust should not become an endlessly retried RPB exit.
+an exchange execution minimum. A material residual that is below an exchange
+minimum is reported as non-executable and must block handoff instead of being
+adopted into a ledger that could never close it.
 """
 
 from __future__ import annotations
@@ -28,7 +29,7 @@ def assess_dust_from_market(
     market: Dict[str, Any],
     hard_cap_usd: float = 0.05,
 ) -> Dict[str, Any]:
-    """Pure dust policy used by both runtime and offline verification."""
+    """Pure execution-viability/dust policy used by runtime and verification."""
     qty = _f(quantity)
     price_candidates = [_f(x) for x in prices]
     price_candidates = [x for x in price_candidates if x > 0]
@@ -42,7 +43,11 @@ def assess_dust_from_market(
     min_amount = _f(amount_limits.get("min"))
 
     if qty <= 0 or price <= 0:
-        return {"ok": False, "reason": "dust_price_or_quantity_unavailable"}
+        return {
+            "ok": False,
+            "below_exchange_minimum": False,
+            "reason": "dust_price_or_quantity_unavailable",
+        }
 
     notional = qty * price
     below_exchange_minimum = bool(
@@ -53,10 +58,15 @@ def assess_dust_from_market(
 
     return {
         "ok": bool(tiny and below_exchange_minimum),
+        "below_exchange_minimum": below_exchange_minimum,
         "reason": (
             "authenticated_non_executable_dust"
             if tiny and below_exchange_minimum
-            else "inventory_not_safe_to_quarantine_as_dust"
+            else (
+                "material_position_below_exchange_minimum"
+                if below_exchange_minimum
+                else "inventory_execution_minimum_satisfied"
+            )
         ),
         "symbol": str(symbol or ""),
         "quantity": qty,
@@ -103,7 +113,7 @@ def inspect_authenticated_testnet_dust(symbol: str, quantity: float) -> Dict[str
 
 
 def annotate_unpriced_dust(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Annotate any residual position that is proven tiny and non-executable."""
+    """Attach authenticated execution-viability evidence to every residual."""
     annotated: List[Dict[str, Any]] = []
     for original in rows or []:
         row = dict(original)
@@ -116,8 +126,10 @@ def annotate_unpriced_dust(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             except Exception as exc:
                 evidence = {
                     "ok": False,
+                    "below_exchange_minimum": False,
                     "reason": f"dust_evidence_error:{type(exc).__name__}",
                 }
+            row["execution_viability"] = evidence
             if evidence.get("ok") is True:
                 row["dust_quarantine"] = evidence
             else:
