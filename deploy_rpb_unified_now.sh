@@ -81,6 +81,7 @@ files = [
     "rpb_production_bridge.py",
     "rpb_adopt_positions.py",
     "rpb_adoption_history.py",
+    "rpb_adoption_dust.py",
     "rpb_adopt_positions_windowed.py",
     "rpb_telegram.py",
     "verify_rpb_unified.py",
@@ -105,10 +106,6 @@ text = text.replace(
     1,
 )
 
-# Use the windowed authenticated-history wrapper for both the dry-run and the
-# final idempotent apply. The wrapper changes only the read-only history fetch;
-# all conservative ambiguity, inventory and cost-basis checks remain in the
-# original adoption utility.
 text = text.replace("python rpb_adopt_positions.py \\\n", "python rpb_adopt_positions_windowed.py \\\n")
 
 old_tg = '''TELEGRAM_TOKEN="$(resolve_env TELEGRAM_BOT_TOKEN || true)"
