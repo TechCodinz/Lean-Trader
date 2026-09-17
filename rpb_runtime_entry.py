@@ -82,6 +82,15 @@ class UnifiedRPBRuntime(REAL_PROFIT_BOT):
         return report
 
     def _authenticated_order_status(self, order_id: str, symbol: str) -> Dict[str, Any]:
+        """Return authenticated terminal/open order state without guessing.
+
+        Bybit's unified account API requires ``acknowledged=True`` when
+        ``fetch_order`` is used outside its recent-order cache. The generic
+        lookup used before this fix therefore returned an empty status for a
+        genuinely canceled order and kept RPB fail-closed forever. Prefer the
+        acknowledged lookup on Bybit, then fall back to explicit open/closed
+        endpoints. Other venues retain the ordinary CCXT fetch_order path.
+        """
         if not order_id:
             return {}
         try:
@@ -93,10 +102,33 @@ class UnifiedRPBRuntime(REAL_PROFIT_BOT):
                 market_mode="spot",
             )
             exchange = broker._make_exchange(self.mode, authenticated=True)  # noqa: SLF001
-            order = exchange.fetch_order(order_id, symbol) or {}
-            return order if isinstance(order, dict) else {}
         except Exception:
             return {}
+
+        attempts = []
+        if self.execution_exchange_id == "bybit":
+            attempts.extend(
+                [
+                    lambda: exchange.fetch_order(
+                        order_id,
+                        symbol,
+                        {"acknowledged": True},
+                    ),
+                    lambda: exchange.fetch_open_order(order_id, symbol),
+                    lambda: exchange.fetch_closed_order(order_id, symbol),
+                ]
+            )
+        else:
+            attempts.append(lambda: exchange.fetch_order(order_id, symbol))
+
+        for fetch_status in attempts:
+            try:
+                order = fetch_status() or {}
+                if isinstance(order, dict) and order:
+                    return order
+            except Exception:
+                continue
+        return {}
 
     def _resolve_pending_execution(self, *, force: bool = False) -> bool:
         pending = self.pending_store.get()
@@ -146,7 +178,7 @@ class UnifiedRPBRuntime(REAL_PROFIT_BOT):
                     )
                     if not record:
                         return False
-            elif side == "sell" and self.ledger.owns(symbol):
+            elif side == "sell" and self.lifecycle_enabled and self.ledger.owns(symbol):
                 if not self._settle_exit(
                     symbol,
                     reconciled,
