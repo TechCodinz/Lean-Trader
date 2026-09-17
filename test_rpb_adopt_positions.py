@@ -107,6 +107,30 @@ def test_build_report_allows_explicit_authenticated_dust_quarantine():
     assert report["quarantined_dust"][0]["symbol"] == "DOT/USDT"
 
 
+def test_build_report_quarantines_non_executable_dust_even_with_known_basis():
+    rows = [
+        {
+            "symbol": "JASMY/USDT",
+            "quantity": 0.03989,
+            "average_entry": 0.0052,
+            "entry_cost": 0.000207428,
+            "dust_quarantine": {
+                "ok": True,
+                "price": 0.0053,
+                "notional": 0.000211417,
+                "min_notional": 1.0,
+                "reason": "authenticated_non_executable_dust",
+            },
+        }
+    ]
+    balance = {"total": {"JASMY": 0.03989}}
+    report = build_report({}, balance, rows=rows)
+    assert report["ok"] is True
+    assert report["adoptable"] == []
+    assert len(report["quarantined_dust"]) == 1
+    assert report["quarantined_dust"][0]["symbol"] == "JASMY/USDT"
+
+
 def test_build_report_still_blocks_unpriced_material_inventory():
     rows = [
         {
