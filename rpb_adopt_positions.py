@@ -5,9 +5,10 @@ The utility is idempotent and conservative. It imports only positions with
 quantity plus cost-basis evidence and only when the authenticated Bybit Testnet
 account still holds at least that quantity. When the production state retained
 inventory quantity but lost its basis fields, the utility may reconstruct the
-remaining basis from authenticated Bybit Testnet trade history. It never
-invents a price or basis, and extra exchange inventory is never assumed to
-belong to RPB.
+remaining basis from authenticated Bybit Testnet trade history. Explicitly
+verified non-executable dust may be quarantined outside the RPB PnL ledger; its
+basis is never invented. Extra exchange inventory is never assumed to belong
+to RPB.
 """
 
 from __future__ import annotations
@@ -222,9 +223,6 @@ def reconstruct_cost_basis_from_trades(
             "reconstructed_quantity": quantity,
         }
 
-    # If the authenticated history covers more inventory than the production
-    # state says belongs to this handoff, adopt only the requested quantity at
-    # the reconstructed average cost. Do not claim the extra inventory.
     scale = min(1.0, target / quantity) if quantity > 0 else 0.0
     adopted_cost = cost_basis * scale
     adopted_fee = entry_fee_quote * scale
@@ -320,6 +318,7 @@ def build_report(
         "ok": True,
         "adoptable": [],
         "already_owned": [],
+        "quarantined_dust": [],
         "ambiguous": [],
         "mismatched": [],
     }
@@ -332,16 +331,10 @@ def build_report(
         qty = _f(row["quantity"])
         avg = _f(row["average_entry"])
         cost = _f(row["entry_cost"])
-        if qty <= 0 or avg <= 0 or cost <= 0:
-            report["ambiguous"].append({
-                **row,
-                "reason": row.get("basis_reconstruction_reason")
-                or "missing_quantity_or_cost_basis",
-            })
-            continue
         base = symbol.split("/", 1)[0]
         held = _f(holdings.get(base))
         tolerance = max(1e-12, qty * 0.01)
+
         if held + tolerance < qty:
             report["mismatched"].append({
                 **row,
@@ -349,6 +342,25 @@ def build_report(
                 "reason": "exchange_holds_less_than_recorded",
             })
             continue
+
+        if qty <= 0 or avg <= 0 or cost <= 0:
+            dust = row.get("dust_quarantine")
+            if isinstance(dust, dict) and dust.get("ok") is True:
+                report["quarantined_dust"].append({
+                    **row,
+                    "authenticated_total": held,
+                    "reason": str(
+                        dust.get("reason") or "authenticated_non_executable_dust"
+                    ),
+                })
+                continue
+            report["ambiguous"].append({
+                **row,
+                "reason": row.get("basis_reconstruction_reason")
+                or "missing_quantity_or_cost_basis",
+            })
+            continue
+
         report["adoptable"].append({**row, "authenticated_total": held})
 
     if report["ambiguous"] or report["mismatched"]:
@@ -360,9 +372,6 @@ def _adoption_record(row: Dict[str, Any]) -> Dict[str, Any]:
     """Build an RPB ledger record without inheriting a zero/unknown hold clock."""
     stamp = _f(row.get("entry_timestamp"))
     if stamp <= 0:
-        # Cost basis remains historical, but an unknown timestamp must not make
-        # the 30-second lifecycle treat the position as millions of seconds old
-        # and force an immediate timeout close at handoff.
         stamp = time.time()
     return {
         "symbol": row["symbol"],
@@ -410,6 +419,25 @@ def main() -> int:
             if ledger.adopt_position(_adoption_record(row)):
                 adopted.append(row["symbol"])
         report["applied"] = adopted
+        if report.get("quarantined_dust"):
+            quarantine_path = Path(
+                os.getenv(
+                    "RPB_DUST_QUARANTINE_PATH",
+                    "/rpb-data/runtime/rpb_quarantined_dust.json",
+                )
+            )
+            quarantine_path.parent.mkdir(parents=True, exist_ok=True)
+            quarantine_path.write_text(
+                json.dumps(
+                    {
+                        "updated_at": time.time(),
+                        "positions": report["quarantined_dust"],
+                    },
+                    indent=2,
+                    sort_keys=True,
+                ),
+                encoding="utf-8",
+            )
 
     text = json.dumps(report, indent=2, sort_keys=True)
     print(text)
