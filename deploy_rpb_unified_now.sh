@@ -167,7 +167,10 @@ if [[ -n "$BYBIT_KEY_FILE" ]]; then BYBIT_KEY_FILE="$(stage_secret_path "$BYBIT_
 if [[ -n "$BYBIT_SECRET_FILE" ]]; then BYBIT_SECRET_FILE="$(stage_secret_path "$BYBIT_SECRET_FILE")"; fi
 
 # RPB ledger, online learner and alpha memory must survive restarts and be
-# writable by the same unprivileged image user.
+# writable by the same unprivileged image user. The parent directory must also
+# be owned/traversable by that UID; otherwise /rpb-data/runtime is unreachable
+# even when the child directory itself is writable.
+chown "$IMAGE_UID:$IMAGE_GID" "$RPB_DATA"
 chown -R "$IMAGE_UID:$IMAGE_GID" "$RPB_DATA/runtime" "$RPB_DATA/reports"
 chmod 0750 "$RPB_DATA" "$RPB_DATA/runtime" "$RPB_DATA/reports"
 
