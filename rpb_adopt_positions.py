@@ -5,10 +5,9 @@ The utility is idempotent and conservative. It imports only positions with
 quantity plus cost-basis evidence and only when the authenticated Bybit Testnet
 account still holds at least that quantity. When the production state retained
 inventory quantity but lost its basis fields, the utility may reconstruct the
-remaining basis from authenticated Bybit Testnet trade history. Explicitly
-verified non-executable dust may be quarantined outside the RPB PnL ledger; its
-basis is never invented. Material residual inventory that is below an exchange
-minimum blocks handoff instead of becoming a position that RPB cannot close.
+remaining basis from authenticated Bybit Testnet trade history. It never
+invents a price or basis, and extra exchange inventory is never assumed to
+belong to RPB.
 """
 
 from __future__ import annotations
@@ -176,6 +175,7 @@ def reconstruct_cost_basis_from_trades(
             cost = amount * price
 
         base_fee, quote_fee = _trade_fees(trade, base, quote)
+
         if side == "buy":
             received = max(0.0, amount - base_fee)
             if received <= 0 or cost <= 0:
@@ -304,6 +304,7 @@ def build_report(
         "adoptable": [],
         "already_owned": [],
         "quarantined_dust": [],
+        "stale_state": [],
         "ambiguous": [],
         "mismatched": [],
     }
@@ -320,6 +321,18 @@ def build_report(
         base = symbol.split("/", 1)[0]
         held = _f(holdings.get(base))
         tolerance = max(1e-12, qty * 0.01)
+
+        # The authenticated Testnet balance is the authority for whether an
+        # old production-state position still exists. A stale row whose base
+        # balance is exactly zero is not a live position and must not block the
+        # execution-owner handoff. We retain it in the report for auditability.
+        if qty > 0 and held <= 1e-12:
+            report["stale_state"].append({
+                **row,
+                "authenticated_total": held,
+                "reason": "state_position_absent_from_authenticated_exchange_balance",
+            })
+            continue
 
         if held + tolerance < qty:
             report["mismatched"].append({
