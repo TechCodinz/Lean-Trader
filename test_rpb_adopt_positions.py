@@ -95,7 +95,12 @@ def test_build_report_allows_explicit_authenticated_dust_quarantine():
                 "price": 0.94,
                 "notional": 0.00141,
                 "min_notional": 1.0,
+                "below_exchange_minimum": True,
                 "reason": "authenticated_non_executable_dust",
+            },
+            "execution_viability": {
+                "ok": True,
+                "below_exchange_minimum": True,
             },
         }
     ]
@@ -108,19 +113,22 @@ def test_build_report_allows_explicit_authenticated_dust_quarantine():
 
 
 def test_build_report_quarantines_non_executable_dust_even_with_known_basis():
+    evidence = {
+        "ok": True,
+        "price": 0.0053,
+        "notional": 0.000211417,
+        "min_notional": 1.0,
+        "below_exchange_minimum": True,
+        "reason": "authenticated_non_executable_dust",
+    }
     rows = [
         {
             "symbol": "JASMY/USDT",
             "quantity": 0.03989,
             "average_entry": 0.0052,
             "entry_cost": 0.000207428,
-            "dust_quarantine": {
-                "ok": True,
-                "price": 0.0053,
-                "notional": 0.000211417,
-                "min_notional": 1.0,
-                "reason": "authenticated_non_executable_dust",
-            },
+            "dust_quarantine": evidence,
+            "execution_viability": evidence,
         }
     ]
     balance = {"total": {"JASMY": 0.03989}}
@@ -129,6 +137,29 @@ def test_build_report_quarantines_non_executable_dust_even_with_known_basis():
     assert report["adoptable"] == []
     assert len(report["quarantined_dust"]) == 1
     assert report["quarantined_dust"][0]["symbol"] == "JASMY/USDT"
+
+
+def test_build_report_blocks_material_position_below_exchange_minimum():
+    rows = [
+        {
+            "symbol": "CSPR/USDT",
+            "quantity": 750.0,
+            "average_entry": 0.002,
+            "entry_cost": 1.5,
+            "execution_viability": {
+                "ok": False,
+                "below_exchange_minimum": True,
+                "notional": 1.5,
+                "min_notional": 5.0,
+                "reason": "inventory_not_safe_to_quarantine_as_dust",
+            },
+        }
+    ]
+    balance = {"total": {"CSPR": 750.0}}
+    report = build_report({}, balance, rows=rows)
+    assert report["ok"] is False
+    assert report["adoptable"] == []
+    assert report["ambiguous"][0]["reason"] == "material_position_below_exchange_minimum"
 
 
 def test_build_report_still_blocks_unpriced_material_inventory():
