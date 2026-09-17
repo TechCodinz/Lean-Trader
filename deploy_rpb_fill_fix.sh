@@ -41,6 +41,7 @@ docker rm -f "$BACKUP_CONTAINER" >/dev/null 2>&1 || true
 if docker inspect "$RPB_CONTAINER" >/dev/null 2>&1; then
   docker stop "$RPB_CONTAINER" >/dev/null 2>&1 || true
   docker rename "$RPB_CONTAINER" "$BACKUP_CONTAINER"
+  docker update --restart=no "$BACKUP_CONTAINER" >/dev/null 2>&1 || true
 else
   echo "ERROR: existing RPB container not found" >&2
   exit 3
