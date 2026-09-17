@@ -47,27 +47,69 @@ git -C "$CANONICAL_REPO" show \
   "origin/$BRANCH:deploy_rpb_unified_testnet_v2.sh" > "$TMP"
 chmod 700 "$TMP"
 
-# The image runs as a non-root user while /workspace is a host git worktree.
-# Redirect bytecode/cache writes to /tmp so verification never mutates or needs
-# write permission on canonical source. Also disable pytest's workspace cache.
+# The runtime image executes as a non-root user while /workspace is a host git
+# worktree. Verification must therefore be completely read-only with respect to
+# source. Disable import bytecode writes, route any cache path to /tmp, disable
+# pytest's workspace cache, and replace py_compile (which explicitly writes
+# .pyc files) with compile(source, ..., 'exec'), which performs the same syntax
+# compilation check entirely in memory.
 python3 - "$TMP" <<'PY'
 from pathlib import Path
 import sys
 
 p = Path(sys.argv[1])
 text = p.read_text(encoding="utf-8")
+
 needle = "  -e PYTHONPATH=/workspace \\\n"
 replacement = (
     "  -e PYTHONPATH=/workspace \\\n"
+    "  -e PYTHONDONTWRITEBYTECODE=1 \\\n"
     "  -e PYTHONPYCACHEPREFIX=/tmp/rpb-pycache \\\n"
 )
 if needle not in text:
     raise SystemExit("ERROR: expected PYTHONPATH marker missing from handoff script")
-text = text.replace(needle, replacement)
+text = text.replace(needle, replacement, 1)
+
+old_compile = '''  python -m py_compile \\
+    REAL_PROFIT_BOT.py \\
+    rpb_position_lifecycle.py \\
+    rpb_intelligence.py \\
+    rpb_scalping.py \\
+    rpb_alpha_risk.py \\
+    rpb_production_bridge.py \\
+    rpb_adopt_positions.py \\
+    rpb_telegram.py \\
+    verify_rpb_unified.py
+'''
+new_compile = '''  python - <<"PYCOMPILE"
+from pathlib import Path
+files = [
+    "REAL_PROFIT_BOT.py",
+    "rpb_position_lifecycle.py",
+    "rpb_intelligence.py",
+    "rpb_scalping.py",
+    "rpb_alpha_risk.py",
+    "rpb_production_bridge.py",
+    "rpb_adopt_positions.py",
+    "rpb_telegram.py",
+    "verify_rpb_unified.py",
+]
+for name in files:
+    source = Path(name).read_text(encoding="utf-8")
+    compile(source, name, "exec")
+print("RPB_SOURCE_COMPILE=PASS")
+PYCOMPILE
+'''
+if old_compile not in text:
+    raise SystemExit("ERROR: expected py_compile block missing from handoff script")
+text = text.replace(old_compile, new_compile, 1)
+
 text = text.replace(
     "python -m pytest -q \\\n",
     "python -m pytest -q -p no:cacheprovider \\\n",
+    1,
 )
+
 p.write_text(text, encoding="utf-8")
 PY
 
