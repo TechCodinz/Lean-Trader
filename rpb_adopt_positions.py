@@ -343,17 +343,18 @@ def build_report(
             })
             continue
 
+        dust = row.get("dust_quarantine")
+        if isinstance(dust, dict) and dust.get("ok") is True:
+            report["quarantined_dust"].append({
+                **row,
+                "authenticated_total": held,
+                "reason": str(
+                    dust.get("reason") or "authenticated_non_executable_dust"
+                ),
+            })
+            continue
+
         if qty <= 0 or avg <= 0 or cost <= 0:
-            dust = row.get("dust_quarantine")
-            if isinstance(dust, dict) and dust.get("ok") is True:
-                report["quarantined_dust"].append({
-                    **row,
-                    "authenticated_total": held,
-                    "reason": str(
-                        dust.get("reason") or "authenticated_non_executable_dust"
-                    ),
-                })
-                continue
             report["ambiguous"].append({
                 **row,
                 "reason": row.get("basis_reconstruction_reason")
