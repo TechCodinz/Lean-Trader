@@ -175,7 +175,7 @@ def verify_dust_quarantine_policy():
     from rpb_adopt_positions import build_report
     from rpb_adoption_dust import assess_dust_from_market
 
-    evidence = assess_dust_from_market(
+    tiny_evidence = assess_dust_from_market(
         "DOT/USDT",
         0.0015,
         prices=[0.94, 0.95, 0.93],
@@ -187,7 +187,8 @@ def verify_dust_quarantine_policy():
         },
         hard_cap_usd=0.05,
     )
-    check(evidence.get("ok") is True, evidence)
+    check(tiny_evidence.get("ok") is True, tiny_evidence)
+    check(tiny_evidence.get("below_exchange_minimum") is True, tiny_evidence)
 
     tiny = {
         "symbol": "DOT/USDT",
@@ -195,19 +196,51 @@ def verify_dust_quarantine_policy():
         "average_entry": 0.0,
         "entry_cost": 0.0,
         "basis_reconstruction_reason": "trade_history_does_not_cover_inventory",
-        "dust_quarantine": evidence,
+        "dust_quarantine": tiny_evidence,
+        "execution_viability": tiny_evidence,
     }
     report = build_report({}, {"total": {"DOT": 0.0015}}, rows=[tiny])
     check(report.get("ok") is True, report)
     check(len(report.get("quarantined_dust") or []) == 1, report)
     check(not report.get("ambiguous"), report)
 
-    material = dict(tiny)
-    material["quantity"] = 2.0
-    material.pop("dust_quarantine", None)
-    blocked = build_report({}, {"total": {"DOT": 2.0}}, rows=[material])
+    known_basis_dust = dict(tiny)
+    known_basis_dust.update({
+        "symbol": "JASMY/USDT",
+        "quantity": 0.03989,
+        "average_entry": 0.0052,
+        "entry_cost": 0.000207428,
+    })
+    known_report = build_report(
+        {}, {"total": {"JASMY": 0.03989}}, rows=[known_basis_dust]
+    )
+    check(known_report.get("ok") is True, known_report)
+    check(len(known_report.get("quarantined_dust") or []) == 1, known_report)
+    check(not known_report.get("adoptable"), known_report)
+
+    material_evidence = assess_dust_from_market(
+        "CSPR/USDT",
+        750.0,
+        prices=[0.002],
+        market={"limits": {"cost": {"min": 5.0}}},
+        hard_cap_usd=0.05,
+    )
+    check(material_evidence.get("ok") is False, material_evidence)
+    check(material_evidence.get("below_exchange_minimum") is True, material_evidence)
+    material = {
+        "symbol": "CSPR/USDT",
+        "quantity": 750.0,
+        "average_entry": 0.002,
+        "entry_cost": 1.5,
+        "execution_viability": material_evidence,
+    }
+    blocked = build_report({}, {"total": {"CSPR": 750.0}}, rows=[material])
     check(blocked.get("ok") is False, blocked)
-    check(len(blocked.get("ambiguous") or []) == 1, blocked)
+    check(
+        (blocked.get("ambiguous") or [{}])[0].get("reason")
+        == "material_position_below_exchange_minimum",
+        blocked,
+    )
     print("VERIFY_AUTHENTICATED_DUST_QUARANTINE=PASS")
 
 
