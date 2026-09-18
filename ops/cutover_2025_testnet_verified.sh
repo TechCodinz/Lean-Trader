@@ -26,7 +26,7 @@ docker ps --format '{{.Names}}' | grep -qx "$LEGACY_CONTAINER" || rollback_postc
 
 LOGS="$(docker logs --since 10m "$LEGACY_CONTAINER" 2>&1 || true)"
 
-for marker in   'Learning loop started'   'Scouting loop started'   'Decision loop started'   'EXECUTION LOOP STARTED'   'SMART SCALPING LOOP STARTED'   'LEGACY_2025_REAL_INTELLIGENCE_BRIDGE_INSTALLED'   'REAL_MARKET_SCAN'   'Evolution database initialized'
+for marker in   'Learning Orchestrator wired'   'Scouting Orchestrator wired'   'Decision Engine wired'   'EXECUTION ORCHESTRATOR WIRED'   'SMART SCALPING ENGINE WIRED'   'LEGACY_2025_REAL_INTELLIGENCE_BRIDGE_INSTALLED'   'REAL_MARKET_SCAN'   'Evolution database initialized'
 do
   printf '%s\n' "$LOGS" | grep -q "$marker" || {
     echo "missing_runtime_marker=$marker"
@@ -63,7 +63,7 @@ PY
 
 echo
 echo "=== ENGINE + MARKET PROOF ==="
-printf '%s\n' "$LOGS"   | grep -E 'Learning loop started|Scouting loop started|Decision loop started|EXECUTION LOOP STARTED|SMART SCALPING LOOP STARTED|REAL_MARKET_SCAN|Scalper generated|Published .* signals|Decision:|EXECUTING:|Evolution database initialized|Evidence Evolution cycle'   | tail -n 220 || true
+printf '%s\n' "$LOGS"   | grep -E 'Learning Orchestrator wired|Scouting Orchestrator wired|Decision Engine wired|EXECUTION ORCHESTRATOR WIRED|SMART SCALPING ENGINE WIRED|REAL_MARKET_SCAN|Scalper generated|Published .* signals|Decision:|EXECUTING:|Evolution database initialized|Evidence Evolution cycle'   | tail -n 220 || true
 
 echo
 echo "=== AUTHENTICATED LIFECYCLE PROOF WINDOW ==="

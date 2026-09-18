@@ -923,9 +923,9 @@ for _ in $(seq 1 18); do
   EVOLUTION_OK=0
   CRYPTO_SCALPER_OK=0
 
-  printf '%s\n' "$LOGS" | grep -Eq 'Decision loop started|Decision:' && DECISION_OK=1 || true
-  printf '%s\n' "$LOGS" | grep -Eq 'EXECUTION LOOP STARTED|EXECUTING:' && EXECUTION_OK=1 || true
-  printf '%s\n' "$LOGS" | grep -Eq 'SMART SCALPING LOOP STARTED|Scalper generated' && SCALPER_OK=1 || true
+  printf '%s\n' "$LOGS" | grep -Eq 'Decision Engine wired|Decision:' && DECISION_OK=1 || true
+  printf '%s\n' "$LOGS" | grep -Eq 'EXECUTION ORCHESTRATOR WIRED|EXECUTING:' && EXECUTION_OK=1 || true
+  printf '%s\n' "$LOGS" | grep -Eq 'SMART SCALPING ENGINE WIRED|Scalper generated' && SCALPER_OK=1 || true
   printf '%s\n' "$LOGS" | grep -q 'REAL_MARKET_SCAN' && MARKET_OK=1 || true
   printf '%s\n' "$LOGS" | grep -q 'LEGACY_2025_REAL_INTELLIGENCE_BRIDGE_INSTALLED' && BRIDGE_OK=1 || true
   printf '%s\n' "$LOGS" | grep -Eq 'Evolution database initialized|Evidence Evolution cycle' && EVOLUTION_OK=1 || true
@@ -940,7 +940,7 @@ done
 if [ "$READY" -ne 1 ]; then
   echo "2025 controller did not reach the required engine-ready state."
   echo "Restoring previous RPB runtime."
-  docker logs --tail 320 "$LEGACY_CONTAINER" 2>&1 || true
+  docker logs "$LEGACY_CONTAINER" 2>&1 || true
   docker rm -f "$LEGACY_CONTAINER" >/dev/null 2>&1 || true
   docker start "$CURRENT_RPB" >/dev/null 2>&1 || true
   exit 1
@@ -958,7 +958,7 @@ docker ps --filter "name=$LEGACY_CONTAINER"   --format 'NAME={{.Names}} STATUS={
 
 echo
 echo "=== ENGINE START EVIDENCE ==="
-docker logs --since 3m "$LEGACY_CONTAINER" 2>&1   | grep -E 'AUTHENTICATED_TESTNET|PRODUCTION_PUBLIC|REAL_MARKET_SCAN|REAL_SMART_SCALPER|LEGACY_2025_REAL_INTELLIGENCE|AUTHENTICATED POSITION|AUTHENTICATED POSITION SETTLED|Realized net P&L|ALL 50\+ ORCHESTRATORS RUNNING|Decision loop started|EXECUTION LOOP STARTED|SMART SCALPING LOOP STARTED|Scalper generated|Published .* signals|Decision:|EXECUTING:|SUBMITTING|ORDER ACKNOWLEDGED|Evolution database initialized|Evidence Evolution cycle|Evolution|Sentient|Swarm|Learning loop started|Scouting loop started|ERROR|Traceback'   | tail -n 240 || true
+docker logs --since 3m "$LEGACY_CONTAINER" 2>&1   | grep -E 'AUTHENTICATED_TESTNET|PRODUCTION_PUBLIC|REAL_MARKET_SCAN|REAL_SMART_SCALPER|LEGACY_2025_REAL_INTELLIGENCE|AUTHENTICATED POSITION|AUTHENTICATED POSITION SETTLED|Realized net P&L|ALL 50\+ ORCHESTRATORS RUNNING|Decision Engine wired|EXECUTION ORCHESTRATOR WIRED|SMART SCALPING ENGINE WIRED|Scalper generated|Published .* signals|Decision:|EXECUTING:|SUBMITTING|ORDER ACKNOWLEDGED|Evolution database initialized|Evidence Evolution cycle|Evolution|Sentient|Swarm|Learning Orchestrator wired|Scouting Orchestrator wired|ERROR|Traceback'   | tail -n 240 || true
 
 echo
 echo "=== CONTAINER MODE EVIDENCE ==="
