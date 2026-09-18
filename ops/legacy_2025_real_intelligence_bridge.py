@@ -253,7 +253,16 @@ async def _real_analyze_all_timeframes(self, symbol: str):
 
 def _real_session_pairs(original):
     def wrapped(session: str):
-        rows = list(original(session) or [])
+        # The restored execution lane is Bybit spot. Keep any historical
+        # crypto session choices, but do not feed FX/XAU symbols into the
+        # CEX SmartScalper/ExecutionOrchestrator path. Forex remains a
+        # separate specialist lane.
+        rows = [
+            str(symbol)
+            for symbol in list(original(session) or [])
+            if "/" in str(symbol)
+            and str(symbol).upper().endswith("/USDT")
+        ]
         for symbol in FAST_CRYPTO_PAIRS:
             if symbol not in rows:
                 rows.append(symbol)
