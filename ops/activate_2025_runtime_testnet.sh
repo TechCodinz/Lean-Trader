@@ -46,6 +46,7 @@ echo "legacy_date=$(git -C "$LEGACY" show -s --format=%cI HEAD)"
 # historical brain does not fall back to simulated trades or synthetic closes.
 rsync -a --delete "$SOURCE/src/leantrader/" "$LEGACY/src/leantrader/"
 cp "$SOURCE/EXECUTION_ORCHESTRATOR.py" "$LEGACY/EXECUTION_ORCHESTRATOR.py"
+cp "$SOURCE/ops/legacy_2025_real_intelligence_bridge.py" "$LEGACY/LEGACY_2025_REAL_INTELLIGENCE_BRIDGE.py"
 
 # Apply compatibility overlays only; the October-2025 signal/decision strategy stays intact.
 python3 - "$LEGACY" <<'PY'
@@ -204,7 +205,26 @@ if p.exists():
     )
     p.write_text(s)
 
-# 5. Keep the 2025 Dynamic Market Scanner alive from public market data even
+# 5. Install the evidence bridge before the historical orchestrator imports.
+# This keeps the 2025 classes/topology but replaces placeholder/RNG market
+# evidence with real public Bybit observations.
+p = root / "RUN_BOT.py"
+s = p.read_text()
+needle = "# Import orchestrator\nprint(\"📦 Loading trading systems...\")"
+replacement = (
+    "# Install October-2025 real-evidence compatibility bridge\n"
+    "from LEGACY_2025_REAL_INTELLIGENCE_BRIDGE import install as _install_real_intelligence\n"
+    "_install_real_intelligence()\n\n"
+    "# Import orchestrator\n"
+    "print(\"📦 Loading trading systems...\")"
+)
+if "_install_real_intelligence()" not in s:
+    if needle not in s:
+        raise SystemExit("failed to locate RUN_BOT orchestrator import marker")
+    s = s.replace(needle, replacement, 1)
+p.write_text(s)
+
+# 6. Keep the 2025 Dynamic Market Scanner alive from public market data even
 # when no private arbitrage credentials are configured.
 p = root / "COMPLETE_ULTIMATE_ORCHESTRATOR.py"
 s = p.read_text()
@@ -213,7 +233,8 @@ old = """        else:
             self.market_scanner = None"""
 new = """        else:
             try:
-                public_bybit = ccxt.bybit({'enableRateLimit': True})
+                import ccxt.async_support as ccxt_async
+                public_bybit = ccxt_async.bybit({'enableRateLimit': True})
                 self.market_scanner = DynamicMarketScanner({'bybit': public_bybit}, self.data_hub)
                 self.advanced_orchestrators['market_scanner'] = self.market_scanner
                 logger.info("✅ 🔍 DYNAMIC MARKET SCANNER WIRED - public Bybit market data")
@@ -239,6 +260,9 @@ EXECUTION_MODE=testnet
 USE_TESTNET=true
 ENABLE_LIVE=false
 GATEIO_MODE=testnet
+EVOLUTION_DB_PATH=/workspace/evolution_engine.db
+DYNAMIC_SCAN_SECONDS=60
+EXECUTION_FILL_RECONCILE_SECONDS=6
 PYTHONUNBUFFERED=1
 EOF
 
@@ -468,7 +492,7 @@ docker run --rm \
   --env-file "$ENV_FILE" \
   -v "$LEGACY:/legacy:ro" \
   "$LEGACY_IMAGE" \
-  sh -lc 'cp -a /legacy /tmp/leantrader-2025 && cd /tmp/leantrader-2025 && python -c '"'"'from COMPLETE_ULTIMATE_ORCHESTRATOR import CompleteUltimateOrchestrator; print("LEGACY_2025_IMPORT_OK")'"'"''
+  sh -lc 'cp -a /legacy /tmp/leantrader-2025 && cd /tmp/leantrader-2025 && python -c '"'"'from LEGACY_2025_REAL_INTELLIGENCE_BRIDGE import install; install(); from COMPLETE_ULTIMATE_ORCHESTRATOR import CompleteUltimateOrchestrator; print("LEGACY_2025_IMPORT_OK")'"'"''
 
 echo
 echo "=== FULL 2025 INITIALIZE + WIRE SMOKE — NO LOOPS / NO ORDERS ==="
@@ -481,6 +505,8 @@ docker run --rm -i \
   "$LEGACY_IMAGE" \
   sh -lc 'cp -a /legacy /tmp/leantrader-2025 && cd /tmp/leantrader-2025 && python -' <<'PY'
 import asyncio
+from LEGACY_2025_REAL_INTELLIGENCE_BRIDGE import install
+install()
 
 from COMPLETE_ULTIMATE_ORCHESTRATOR import CompleteUltimateOrchestrator
 
@@ -503,6 +529,18 @@ async def check():
     print("SMART_SCALPING_PRESENT", bool(getattr(bot, "smart_scalping", None)))
     print("SENTIENT_BRAIN_PRESENT", bool(getattr(bot, "sentient_brain", None)))
     print("REAL_PROFIT_BOT_PRESENT", bool(getattr(bot, "real_profit_bot", None)))
+    print("MARKET_SCANNER_PRESENT", bool(getattr(bot, "market_scanner", None)))
+
+    evolution = (getattr(bot, "ai_systems", {}) or {}).get("evolution")
+    if evolution is None or not hasattr(evolution, "evo_db"):
+        raise SystemExit("EVOLUTION_DATABASE_NOT_CONNECTED")
+    db_check = evolution.evo_db.execute("PRAGMA quick_check").fetchone()[0]
+    print("EVOLUTION_DATABASE_CHECK", db_check)
+    if db_check != "ok":
+        raise SystemExit("EVOLUTION_DATABASE_QUICK_CHECK_FAILED")
+
+    if not getattr(bot, "market_scanner", None):
+        raise SystemExit("REAL_MARKET_SCANNER_NOT_CONNECTED")
 
     if missing_base or missing_advanced:
         raise SystemExit(
@@ -512,6 +550,55 @@ async def check():
     print("LEGACY_2025_WIRE_OK")
 
 asyncio.run(check())
+PY
+
+echo
+echo "=== REAL MARKET INTELLIGENCE SMOKE — READ ONLY / NO ORDERS ==="
+docker run --rm -i \
+  --env-file "$ENV_FILE" \
+  -v "$WORKSPACE_STATE:/workspace" \
+  -v "$LEGACY:/legacy:ro" \
+  "$LEGACY_IMAGE" \
+  sh -lc 'cp -a /legacy /tmp/leantrader-2025 && cd /tmp/leantrader-2025 && python -' <<'PY'
+import asyncio
+
+from LEGACY_2025_REAL_INTELLIGENCE_BRIDGE import install, smoke_real_market
+install()
+
+evidence = smoke_real_market()
+print("REAL_MARKET_PUBLIC_EVIDENCE", evidence)
+
+from SMART_SCALPING_ENGINE import SmartScalpingEngine
+
+async def verify_scalper():
+    engine = SmartScalpingEngine(None, None)
+    count = await engine.analyze_all_timeframes("BTC/USDT")
+    details = engine.mtf_analyzer.get_confluence_details("BTC/USDT")
+    frames = details.get("timeframes") or {}
+    real_frames = sum(
+        1
+        for row in frames.values()
+        if isinstance(row, dict)
+        and isinstance(row.get("indicators"), dict)
+        and row["indicators"].get("real_market_data") is True
+    )
+    print("REAL_SMART_SCALPER_TIMEFRAMES", count)
+    print("REAL_SMART_SCALPER_EVIDENCE_FRAMES", real_frames)
+    if count < 3 or real_frames < 3:
+        raise SystemExit("REAL_SMART_SCALPER_DATA_FAILED")
+    print("REAL_SMART_SCALPER_OK")
+
+asyncio.run(verify_scalper())
+
+from EVOLUTION_ENGINE import ULTIMATE_EVOLUTION_ENGINE
+probe = ULTIMATE_EVOLUTION_ENGINE.__new__(ULTIMATE_EVOLUTION_ENGINE)
+probe.active_engines = {"scalper_engine": {"pairs": ["BTC/USDT", "ETH/USDT"]}}
+probe.data_hub = None
+signals = probe.generate_scalping_signals()
+print("EVOLUTION_REAL_SCALPER_SIGNAL_COUNT", len(signals))
+if any(not row.get("real_market_data") for row in signals):
+    raise SystemExit("EVOLUTION_SCALPER_SYNTHETIC_SIGNAL_DETECTED")
+print("EVOLUTION_REAL_MARKET_PATH_OK")
 PY
 
 echo
@@ -588,12 +675,16 @@ for _ in $(seq 1 18); do
   DECISION_OK=0
   EXECUTION_OK=0
   SCALPER_OK=0
+  MARKET_OK=0
+  BRIDGE_OK=0
 
   printf '%s\n' "$LOGS" | grep -Eq 'Decision loop started|Decision:' && DECISION_OK=1 || true
   printf '%s\n' "$LOGS" | grep -Eq 'EXECUTION LOOP STARTED|EXECUTING:' && EXECUTION_OK=1 || true
   printf '%s\n' "$LOGS" | grep -Eq 'SMART SCALPING LOOP STARTED|Scalper generated' && SCALPER_OK=1 || true
+  printf '%s\n' "$LOGS" | grep -q 'REAL_MARKET_SCAN' && MARKET_OK=1 || true
+  printf '%s\n' "$LOGS" | grep -q 'LEGACY_2025_REAL_INTELLIGENCE_BRIDGE_INSTALLED' && BRIDGE_OK=1 || true
 
-  if [ "$DECISION_OK" -eq 1 ] && [ "$EXECUTION_OK" -eq 1 ] && [ "$SCALPER_OK" -eq 1 ]; then
+  if [ "$DECISION_OK" -eq 1 ] && [ "$EXECUTION_OK" -eq 1 ] && [ "$SCALPER_OK" -eq 1 ] && [ "$MARKET_OK" -eq 1 ] && [ "$BRIDGE_OK" -eq 1 ]; then
     READY=1
     break
   fi
@@ -620,7 +711,7 @@ docker ps --filter "name=$LEGACY_CONTAINER"   --format 'NAME={{.Names}} STATUS={
 
 echo
 echo "=== ENGINE START EVIDENCE ==="
-docker logs --since 3m "$LEGACY_CONTAINER" 2>&1   | grep -E 'AUTHENTICATED_TESTNET|ALL 50\+ ORCHESTRATORS RUNNING|Decision loop started|EXECUTION LOOP STARTED|SMART SCALPING LOOP STARTED|Scalper generated|Published .* signals|Decision:|EXECUTING:|SUBMITTING|ORDER ACKNOWLEDGED|Trade executed|Evolution|Sentient|Swarm|Learning loop started|Scouting loop started|ERROR|Traceback'   | tail -n 240 || true
+docker logs --since 3m "$LEGACY_CONTAINER" 2>&1   | grep -E 'AUTHENTICATED_TESTNET|REAL_MARKET_SCAN|REAL_SMART_SCALPER|LEGACY_2025_REAL_INTELLIGENCE|AUTHENTICATED POSITION|AUTHENTICATED POSITION SETTLED|Realized net P&L|ALL 50\+ ORCHESTRATORS RUNNING|Decision loop started|EXECUTION LOOP STARTED|SMART SCALPING LOOP STARTED|Scalper generated|Published .* signals|Decision:|EXECUTING:|SUBMITTING|Evolution|Sentient|Swarm|Learning loop started|Scouting loop started|ERROR|Traceback'   | tail -n 240 || true
 
 echo
 echo "=== CONTAINER MODE EVIDENCE ==="
