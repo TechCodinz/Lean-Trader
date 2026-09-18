@@ -1087,7 +1087,14 @@ class ExecutionOrchestrator:
         cancelled = False
 
         try:
-            await asyncio.to_thread(_cancel)
+            cancel_result = await asyncio.to_thread(_cancel)
+
+            # Some exposed ccxt clients are async objects. Their
+            # cancel_order() returns an awaitable rather than the final
+            # response. Await it here instead of silently dropping it.
+            if hasattr(cancel_result, "__await__"):
+                await cancel_result
+
             cancelled = True
 
             logger.info(
@@ -1364,7 +1371,7 @@ class ExecutionOrchestrator:
             is_dust, limits = self._is_non_executable_residual(
                 symbol,
                 size,
-                current_price,
+                exit_price,
             )
 
             if is_dust:
@@ -1372,7 +1379,7 @@ class ExecutionOrchestrator:
                     symbol,
                     position,
                     size,
-                    current_price,
+                    exit_price,
                     (
                         f"exchange_non_executable_residual:"
                         f"min_amount={limits.get('min_amount')}:"
@@ -1384,14 +1391,15 @@ class ExecutionOrchestrator:
                 return {
                     'symbol': symbol,
                     'status': 'tradable_closed_with_dust',
-                    'realized_pnl': 0.0,
-                    'realized_net_pnl': 0.0,
+                    'realized_pnl': None,
+                    'realized_net_pnl': None,
                     'residual_dust': dust,
                     'reason': reason,
                 }
 
             logger.warning(
-                f"🛑 {symbol} close NOT placed ({blocker}): position remains open"
+                f"🛑 {symbol} close NOT placed ({blocker}): "
+                f"{detail or 'no_exchange_detail'}; position remains open"
             )
             return None
 
@@ -1411,15 +1419,61 @@ class ExecutionOrchestrator:
 
         sold = min(size, float(fill.get('filled') or 0.0))
         fill_price = float(fill.get('average') or 0.0)
+
+        if sold <= 0.0 or fill_price <= 0.0:
+            close_order_id = str(
+                fill.get('order_id')
+                or ((receipt.get('order') or {}).get('id'))
+                or ''
+            )
+
+            # An unfilled SELL can reserve BTC/ETH/etc. just as an
+            # unfilled BUY can reserve USDT. Cancel only this exact
+            # acknowledged close after its reconciliation timeout.
+            await self._cancel_ack_without_fill(
+                close_order_id,
+                symbol,
+            )
+
+            # One final reconciliation covers the race where the close
+            # filled immediately before cancellation reached the venue.
+            receipt = await asyncio.to_thread(
+                reconcile_authenticated_receipt,
+                receipt,
+                preflight.normalize_symbol(symbol) or symbol,
+                mode=mode,
+                exchange_id=exchange_id,
+                timeout_seconds=2.0,
+            )
+
+            fill = reconcile_fill(
+                receipt,
+                preflight.normalize_symbol(symbol) or symbol,
+            )
+
+            sold = min(
+                size,
+                float(fill.get('filled') or 0.0),
+            )
+
+            fill_price = float(
+                fill.get('average') or 0.0
+            )
+
         if sold <= 0.0 or fill_price <= 0.0:
             preflight.record_blocker(
                 preflight.EXCHANGE_REJECT,
                 f"close:{symbol}:ack_without_authenticated_fill",
             )
+
+            preflight.invalidate_balance_cache()
+
             logger.warning(
                 f"🛑 {symbol} close acknowledged without authenticated fill; "
+                "stale close reservation cancellation attempted; "
                 "position remains owned"
             )
+
             return None
 
         preflight.record_event('fills')
