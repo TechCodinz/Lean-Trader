@@ -9,7 +9,6 @@ CURRENT_INTEL="leantrader-intelligence-only"
 LEGACY_CONTAINER="leantrader-2025-testnet"
 ENV_FILE="/opt/leantrader/leantrader-2025-testnet.env"
 LEGACY_IMAGE="leantrader-2025-runtime:local"
-LEGACY_IMAGE="leantrader-2025-runtime:local"
 
 cd "$SOURCE"
 
@@ -95,7 +94,7 @@ for key in ANTHROPIC_API_KEY OPENAI_API_KEY HUGGINGFACE_TOKEN QISKIT_IBM_TOKEN; 
   fi
 done
 
-BASE_BASE_IMAGE="$(docker inspect "$CURRENT_RPB" --format '{{.Config.Image}}')"
+BASE_IMAGE="$(docker inspect "$CURRENT_RPB" --format '{{.Config.Image}}')"
 echo "base_runtime_image=$BASE_IMAGE"
 
 # Historical RUN_BOT.py loads /app/.env itself.  Replace only this detached
