@@ -15,7 +15,7 @@ from src.leantrader.execution import intent as execution_intent
 from src.leantrader.execution import inventory as inventory_reconciler
 from src.leantrader.execution import recovery as inventory_recovery
 from src.leantrader.execution import preflight
-from src.leantrader.execution.router import route_order
+from src.leantrader.execution.router import route_order, route_balance
 from rpb_fill_reconciliation import reconcile_authenticated_receipt
 from rpb_position_lifecycle import reconcile_fill
 
@@ -565,6 +565,10 @@ class ExecutionOrchestrator:
         preflight.record_event('acknowledged')
         order_id = str(((receipt or {}).get('order') or {}).get('id') or '')
         intent.advance(execution_intent.EXCHANGE_ORDER, order_id)
+        logger.info(
+            f"RUNTIME_PROOF TESTNET_ACK symbol={prepared.symbol} order_id={order_id} "
+            f"exchange={receipt.get('exchange')} mode={receipt.get('execution_mode')}"
+        )
 
         # An acknowledgement is not a position. Reuse the already-proven RPB
         # authenticated reconciliation path and never submit a second order.
@@ -600,6 +604,10 @@ class ExecutionOrchestrator:
 
         preflight.record_event('fills')
         intent.succeed(execution_intent.FILL, str(filled))
+        logger.info(
+            f"RUNTIME_PROOF AUTHENTICATED_FILL symbol={prepared.symbol} "
+            f"order_id={fill.get('order_id') or order_id} filled={filled} average={avg_price}"
+        )
 
         fee_base = float(fill.get('fee_base') or 0.0)
         fee_quote = float(fill.get('fee_quote') or 0.0)
@@ -677,6 +685,11 @@ class ExecutionOrchestrator:
 
         await self.data_hub.publish_trade(trade_record)
         self.total_trades += 1
+
+        logger.info(
+            f"RUNTIME_PROOF POSITION_OWNER symbol={prepared.symbol} owned_size={owned_size} "
+            f"entry_order_id={trade_record['order_id']}"
+        )
 
         logger.info("✅ AUTHENTICATED POSITION OPENED:")
         logger.info(f"   Symbol: {prepared.symbol}")
@@ -974,6 +987,11 @@ class ExecutionOrchestrator:
             return None
 
         preflight.record_event('fills')
+        logger.info(
+            f"RUNTIME_PROOF AUTHENTICATED_CLOSE_FILL symbol={symbol} "
+            f"order_id={fill.get('order_id') or ((receipt.get('order') or {}).get('id'))} "
+            f"filled={sold} average={fill_price}"
+        )
 
         fill_cost = float(fill.get('cost') or (sold * fill_price))
         exit_fee = float(fill.get('fee_quote') or 0.0)
@@ -1055,6 +1073,39 @@ class ExecutionOrchestrator:
 
         await self.data_hub.publish_trade(close_record)
 
+        logger.info(
+            f"RUNTIME_PROOF REALIZED_NET_AFTER_COSTS symbol={symbol} net={net_pnl:.8f} "
+            f"fees={entry_fee + exit_fee:.8f} status={close_record['status']}"
+        )
+
+        # Prove that the authenticated venue balance is readable again after
+        # settlement. This is a read-only balance check; it does not submit
+        # another order and does not fabricate recycled capital.
+        try:
+            recycled_balance = await asyncio.to_thread(
+                route_balance,
+                mode=mode,
+                exchange_id=exchange_id,
+            )
+            free_map = (recycled_balance or {}).get('free') or {}
+            free_quote = free_map.get('USDT')
+            if free_quote is None:
+                free_quote = ((recycled_balance or {}).get('USDT') or {}).get('free')
+            if free_quote is not None:
+                logger.info(
+                    f"RUNTIME_PROOF CAPITAL_RECYCLED symbol={symbol} "
+                    f"free_USDT={float(free_quote):.8f}"
+                )
+            else:
+                logger.warning(
+                    f"RUNTIME_PROOF CAPITAL_RECYCLE_BALANCE_UNAVAILABLE symbol={symbol}"
+                )
+        except Exception as exc:
+            logger.warning(
+                f"RUNTIME_PROOF CAPITAL_RECYCLE_CHECK_FAILED symbol={symbol} "
+                f"error={type(exc).__name__}"
+            )
+
         logger.info("💰 AUTHENTICATED POSITION SETTLED:")
         logger.info(f"   Symbol: {symbol}")
         logger.info(f"   Order ID: {close_record['order_id']}")
@@ -1134,6 +1185,9 @@ class ExecutionOrchestrator:
             'winning_trades': self.winning_trades,
             'win_rate': self.get_win_rate(),
             'realized_net_profit': self.total_profit,
+            # October-2025 compatibility alias. This is the exact same
+            # authenticated realized-net value, not a synthetic/estimated PnL.
+            'total_profit': self.total_profit,
             'open_positions': len(self.risk_manager.open_positions),
             'daily_pnl': self.risk_manager.daily_pnl,
             'daily_trades': self.risk_manager.daily_trades,
