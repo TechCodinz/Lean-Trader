@@ -29,6 +29,123 @@ def _read_json(path: Path) -> Dict[str, Any]:
         return {}
 
 
+def assess_testnet_execution_book(
+    orderbook: Any,
+    *,
+    target_quote: float,
+    max_spread_bps: float = 250.0,
+    min_depth_multiple: float = 1.25,
+    depth_levels: int = 5,
+) -> Dict[str, Any]:
+    """Decide whether a Testnet spot book can support a small round trip.
+
+    Public production data may generate the signal, but authenticated Testnet
+    execution must have both entry-side and exit-side liquidity. This helper is
+    deliberately pure: it does not place orders or grant authority.
+    """
+
+    book = orderbook if isinstance(orderbook, dict) else {}
+    raw_bids = book.get("bids") if isinstance(book.get("bids"), list) else []
+    raw_asks = book.get("asks") if isinstance(book.get("asks"), list) else []
+
+    def _levels(rows):
+        out = []
+        for row in rows or []:
+            try:
+                price = float(row[0])
+                qty = float(row[1])
+            except (TypeError, ValueError, IndexError):
+                continue
+            if price > 0.0 and qty > 0.0:
+                out.append((price, qty))
+        return out
+
+    bids = _levels(raw_bids)
+    asks = _levels(raw_asks)
+    if not bids and not asks:
+        return {
+            "ok": False,
+            "reason": "missing_two_sided_liquidity",
+            "spread_bps": None,
+            "bid_depth_quote": 0.0,
+            "ask_depth_quote": 0.0,
+        }
+    if not asks:
+        return {
+            "ok": False,
+            "reason": "missing_ask_liquidity",
+            "spread_bps": None,
+            "bid_depth_quote": sum(p * q for p, q in bids[:depth_levels]),
+            "ask_depth_quote": 0.0,
+        }
+    if not bids:
+        return {
+            "ok": False,
+            "reason": "missing_bid_liquidity",
+            "spread_bps": None,
+            "bid_depth_quote": 0.0,
+            "ask_depth_quote": sum(p * q for p, q in asks[:depth_levels]),
+        }
+
+    best_bid = bids[0][0]
+    best_ask = asks[0][0]
+    mid = (best_bid + best_ask) / 2.0
+    spread_bps = ((best_ask - best_bid) / mid) * 10_000.0 if mid > 0.0 else float("inf")
+
+    bid_depth = sum(p * q for p, q in bids[:depth_levels])
+    ask_depth = sum(p * q for p, q in asks[:depth_levels])
+    required_depth = max(0.0, float(target_quote or 0.0)) * max(
+        1.0, float(min_depth_multiple or 1.0)
+    )
+
+    if best_ask <= best_bid or spread_bps < 0.0:
+        return {
+            "ok": False,
+            "reason": "crossed_or_invalid_book",
+            "spread_bps": spread_bps,
+            "best_bid": best_bid,
+            "best_ask": best_ask,
+            "bid_depth_quote": bid_depth,
+            "ask_depth_quote": ask_depth,
+            "required_depth_quote": required_depth,
+        }
+
+    if spread_bps > max(0.0, float(max_spread_bps or 0.0)):
+        return {
+            "ok": False,
+            "reason": "spread_too_wide",
+            "spread_bps": spread_bps,
+            "best_bid": best_bid,
+            "best_ask": best_ask,
+            "bid_depth_quote": bid_depth,
+            "ask_depth_quote": ask_depth,
+            "required_depth_quote": required_depth,
+        }
+
+    if bid_depth + 1e-12 < required_depth or ask_depth + 1e-12 < required_depth:
+        return {
+            "ok": False,
+            "reason": "insufficient_roundtrip_depth",
+            "spread_bps": spread_bps,
+            "best_bid": best_bid,
+            "best_ask": best_ask,
+            "bid_depth_quote": bid_depth,
+            "ask_depth_quote": ask_depth,
+            "required_depth_quote": required_depth,
+        }
+
+    return {
+        "ok": True,
+        "reason": "executable",
+        "spread_bps": spread_bps,
+        "best_bid": best_bid,
+        "best_ask": best_ask,
+        "bid_depth_quote": bid_depth,
+        "ask_depth_quote": ask_depth,
+        "required_depth_quote": required_depth,
+    }
+
+
 def extract_order_id(receipt: Any) -> str:
     if not isinstance(receipt, dict):
         return ""
