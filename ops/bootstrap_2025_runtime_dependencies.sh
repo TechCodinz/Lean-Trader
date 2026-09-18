@@ -84,7 +84,7 @@ import importlib
 import sys
 
 modules = [
-    "pytest", "numpy", "pandas", "scipy", "sklearn", "ccxt",
+    "pytest", "numpy", "pandas", "scipy", "sklearn", "numba", "tiktoken", "multipart", "ccxt",
     "yaml", "aiohttp", "psutil", "dotenv", "redis", "web3",
     "bs4", "lxml", "feedparser", "tensorflow", "keras", "torch",
     "transformers", "xgboost", "lightgbm", "catboost", "joblib",
