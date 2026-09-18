@@ -372,16 +372,33 @@ def _real_evolution_scalping_signals(self):
 
             ticker = _FEED.ticker(pair)
             price = _f(ticker.get("last") or ticker.get("close")) or closes[-1]
+            # Restore the October-2025 fast-growth parameters rather than
+            # inventing a new lifecycle: FastScalper targeted 0.6% moves with
+            # a 60-second max hold; SteadyProfitExtractor used a tight 0.8%
+            # protective stop.
+            fast_target = 0.006
+            fast_hold = 60.0
+            protective_stop = 0.008
+            try:
+                from STEADY_PROFIT_EXTRACTOR import FastScalper, SteadyProfitExtractor
+                fast_cfg = FastScalper()
+                steady_cfg = SteadyProfitExtractor.__new__(SteadyProfitExtractor)
+                fast_target = _f(getattr(fast_cfg, "target_move", fast_target), fast_target)
+                fast_hold = _f(getattr(fast_cfg, "hold_time", fast_hold), fast_hold)
+                protective_stop = 0.008
+            except Exception:
+                pass
+
             signals.append(
                 {
                     "pair": pair,
                     "action": "BUY" if score > 0 else "SELL",
                     "confidence": confidence,
                     "price": price,
-                    "target_profit": 0.006,
-                    "take_profit_pct": 0.006,
-                    "stop_loss_pct": 0.003,
-                    "target_hold_seconds": 60.0,
+                    "target_profit": fast_target,
+                    "take_profit_pct": fast_target,
+                    "stop_loss_pct": protective_stop,
+                    "target_hold_seconds": fast_hold,
                     "source_strategy": "2025_evolution_fast_scalper_real_market",
                     "real_market_data": True,
                     "ema_fast": fast,
