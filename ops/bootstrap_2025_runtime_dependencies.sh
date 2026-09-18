@@ -74,12 +74,20 @@ RUN pip check
 EOF
 
 echo
-echo "=== BUILDING FULL 2025 DEPENDENCY IMAGE ==="
-docker build -t "$LEGACY_IMAGE" -f /tmp/Dockerfile.leantrader-2025-deps /tmp
+echo "=== BUILDING / REUSING FULL 2025 DEPENDENCY IMAGE ==="
+if docker image inspect "$LEGACY_IMAGE" >/dev/null 2>&1; then
+  echo "Reusing existing $LEGACY_IMAGE"
+else
+  docker build -t "$LEGACY_IMAGE" -f /tmp/Dockerfile.leantrader-2025-deps /tmp
+fi
+
+echo
+echo "=== PIP CONSISTENCY CHECK ==="
+docker run --rm "$LEGACY_IMAGE" pip check
 
 echo
 echo "=== DEPENDENCY IMPORT MATRIX ==="
-docker run --rm "$LEGACY_IMAGE" python - <<'PY'
+docker run --rm -i "$LEGACY_IMAGE" python - <<'PY'
 import importlib
 import sys
 
@@ -120,7 +128,7 @@ PY
 
 echo
 echo "=== PYTEST / TENSOR / KERAS PROOF ==="
-docker run --rm "$LEGACY_IMAGE" python - <<'PY'
+docker run --rm -i "$LEGACY_IMAGE" python - <<'PY'
 import pytest
 import tensorflow as tf
 import keras
@@ -173,15 +181,14 @@ PY
 
 echo
 echo "=== SOURCE SYNTAX CHECK — NO PYC WRITES ==="
-docker run --rm \
-  -v "$LEGACY:/app:ro" \
-  -w /app \
+docker run --rm -i \
+  -v "$LEGACY:/legacy:ro" \
   "$LEGACY_IMAGE" \
   python - <<'PY'
 from pathlib import Path
 import sys
 
-root = Path("/app")
+root = Path("/legacy")
 bad = []
 checked = 0
 skip_parts = {".git", "__pycache__", ".venv", "venv", "runtime", "node_modules"}
@@ -210,10 +217,9 @@ PY
 echo
 echo "=== EXACT 2025 ORCHESTRATOR IMPORT SMOKE ==="
 docker run --rm \
-  -v "$LEGACY:/app:ro" \
-  -w /app \
+  -v "$LEGACY:/legacy:ro" \
   "$LEGACY_IMAGE" \
-  python -c 'from COMPLETE_ULTIMATE_ORCHESTRATOR import CompleteUltimateOrchestrator; print("LEGACY_2025_IMPORT_OK")'
+  sh -lc 'cp -a /legacy /tmp/leantrader-2025 && cd /tmp/leantrader-2025 && python -c '"'"'from COMPLETE_ULTIMATE_ORCHESTRATOR import CompleteUltimateOrchestrator; print("LEGACY_2025_IMPORT_OK")'"'"''
 
 echo
 echo "=== BOOTSTRAP COMPLETE ==="
