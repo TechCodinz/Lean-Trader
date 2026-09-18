@@ -640,6 +640,63 @@ print(
 PYFIX_RPB_OS
 
 
+
+# FIX_EVOLUTION_MODEL_JSON_20260918
+# The historical model dict stores spawn_time as datetime.now(). SQLite can
+# retain the timestamp, but json.dumps(model) cannot serialize datetime.
+# Convert unsupported objects to their ISO representation only for the JSON
+# evidence blob; do not alter model generation/performance logic.
+python3 - "$LEGACY/EVOLUTION_ENGINE.py" <<'PYFIX_EVO_JSON'
+from pathlib import Path
+import sys
+
+p = Path(sys.argv[1])
+src = p.read_text()
+
+old = "json.dumps(model),"
+
+new = (
+    "json.dumps("
+    "model, "
+    "default=lambda obj: "
+    "obj.isoformat() "
+    "if hasattr(obj, 'isoformat') "
+    "else str(obj)"
+    "),"
+)
+
+count = src.count(old)
+
+if count == 0:
+    if "default=lambda obj:" in src:
+        print("EVOLUTION_MODEL_JSON_ALREADY_FIXED")
+    else:
+        raise SystemExit(
+            "ABORT: json.dumps(model) registration target not found"
+        )
+else:
+    if count != 1:
+        raise SystemExit(
+            f"ABORT: expected one json.dumps(model), found {count}"
+        )
+
+    src = src.replace(
+        old,
+        new,
+        1,
+    )
+
+    compile(
+        src,
+        str(p),
+        "exec",
+    )
+
+    p.write_text(src)
+
+    print("EVOLUTION_MODEL_JSON_FIXED")
+PYFIX_EVO_JSON
+
 echo "=== SOURCE SYNTAX CHECK — NO PYC WRITES ==="
 docker run --rm -i \
   -v "$LEGACY:/legacy:ro" \
@@ -926,7 +983,7 @@ for _ in $(seq 1 18); do
   printf '%s\n' "$LOGS" | grep -Eq 'Decision Engine wired|Decision:' && DECISION_OK=1 || true
   printf '%s\n' "$LOGS" | grep -Eq 'EXECUTION ORCHESTRATOR WIRED|EXECUTING:' && EXECUTION_OK=1 || true
   printf '%s\n' "$LOGS" | grep -Eq 'SMART SCALPING ENGINE WIRED|Scalper generated' && SCALPER_OK=1 || true
-  printf '%s\n' "$LOGS" | grep -q 'REAL_MARKET_SCAN' && MARKET_OK=1 || true
+  printf '%s\n' "$LOGS" | grep -Eq 'REAL_MARKET_SCAN .*hub_market=[1-9][0-9]*' && MARKET_OK=1 || true
   printf '%s\n' "$LOGS" | grep -q 'LEGACY_2025_REAL_INTELLIGENCE_BRIDGE_INSTALLED' && BRIDGE_OK=1 || true
   printf '%s\n' "$LOGS" | grep -Eq 'Evolution database initialized|Evidence Evolution cycle' && EVOLUTION_OK=1 || true
   printf '%s\n' "$LOGS" | grep -Eq 'BTC/USDT|ETH/USDT|SOL/USDT|DOGE/USDT|XRP/USDT|ADA/USDT|BNB/USDT' && CRYPTO_SCALPER_OK=1 || true

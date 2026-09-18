@@ -1076,65 +1076,275 @@ async def _no_simulated_arbitrage_execution(self, *_args, **_kwargs) -> bool:
 
 
 async def _real_dynamic_scanning(self):
-    interval = max(15.0, _f(os.getenv("DYNAMIC_SCAN_SECONDS", "60"), 60.0))
+    """
+    Drive the historical dynamic scanner from authentic public-market data.
+
+    Historical discovery remains available, but a populated exchange mapping is
+    not treated as proof that ticker retrieval succeeded. If those exchange
+    objects fail or yield no usable spot snapshots, fall back to a fresh
+    unauthenticated Bybit production-public client.
+
+    Execution authority remains separate and TESTNET-only.
+    """
+    interval = max(
+        15.0,
+        _f(os.getenv("DYNAMIC_SCAN_SECONDS", "60"), 60.0),
+    )
+
+    async def ingest_tickers(exchange_name, tickers):
+        from datetime import datetime
+
+        if not isinstance(tickers, dict) or not tickers:
+            return 0, 0, 0
+
+        usable = []
+        discovered = set()
+        trending_added = 0
+
+        for symbol, raw in tickers.items():
+            if "/USDT" not in str(symbol) or ":" in str(symbol):
+                continue
+
+            ticker = raw or {}
+
+            last = _f(
+                ticker.get("last")
+                or ticker.get("close")
+            )
+            if last <= 0.0:
+                continue
+
+            quote_volume = _f(ticker.get("quoteVolume"))
+
+            # Some public ticker implementations omit quoteVolume but expose
+            # baseVolume. Derive quote turnover only from authentic values.
+            if quote_volume <= 0.0:
+                base_volume = _f(ticker.get("baseVolume"))
+                if base_volume > 0.0:
+                    quote_volume = base_volume * last
+
+            pct = _f(ticker.get("percentage"))
+
+            # If percentage is missing, derive it from authentic open/last.
+            if pct == 0.0:
+                open_price = _f(ticker.get("open"))
+                if open_price > 0.0:
+                    pct = ((last - open_price) / open_price) * 100.0
+
+            usable.append(
+                (quote_volume, str(symbol), ticker, last, pct)
+            )
+
+            if quote_volume >= self.min_24h_volume_usd:
+                discovered.add(str(symbol))
+
+                if (
+                    abs(pct) >= self.min_price_change_pct
+                    and len(self.trending_pairs) < self.trending_pairs.maxlen
+                ):
+                    existing = {
+                        item.get("symbol")
+                        for item in self.trending_pairs
+                        if isinstance(item, dict)
+                    }
+
+                    if str(symbol) not in existing:
+                        self.trending_pairs.append(
+                            {
+                                "symbol": str(symbol),
+                                "exchange": exchange_name,
+                                "volume_24h": quote_volume,
+                                "price_change_pct": pct,
+                                "discovered_at": datetime.now(),
+                                "authentic_market_data": True,
+                                "market_data_source":
+                                    "public_exchange_ticker",
+                            }
+                        )
+                        trending_added += 1
+
+        # Authentic high-volume discovery directly expands the historical
+        # scanner universe rather than depending on another scanner path.
+        self.active_pairs.update(discovered)
+
+        usable.sort(
+            reverse=True,
+            key=lambda row: row[0],
+        )
+
+        published = 0
+
+        # Bound hub pressure while still giving decision/scouting layers broad
+        # real-market coverage.
+        for (
+            quote_volume,
+            symbol,
+            ticker,
+            last,
+            pct,
+        ) in usable[:60]:
+            await self.data_hub.publish_market_data(
+                {
+                    "type": "market_snapshot",
+                    "symbol": symbol,
+                    "exchange": exchange_name,
+                    "source":
+                        "dynamic_market_scanner_real_tickers",
+                    "price": last,
+                    "last": last,
+                    "bid": _f(ticker.get("bid")),
+                    "ask": _f(ticker.get("ask")),
+                    "volume_24h": quote_volume,
+                    "change_24h_pct": pct,
+                    "timestamp": time.time(),
+                    "authentic_market_data": True,
+                }
+            )
+            published += 1
+
+        return published, len(discovered), trending_added
+
     while True:
+        fallback_exchange = None
+
         try:
-            await self.scan_all_exchanges()
+            # Preserve the October-2025 discovery machinery. Failure here must
+            # not prevent public-market evidence from reaching the hub.
+            try:
+                await self.scan_all_exchanges()
+            except Exception as exc:
+                print(
+                    "REAL_MARKET_HISTORICAL_SCAN_ERROR "
+                    f"{type(exc).__name__}: {exc}"
+                )
+
             self.scan_count += 1
+
             from datetime import datetime
             self.last_scan = datetime.now()
 
             actual = self._extract_ccxt_exchanges()
-            if not actual:
-                actual = await self._create_fallback_exchanges()
 
-            # Publish a bounded market snapshot set into the historical hub.
+            if not actual:
+                try:
+                    actual = await self._create_fallback_exchanges()
+                except Exception as exc:
+                    print(
+                        "REAL_MARKET_EXISTING_FALLBACK_ERROR "
+                        f"{type(exc).__name__}: {exc}"
+                    )
+                    actual = {}
+
+            total_published = 0
+            total_discovered = 0
+            total_trending = 0
+            successful_sources = 0
+
+            # Use at most two already-available public exchange feeds.
             for exchange_name, exchange in list(actual.items())[:2]:
                 try:
                     tickers = await exchange.fetch_tickers()
-                except Exception:
-                    continue
-                candidates = []
-                for symbol, ticker in (tickers or {}).items():
-                    if "/USDT" not in symbol or ":" in symbol:
-                        continue
-                    volume = _f((ticker or {}).get("quoteVolume"))
-                    candidates.append((volume, symbol, ticker))
-                candidates.sort(reverse=True, key=lambda x: x[0])
-                for volume, symbol, ticker in candidates[:40]:
-                    last = _f((ticker or {}).get("last") or (ticker or {}).get("close"))
-                    if last <= 0.0:
-                        continue
-                    await self.data_hub.publish_market_data(
-                        {
-                            "type": "market_snapshot",
-                            "symbol": symbol,
-                            "exchange": exchange_name,
-                            "source": "dynamic_market_scanner_real_tickers",
-                            "price": last,
-                            "last": last,
-                            "bid": _f((ticker or {}).get("bid")),
-                            "ask": _f((ticker or {}).get("ask")),
-                            "volume_24h": volume,
-                            "change_24h_pct": _f((ticker or {}).get("percentage")),
-                            "timestamp": time.time(),
-                            "authentic_market_data": True,
-                        }
+                    published, discovered, trending = (
+                        await ingest_tickers(
+                            exchange_name,
+                            tickers,
+                        )
                     )
-                break
+
+                    total_published += published
+                    total_discovered += discovered
+                    total_trending += trending
+
+                    if published > 0:
+                        successful_sources += 1
+
+                except Exception as exc:
+                    print(
+                        "REAL_MARKET_SOURCE_ERROR "
+                        f"exchange={exchange_name} "
+                        f"{type(exc).__name__}: {exc}"
+                    )
+
+            # Important distinction:
+            # existing exchange OBJECTS != working public market evidence.
+            #
+            # If nothing usable arrived, create a fresh public Bybit spot
+            # client. No API key/secret is supplied.
+            if total_published == 0:
+                import ccxt.async_support as ccxt_async
+
+                fallback_exchange = ccxt_async.bybit(
+                    {
+                        "enableRateLimit": True,
+                        "options": {
+                            "defaultType": "spot",
+                        },
+                    }
+                )
+
+                try:
+                    await fallback_exchange.load_markets()
+                    tickers = await fallback_exchange.fetch_tickers()
+
+                    published, discovered, trending = (
+                        await ingest_tickers(
+                            "bybit_public_production",
+                            tickers,
+                        )
+                    )
+
+                    total_published += published
+                    total_discovered += discovered
+                    total_trending += trending
+
+                    if published > 0:
+                        successful_sources += 1
+
+                finally:
+                    try:
+                        await fallback_exchange.close()
+                    except Exception:
+                        pass
+
+                    fallback_exchange = None
 
             await self.publish_trending_signals()
+
+            hub_market = len(
+                getattr(
+                    self.data_hub,
+                    "recent_market_data",
+                    [],
+                )
+            )
+
             print(
                 "REAL_MARKET_SCAN "
                 f"active_pairs={len(self.active_pairs)} "
                 f"trending={len(self.trending_pairs)} "
-                f"hub_market={len(getattr(self.data_hub, 'recent_market_data', []))}"
+                f"hub_market={hub_market} "
+                f"published={total_published} "
+                f"discovered={total_discovered} "
+                f"sources={successful_sources}"
             )
-            await asyncio.sleep(interval)
-        except Exception as exc:
-            print(f"REAL_MARKET_SCAN_ERROR {type(exc).__name__}: {exc}")
-            await asyncio.sleep(min(60.0, interval))
 
+            await asyncio.sleep(interval)
+
+        except Exception as exc:
+            if fallback_exchange is not None:
+                try:
+                    await fallback_exchange.close()
+                except Exception:
+                    pass
+
+            print(
+                "REAL_MARKET_SCAN_ERROR "
+                f"{type(exc).__name__}: {exc}"
+            )
+
+            await asyncio.sleep(
+                min(60.0, interval)
+            )
 
 def install() -> None:
     global _INSTALLED
