@@ -256,18 +256,6 @@ class UnifiedRPBRuntime(REAL_PROFIT_BOT):
         max_spread_bps = float(
             os.getenv("RPB_TESTNET_MAX_ENTRY_SPREAD_BPS", "250") or 250
         )
-        take_profit_bps = float(
-            getattr(self.exit_evaluator, "take_profit_bps", 50.0) or 50.0
-        )
-        configured_roundtrip_cap = float(
-            os.getenv("RPB_TESTNET_MAX_ROUNDTRIP_FRICTION_BPS", "0") or 0
-        )
-        economic_roundtrip_cap = max(5.0, take_profit_bps * 0.5)
-        max_roundtrip_friction_bps = (
-            min(configured_roundtrip_cap, economic_roundtrip_cap)
-            if configured_roundtrip_cap > 0
-            else economic_roundtrip_cap
-        )
         min_depth_multiple = float(
             os.getenv("RPB_TESTNET_MIN_DEPTH_MULTIPLE", "1.25") or 1.25
         )
@@ -290,7 +278,6 @@ class UnifiedRPBRuntime(REAL_PROFIT_BOT):
                 target_quote=target_quote,
                 max_spread_bps=max_spread_bps,
                 min_depth_multiple=min_depth_multiple,
-                max_roundtrip_friction_bps=max_roundtrip_friction_bps,
             )
         except Exception as exc:
             assessment = {
@@ -309,11 +296,8 @@ class UnifiedRPBRuntime(REAL_PROFIT_BOT):
         spread = assessment.get("spread_bps")
         bid_depth = float(assessment.get("bid_depth_quote") or 0.0)
         ask_depth = float(assessment.get("ask_depth_quote") or 0.0)
-        roundtrip = assessment.get("roundtrip_friction_bps")
         detail = (
             f"{reason}; spread_bps={spread}; "
-            f"roundtrip_friction_bps={roundtrip}; "
-            f"roundtrip_cap_bps={max_roundtrip_friction_bps}; "
             f"bid_depth=${bid_depth:.4f}; ask_depth=${ask_depth:.4f}; "
             f"target=${target_quote:.4f}"
         )
