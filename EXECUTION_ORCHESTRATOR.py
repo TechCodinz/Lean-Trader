@@ -303,14 +303,30 @@ class ExecutionOrchestrator:
                 logger.debug("No symbol in decision")
                 return
 
-            # Validate confidence. This threshold is not lowered to produce
-            # activity; attempts that fail it are counted so a quiet run can
-            # be attributed rather than guessed at.
-            if confidence < self.min_confidence:
-                # A structured rejection, not a silent end. Most live
-                # decisions sit below the threshold, and that is an
-                # acceptable answer -- but it has to be distinguishable from
-                # a broken handoff.
+            # A specialist backed by authentic market evidence has already
+            # made its own suitability decision. Do not let one modern global
+            # confidence threshold serialize/veto every 2025 specialist. The
+            # legacy threshold remains for unverified/synthetic-era sources.
+            signal_data = signal.get('data', {}) if isinstance(signal.get('data'), dict) else {}
+            evidence_backed = bool(
+                signal.get('real_market_data')
+                or signal_data.get('real_market_data')
+                or signal.get('authentic_market_data')
+                or signal_data.get('authentic_market_data')
+            )
+            if confidence <= 0.0:
+                preflight.record_blocker(
+                    preflight.CONFIDENCE_BELOW_THRESHOLD,
+                    f"{symbol}:non_positive_confidence",
+                )
+                intent.stop(
+                    execution_intent.THRESHOLD,
+                    execution_intent.DECISION_REJECTED_CONFIDENCE,
+                    "non-positive specialist confidence",
+                )
+                return
+
+            if confidence < self.min_confidence and not evidence_backed:
                 preflight.record_blocker(
                     preflight.CONFIDENCE_BELOW_THRESHOLD,
                     f"{symbol} {confidence:.4f}<{self.min_confidence:.4f}",
@@ -321,7 +337,10 @@ class ExecutionOrchestrator:
                     f"confidence {confidence:.4f} < threshold "
                     f"{self.min_confidence:.4f}",
                 )
-                logger.debug(f"Low confidence: {confidence:.2%} < {self.min_confidence:.2%}")
+                logger.debug(
+                    f"Unverified source below confidence threshold: "
+                    f"{confidence:.2%} < {self.min_confidence:.2%}"
+                )
                 return
 
             # USE ADVANCED ACTION DECIDER if available
