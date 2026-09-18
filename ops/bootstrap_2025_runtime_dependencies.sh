@@ -43,7 +43,7 @@ RUN python -m pip install --upgrade pip setuptools wheel
 # previous LeanTrader import-smoke/restoration work.
 RUN pip install --no-cache-dir --prefer-binary \
       pytest pytest-asyncio pytest-cov pytest-mock black flake8 mypy \
-      numpy pandas scipy scikit-learn joblib \
+      numpy pandas scipy scikit-learn joblib numba tiktoken python-multipart \
       ccxt PyYAML aiohttp psutil python-dotenv redis web3 \
       requests httpx beautifulsoup4 lxml feedparser \
       fastapi uvicorn sqlalchemy prometheus-client
