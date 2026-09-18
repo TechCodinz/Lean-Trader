@@ -285,21 +285,87 @@ docker run --rm \
   sh -lc 'cp -a /legacy /tmp/leantrader-2025 && cd /tmp/leantrader-2025 && python -c '"'"'from COMPLETE_ULTIMATE_ORCHESTRATOR import CompleteUltimateOrchestrator; print("LEGACY_2025_IMPORT_OK")'"'"''
 
 echo
+echo "=== FULL 2025 INITIALIZE + WIRE SMOKE — NO LOOPS / NO ORDERS ==="
+docker run --rm -i \
+  --name leantrader-2025-wire-smoke \
+  --env-file "$ENV_FILE" \
+  -v "$LEGACY:/legacy:ro" \
+  "$LEGACY_IMAGE" \
+  sh -lc 'cp -a /legacy /tmp/leantrader-2025 && cd /tmp/leantrader-2025 && python -' <<'PY'
+import asyncio
+
+from COMPLETE_ULTIMATE_ORCHESTRATOR import CompleteUltimateOrchestrator
+
+async def check():
+    bot = CompleteUltimateOrchestrator(mode="testnet")
+    await bot.initialize_all_systems()
+    await bot.wire_all_systems()
+
+    base = set(getattr(bot, "orchestrators", {}) or {})
+    advanced = set(getattr(bot, "advanced_orchestrators", {}) or {})
+
+    required_base = {"learning", "scouting", "decision"}
+    required_advanced = {"execution", "smart_scalping"}
+
+    missing_base = sorted(required_base - base)
+    missing_advanced = sorted(required_advanced - advanced)
+
+    print("WIRE_BASE", sorted(base))
+    print("WIRE_ADVANCED", sorted(advanced))
+    print("SMART_SCALPING_PRESENT", bool(getattr(bot, "smart_scalping", None)))
+    print("SENTIENT_BRAIN_PRESENT", bool(getattr(bot, "sentient_brain", None)))
+    print("REAL_PROFIT_BOT_PRESENT", bool(getattr(bot, "real_profit_bot", None)))
+
+    if missing_base or missing_advanced:
+        raise SystemExit(
+            f"WIRE_SMOKE_FAILED base={missing_base} advanced={missing_advanced}"
+        )
+
+    print("LEGACY_2025_WIRE_OK")
+
+asyncio.run(check())
+PY
+
+echo
 echo "=== CUTOVER TO 2025 CONTROLLER ==="
 docker rm -f "$LEGACY_CONTAINER" >/dev/null 2>&1 || true
 docker stop "$CURRENT_RPB" >/dev/null 2>&1 || true
 
 docker run -d   --name "$LEGACY_CONTAINER"   --restart unless-stopped   --env-file "$ENV_FILE"   -v "$LEGACY:/app"   -w /app   "$LEGACY_IMAGE"   python RUN_BOT.py --testnet >/dev/null
 
-sleep 25
+echo "Waiting for 2025 controller engine loops to come online..."
+READY=0
+for _ in $(seq 1 18); do
+  sleep 10
 
-if ! docker ps --format '{{.Names}}' | grep -qx "$LEGACY_CONTAINER"; then
-  echo "2025 runtime exited during startup. Restoring previous RPB."
-  docker logs --tail 220 "$LEGACY_CONTAINER" 2>&1 || true
+  if ! docker ps --format '{{.Names}}' | grep -qx "$LEGACY_CONTAINER"; then
+    break
+  fi
+
+  LOGS="$(docker logs --since 5m "$LEGACY_CONTAINER" 2>&1 || true)"
+
+  if printf '%s\n' "$LOGS" | grep -q 'Decision loop started' \
+     && printf '%s\n' "$LOGS" | grep -q 'EXECUTION LOOP STARTED' \
+     && printf '%s\n' "$LOGS" | grep -q 'SMART SCALPING LOOP STARTED' \
+     && printf '%s\n' "$LOGS" | grep -q 'ALL 50+ ORCHESTRATORS RUNNING'; then
+    READY=1
+    break
+  fi
+done
+
+if [ "$READY" -ne 1 ]; then
+  echo "2025 controller did not reach the required engine-ready state."
+  echo "Restoring previous RPB runtime."
+  docker logs --tail 320 "$LEGACY_CONTAINER" 2>&1 || true
+  docker rm -f "$LEGACY_CONTAINER" >/dev/null 2>&1 || true
   docker start "$CURRENT_RPB" >/dev/null 2>&1 || true
   exit 1
 fi
 
+# The restored 2025 controller has proven that its decision, execution and
+# smart-scalping loops are online. Only now retire the old intelligence-only
+# sidecar to free memory/CPU. The previous RPB remains stopped but available
+# for rollback.
 docker stop "$CURRENT_INTEL" >/dev/null 2>&1 || true
 
 echo
@@ -308,7 +374,7 @@ docker ps --filter "name=$LEGACY_CONTAINER"   --format 'NAME={{.Names}} STATUS={
 
 echo
 echo "=== ENGINE START EVIDENCE ==="
-docker logs --since 3m "$LEGACY_CONTAINER" 2>&1   | grep -E 'Decision loop started|EXECUTION LOOP STARTED|SMART SCALPING LOOP STARTED|Scalper generated|Published .* signals|Decision:|EXECUTING:|SUBMITTING|ORDER ACKNOWLEDGED|Trade executed|Evolution|Sentient|Swarm|Learning loop started|Scouting loop started|ERROR|Traceback'   | tail -n 240 || true
+docker logs --since 3m "$LEGACY_CONTAINER" 2>&1   | grep -E 'ALL 50\+ ORCHESTRATORS RUNNING|Decision loop started|EXECUTION LOOP STARTED|SMART SCALPING LOOP STARTED|Scalper generated|Published .* signals|Decision:|EXECUTING:|SUBMITTING|ORDER ACKNOWLEDGED|Trade executed|Evolution|Sentient|Swarm|Learning loop started|Scouting loop started|ERROR|Traceback'   | tail -n 240 || true
 
 echo
 echo "=== CONTAINER MODE EVIDENCE ==="
