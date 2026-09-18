@@ -771,6 +771,166 @@ def _real_initialize_ai_clients(self):
         print("ℹ️ OpenAI intelligence provider not configured")
 
 
+async def _real_swarm_market_data(self, symbol: str, timeframe: str):
+    """Supply every historical SwarmAgent with the same authentic OHLCV fabric."""
+    import pandas as pd
+
+    if "/" not in str(symbol) or not str(symbol).upper().endswith("/USDT"):
+        return None
+
+    supported = {"1m", "5m", "15m", "30m", "1h", "4h"}
+    tf = timeframe if timeframe in supported else "1m"
+    try:
+        rows = await asyncio.to_thread(_FEED.ohlcv, symbol, tf, 100)
+    except Exception:
+        return None
+
+    valid = [
+        row for row in rows
+        if isinstance(row, (list, tuple)) and len(row) >= 6 and _f(row[4]) > 0.0
+    ]
+    if len(valid) < 50:
+        return None
+
+    return pd.DataFrame(
+        {
+            "timestamp": [_f(row[0]) / 1000.0 for row in valid],
+            "open": [_f(row[1]) for row in valid],
+            "high": [_f(row[2]) for row in valid],
+            "low": [_f(row[3]) for row in valid],
+            "close": [_f(row[4]) for row in valid],
+            "volume": [_f(row[5]) for row in valid],
+        }
+    )
+
+
+async def _real_swarm_collective_decision(self, signal=None):
+    """On-demand 2025 swarm consensus over real data for the current signal."""
+    source = signal if isinstance(signal, dict) else {}
+    data = source.get("data") if isinstance(source.get("data"), dict) else {}
+    symbol = str(source.get("symbol") or data.get("symbol") or data.get("pair") or "BTC/USDT")
+    if "/" not in symbol or not symbol.upper().endswith("/USDT"):
+        return {
+            "action": "hold",
+            "confidence": 0.0,
+            "agent_count": 0,
+            "symbol": symbol,
+            "real_market_data": False,
+        }
+
+    frame = await _real_swarm_market_data(None, symbol, "1m")
+    if frame is None:
+        return {
+            "action": "hold",
+            "confidence": 0.0,
+            "agent_count": 0,
+            "symbol": symbol,
+            "real_market_data": False,
+        }
+
+    # Reuse all historical agent specializations, but share one observed frame
+    # so collective intelligence does not multiply network/API traffic.
+    async def analyze(agent):
+        try:
+            if agent.specialization == "scalping":
+                return await agent._analyze_scalping(frame, symbol, "1m")
+            if agent.specialization == "arbitrage":
+                return await agent._analyze_arbitrage(frame, symbol, "1m")
+            if agent.specialization == "trend":
+                return await agent._analyze_trend(frame, symbol, "1m")
+            if agent.specialization == "black_swan":
+                return await agent._analyze_black_swan(frame, symbol, "1m")
+            return await agent._analyze_general(frame, symbol, "1m")
+        except Exception:
+            return None
+
+    votes = await asyncio.gather(
+        *(analyze(agent) for agent in getattr(self, "agents", [])),
+        return_exceptions=True,
+    )
+    valid = [
+        row for row in votes
+        if not isinstance(row, Exception)
+        and row is not None
+        and getattr(row, "signal_type", None) in {"buy", "sell"}
+    ]
+    buys = [row for row in valid if row.signal_type == "buy"]
+    sells = [row for row in valid if row.signal_type == "sell"]
+    buy_weight = sum(_f(row.confidence) for row in buys)
+    sell_weight = sum(_f(row.confidence) for row in sells)
+
+    if buy_weight <= 0.0 and sell_weight <= 0.0:
+        action = "hold"
+        confidence = 0.0
+    elif buy_weight > sell_weight:
+        action = "buy"
+        confidence = buy_weight / max(1.0, len(buys))
+    elif sell_weight > buy_weight:
+        action = "sell"
+        confidence = sell_weight / max(1.0, len(sells))
+    else:
+        action = "hold"
+        confidence = 0.0
+
+    return {
+        "action": action,
+        "confidence": max(0.0, min(0.99, confidence)),
+        "agent_count": len(valid),
+        "buy_votes": len(buys),
+        "sell_votes": len(sells),
+        "symbol": symbol,
+        "real_market_data": True,
+        "market_data_source": "bybit_public_production",
+    }
+
+
+async def _real_swarm_performance_metrics(self):
+    """Never assign random PnL/performance to swarm agents."""
+    total_agents = len(getattr(self, "agents", []))
+    awareness = getattr(self, "collective_awareness", None)
+    active_agents = getattr(awareness, "active_agents", 0)
+    signals_count = getattr(awareness, "signals_count", 0)
+    self.logger.info(
+        f"Swarm Performance: {active_agents}/{total_agents} agents active, "
+        f"{signals_count} observed signals; synthetic performance disabled"
+    )
+
+
+async def _no_simulated_swarm_trade(self, signal):
+    """The swarm contributes intelligence; universal router owns all orders."""
+    self.logger.info(
+        f"Swarm execution intent delegated to unified controller: "
+        f"{getattr(signal, 'signal_type', 'hold')} "
+        f"{getattr(signal, 'symbol', 'UNKNOWN')}"
+    )
+    return None
+
+
+async def _real_publish_trending_signals(self):
+    """Publish real scanner trends with explicit evidence provenance."""
+    top_trending = self.get_trending_opportunities(limit=10)
+    for trend in top_trending:
+        change = _f(trend.get("price_change_pct"))
+        signal = {
+            "type": "trending",
+            "symbol": trend.get("symbol"),
+            "side": "buy" if change > 0.0 else "sell",
+            "confidence": min(abs(change) / 10.0, 0.95),
+            "source": "DynamicScanner",
+            "reasoning": (
+                f"Observed 24h move {change:+.2f}% with "
+                f"{_f(trend.get('volume_24h')):.2f} quote volume"
+            ),
+            "timestamp": time.time(),
+            "real_market_data": True,
+            "market_data_source": "dynamic_market_scanner_real_tickers",
+            "exchange": trend.get("exchange"),
+        }
+        await self.data_hub.publish_signal(signal)
+    if top_trending:
+        print(f"REAL_TREND_SIGNALS_PUBLISHED {len(top_trending)}")
+
+
 async def _real_statistical_arbitrage(self):
     """Preserve the 2025 pairs/z-score strategy, replace its random ratio."""
     import numpy as np
@@ -963,6 +1123,7 @@ def install() -> None:
     # Dynamic scanner: existing scanning logic remains; its loop now also feeds
     # the CentralDataHub and emits its already-defined trending signals.
     dynamic.DynamicMarketScanner.run_continuous_scanning = _real_dynamic_scanning
+    dynamic.DynamicMarketScanner.publish_trending_signals = _real_publish_trending_signals
 
     # Other historical specialist modules stay present, but no random/simulated
     # result is permitted to become execution evidence.
@@ -971,6 +1132,16 @@ def install() -> None:
         hedge.StatisticalArbitrage.find_pairs_trades = _real_statistical_arbitrage
     except Exception:
         pass
+
+    try:
+        import ultra_swarm_consciousness as swarm
+        swarm.SwarmAgent._get_market_data = _real_swarm_market_data
+        swarm.SwarmConsciousness.collective_decision = _real_swarm_collective_decision
+        swarm.SwarmConsciousness._update_performance_metrics = _real_swarm_performance_metrics
+        swarm.SwarmConsciousness._execute_testnet_trade = _no_simulated_swarm_trade
+    except Exception:
+        pass
+
 
     try:
         import ultra_scalping_engine as ultra_scalp
