@@ -633,6 +633,9 @@ class ExecutionOrchestrator:
                 'entry_fee_quote': fee_quote,
                 'entry_fee_base': fee_base,
                 'source_engine': intent.source_engine,
+                'source_signal': metadata.get('source') or metadata.get('source_strategy') or intent.source_engine,
+                'strategy': metadata.get('strategy') or metadata.get('source_strategy'),
+                'session': metadata.get('session'),
                 'take_profit_pct': float(metadata.get('take_profit_pct') or 0.0),
                 'stop_loss_pct': float(metadata.get('stop_loss_pct') or 0.0),
                 'target_hold_seconds': float(metadata.get('target_hold_seconds') or 0.0),
@@ -1006,6 +1009,22 @@ class ExecutionOrchestrator:
             self.winning_trades += 1
         self.total_profit += net_pnl
 
+        # Feed the historical SmartScalping session learner only from a
+        # completed authenticated close. No synthetic win/loss labels.
+        try:
+            scalper = (self.engines or {}).get('smart_scalping')
+            tracker = getattr(scalper, 'session_tracker', None)
+            session = position.get('session')
+            if tracker is not None and session:
+                tracker.record_trade(
+                    symbol,
+                    str(session),
+                    float(net_pnl),
+                    bool(net_pnl > 0.0),
+                )
+        except Exception as exc:
+            logger.debug(f"Session performance learning skipped: {exc}")
+
         close_record = {
             'symbol': symbol,
             'order_id': fill.get('order_id') or ((receipt.get('order') or {}).get('id')),
@@ -1023,6 +1042,10 @@ class ExecutionOrchestrator:
             'realized_pnl': net_pnl,
             'realized_net_pnl': net_pnl,
             'reason': reason,
+            'source_engine': position.get('source_engine'),
+            'source_signal': position.get('source_signal'),
+            'strategy': position.get('strategy'),
+            'session': position.get('session'),
             'exchange': receipt.get('exchange'),
             'execution_mode': receipt.get('execution_mode'),
             'fill_source': receipt.get('rpb_fill_source', 'exchange_receipt'),
