@@ -233,6 +233,7 @@ class ExecutionOrchestrator:
         self.total_trades = 0
         self.winning_trades = 0
         self.total_profit = 0.0
+        self.completed_cycles = 0
         self.execution_times = deque(maxlen=100)
 
         logger.info("⚡ Execution Orchestrator initialized")
@@ -425,6 +426,11 @@ class ExecutionOrchestrator:
 
             # EXECUTE THE TRADE!
             logger.info(f"⚡ EXECUTING: {action.upper()} {symbol} (confidence: {confidence:.1%})")
+            if self.completed_cycles > 0:
+                logger.info(
+                    f"RUNTIME_PROOF NEXT_TRADE_CYCLE cycle={self.completed_cycles + 1} "
+                    f"symbol={symbol} side={action}"
+                )
 
             preflight.record_event('candidates_execution_eligible')
             intent.candidate_id = execution_intent.new_candidate_id()
@@ -1072,6 +1078,8 @@ class ExecutionOrchestrator:
         }
 
         await self.data_hub.publish_trade(close_record)
+        if close_record['status'] == 'closed':
+            self.completed_cycles += 1
 
         logger.info(
             f"RUNTIME_PROOF REALIZED_NET_AFTER_COSTS symbol={symbol} net={net_pnl:.8f} "
