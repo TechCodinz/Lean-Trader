@@ -832,6 +832,11 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
 
     def __init__(self, mode: str = "testnet"):
         super().__init__(mode)
+        # Preserve the original orchestrator contract: one selected runtime
+        # mode is inherited by every execution path.  Engines do not decide
+        # testnet vs live independently; the operator-selected mode and the
+        # universal router do.
+        os.environ["EXECUTION_MODE"] = str(self.mode).strip().lower()
 
         # Additional advanced systems
         self.advanced_systems = {}
@@ -1782,6 +1787,7 @@ class CompleteUltimateOrchestrator(UltimateOrchestrator):
         try:
             # MODE-AWARE: Bybit testnet ($17k) or Gate.io live
             self.real_profit_bot = REAL_PROFIT_BOT(
+                mode=self.mode,
                 universe=getattr(
                     self,
                     "trading_universe",
