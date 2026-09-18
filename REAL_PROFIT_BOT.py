@@ -70,9 +70,6 @@ class REAL_PROFIT_BOT:
         self.entry_confidence = float(os.getenv("RPB_ENTRY_CONFIDENCE", "85") or 85)
         self.post_entry_sleep = float(os.getenv("RPB_POST_ENTRY_SLEEP_SECONDS", "0.5") or 0.5)
         self.cycle_sleep = float(os.getenv("RPB_CYCLE_SLEEP_SECONDS", "0.5") or 0.5)
-        self.fast_ticker_refresh_seconds = float(os.getenv("RPB_FAST_TICKER_SECONDS", "0.75") or 0.75)
-        self._ticker_snapshot: Dict[str, Dict[str, Any]] = {}
-        self._ticker_snapshot_at = 0.0
 
         if universe:
             self.crypto_pairs = [str(x) for x in universe if "/" in str(x)]
@@ -194,43 +191,9 @@ class REAL_PROFIT_BOT:
             print(f"❌ Balance unavailable: {type(exc).__name__}")
             return 0.0
 
-    def _refresh_fast_ticker_snapshot(self, *, force: bool = False) -> Dict[str, Dict[str, Any]]:
-        """Refresh one public-production ticker snapshot for the whole scan.
-
-        Historical micro runtimes were fast because they did not perform one
-        REST ticker request per symbol. RPB keeps that behavior: one bulk
-        snapshot feeds the entire scan, while per-symbol fetch remains a
-        fallback only if the venue cannot provide bulk tickers.
-        """
-        now = time.time()
-        if (
-            not force
-            and self._ticker_snapshot
-            and now - self._ticker_snapshot_at < max(0.1, self.fast_ticker_refresh_seconds)
-        ):
-            return self._ticker_snapshot
-        try:
-            tickers = self.market_data.fetch_tickers() or {}
-            if isinstance(tickers, dict) and tickers:
-                self._ticker_snapshot = {
-                    str(symbol): dict(ticker)
-                    for symbol, ticker in tickers.items()
-                    if isinstance(ticker, dict)
-                }
-                self._ticker_snapshot_at = now
-        except Exception:
-            pass
-        return self._ticker_snapshot
-
     def get_gate_ticker(self, symbol):
-        snapshot = self._refresh_fast_ticker_snapshot()
-        ticker = snapshot.get(symbol) if isinstance(snapshot, dict) else None
-        if not isinstance(ticker, dict):
-            try:
-                ticker = self.market_data.fetch_ticker(symbol) or {}
-            except Exception:
-                return None
         try:
+            ticker = self.market_data.fetch_ticker(symbol) or {}
             price = float(ticker.get("last") or ticker.get("close") or 0.0)
             if price <= 0:
                 return None
@@ -283,7 +246,7 @@ class REAL_PROFIT_BOT:
     def refresh_dynamic_pairs(self):
         try:
             self.market_data.load_markets()
-            tickers = self._refresh_fast_ticker_snapshot(force=True) or {}
+            tickers = self.market_data.fetch_tickers() or {}
             executable = self._execution_market_symbols()
             discovered = []
             for symbol, ticker in tickers.items():
@@ -436,22 +399,7 @@ class REAL_PROFIT_BOT:
             intent["risk_budget"] = min(max(0.0, target_usd), max(0.0, balance))
             print(f"🌱 {phase} sizing: wallet=${balance:.6f} budget=${intent['risk_budget']:.6f}")
 
-        policy = None
-        if side == "buy" and float(intent.get("risk_budget") or 0.0) > 0.0:
-            # RPB has already produced the final authenticated-wallet risk
-            # budget via its growth ladder / risk governor. Do not apply the
-            # generic allocation fraction a second time inside preflight.
-            # Preflight still retains fee reserve, venue floors, precision,
-            # balance checks, and every execution safety check.
-            base_policy = preflight.SizingPolicy.from_env()
-            policy = preflight.SizingPolicy(
-                allocation_fraction=1.0,
-                max_fraction=1.0,
-                fee_reserve_multiple=base_policy.fee_reserve_multiple,
-                absolute_reserve_quote=base_policy.absolute_reserve_quote,
-            )
-
-        prepared, blocked = preflight.prepare_order(intent, policy=policy)
+        prepared, blocked = preflight.prepare_order(intent)
         if prepared is None:
             if blocked is not None:
                 print(f"⏭️ PRECHECK {symbol} {signal}: {blocked.blocker} {blocked.detail}")
@@ -656,7 +604,6 @@ class REAL_PROFIT_BOT:
 
         while self.running:
             try:
-                self._refresh_fast_ticker_snapshot()
                 if not self.last_pair_refresh or time.time() - self.last_pair_refresh >= self.dynamic_pair_refresh_seconds:
                     self.refresh_dynamic_pairs()
 
