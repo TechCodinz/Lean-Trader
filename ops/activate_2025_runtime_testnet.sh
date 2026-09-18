@@ -204,6 +204,34 @@ if p.exists():
         s = s.replace(old, new)
     p.write_text(s)
 
+# The October-2025 auto-fix pass accidentally inserted a typing import
+# inside two function bodies. Restore the syntax without changing behavior.
+p = root / "run_live_meme.py"
+if p.exists():
+    s = p.read_text()
+    s = s.replace(
+        "    from utils import load_config\nfrom typing import Callable\n\n    cfg =",
+        "    from utils import load_config\n\n    cfg =",
+    )
+    p.write_text(s)
+
+p = root / "run_unified.py"
+if p.exists():
+    s = p.read_text()
+    s = s.replace(
+        "    try:\n        import os\nfrom typing import Callable\n\n        run_daemons =",
+        "    try:\n        import os\n\n        run_daemons =",
+    )
+    # The 2025 static/ruff reports show trader_core as an expected import for
+    # run_unified.py; restore that import if the broken auto-fix removed it.
+    if "from trader_core import TraderCore" not in s:
+        s = s.replace(
+            "import argparse\n",
+            "import argparse\n\nfrom trader_core import TraderCore\n",
+            1,
+        )
+    p.write_text(s)
+
 # Package markers restored during the later module-repair work.
 for pkgdir in (root / "src" / "leantrader" / "agents", root / "src" / "leantrader" / "production"):
     if pkgdir.is_dir():
