@@ -113,51 +113,17 @@ for pkgdir in "$LEGACY/src/leantrader/agents" "$LEGACY/src/leantrader/production
 done
 
 echo
-echo "=== BUILD COMPLETE 2025 COMPATIBILITY IMAGE ==="
-cat > /tmp/Dockerfile.leantrader-2025 <<EOF
-FROM $BASE_IMAGE
-USER root
-RUN apt-get update && apt-get install -y --no-install-recommends \
-      build-essential gcc g++ libgomp1 libgl1 libglib2.0-0 libxml2 libxslt1.1 \
-    && rm -rf /var/lib/apt/lists/*
-RUN python -m pip install --upgrade pip setuptools wheel
-
-# Packages already encountered during LeanTrader restoration/import-smoke work.
-RUN pip install --no-cache-dir --prefer-binary \
-      pytest pytest-asyncio pytest-cov pytest-mock \
-      numpy pandas scipy scikit-learn joblib numba tiktoken python-multipart \
-      ccxt PyYAML aiohttp psutil python-dotenv redis web3 requests httpx \
-      beautifulsoup4 lxml feedparser
-
-# October-2025 active intelligence/runtime stack: Tensor/Keras, model arsenal,
-# exchange/data clients, NLP, external-AI clients, orchestration and utilities.
-RUN pip install --no-cache-dir --prefer-binary \
-      tensorflow keras torch transformers \
-      xgboost lightgbm catboost yfinance python-binance \
-      websocket-client websockets eth-account eth-utils \
-      matplotlib seaborn plotly \
-      nltk textblob vaderSentiment \
-      "langchain==0.3.27" langchain-community anthropic openai \
-      python-telegram-bot aiogram \
-      fastapi uvicorn sqlalchemy \
-      stripe qrcode \
-      pytz python-dateutil networkx \
-      cryptography bcrypt schedule loguru toml \
-      optuna statsmodels prometheus-client \
-      tweepy praw discord.py celery \
-      qiskit qiskit-aer qiskit-ibm-runtime
-
-# Technical-analysis libraries used by several 2025 specialist engines.
-RUN pip install --no-cache-dir --prefer-binary TA-Lib ta || true
-
-RUN pip check
-EOF
-
-docker build -t "$LEGACY_IMAGE" -f /tmp/Dockerfile.leantrader-2025 /tmp
+echo "=== REQUIRE PRE-VERIFIED 2025 COMPATIBILITY IMAGE ==="
+if ! docker image inspect "$LEGACY_IMAGE" >/dev/null 2>&1; then
+  echo "Missing $LEGACY_IMAGE. Run ops/bootstrap_2025_runtime_dependencies.sh first."
+  exit 1
+fi
+docker run --rm "$LEGACY_IMAGE" pip check
+echo "LEGACY_2025_IMAGE_READY"
 
 echo
 echo "=== COMPLETE DEPENDENCY IMPORT MATRIX ==="
-docker run --rm "$LEGACY_IMAGE" python - <<'PY'
+docker run --rm -i "$LEGACY_IMAGE" python - <<'PY'
 import importlib
 import sys
 
