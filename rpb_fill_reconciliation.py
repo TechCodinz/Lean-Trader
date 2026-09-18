@@ -11,6 +11,7 @@ It never creates orders and never grants execution authority.
 
 from __future__ import annotations
 
+import math
 import time
 from typing import Any, Dict, Iterable, List, Optional, Set
 
@@ -283,8 +284,18 @@ def reconstruct_epoch_positions(
         held = _f(totals.get(base))
         if held <= 1e-12:
             continue
-        adopted_qty = min(qty, held)
-        scale = adopted_qty / qty if qty > 0 else 0.0
+        # Authenticated wallet balance is the final quantity arbiter when the
+        # trade-history residual differs only by floating-point arithmetic.
+        # This prevents exact venue-minimum balances such as 0.0001 DOT from
+        # becoming 0.0000999999999997 and being falsely classified as dust.
+        snapped_to_balance = math.isclose(
+            qty,
+            held,
+            rel_tol=1e-10,
+            abs_tol=1e-15,
+        )
+        adopted_qty = held if snapped_to_balance else min(qty, held)
+        scale = 1.0 if snapped_to_balance else (adopted_qty / qty if qty > 0 else 0.0)
         adopted_cost = cost * scale
         if adopted_qty <= 1e-12 or adopted_cost <= 0:
             continue
@@ -330,9 +341,35 @@ def recover_current_epoch_to_ledger(
     ledger = PositionLedger()
     adopted: List[str] = []
     already_owned: List[str] = []
+    precision_synced: List[str] = []
+    ledger_changed = False
     for row in reconstructed:
         symbol = row["symbol"]
         if ledger.owns(symbol):
+            existing = ledger.positions.get(symbol) or {}
+            current_qty = _f(
+                existing.get("remaining_quantity")
+                or existing.get("sellable_quantity")
+                or existing.get("quantity")
+            )
+            recovered_qty = _f(row.get("quantity"))
+            if (
+                current_qty > 0
+                and recovered_qty > 0
+                and current_qty != recovered_qty
+                and math.isclose(
+                    current_qty,
+                    recovered_qty,
+                    rel_tol=1e-10,
+                    abs_tol=1e-15,
+                )
+            ):
+                existing["remaining_quantity"] = recovered_qty
+                existing["sellable_quantity"] = recovered_qty
+                existing["precision_reconciled_at"] = time.time()
+                ledger.positions[symbol] = existing
+                precision_synced.append(symbol)
+                ledger_changed = True
             already_owned.append(symbol)
             continue
         if ledger.adopt_position(
@@ -352,6 +389,9 @@ def recover_current_epoch_to_ledger(
         ):
             adopted.append(symbol)
 
+    if ledger_changed:
+        ledger.save()
+
     return {
         "ok": True,
         "since_ms": int(since_ms),
@@ -359,5 +399,6 @@ def recover_current_epoch_to_ledger(
         "reconstructed": [row["symbol"] for row in reconstructed],
         "adopted": adopted,
         "already_owned": already_owned,
+        "precision_synced": precision_synced,
         "excluded": sorted(excluded),
     }
