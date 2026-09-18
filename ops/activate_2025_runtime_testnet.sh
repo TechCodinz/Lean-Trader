@@ -50,6 +50,7 @@ cp "$SOURCE/EXECUTION_ORCHESTRATOR.py" "$LEGACY/EXECUTION_ORCHESTRATOR.py"
 # Apply compatibility overlays only; the October-2025 signal/decision strategy stays intact.
 python3 - "$LEGACY" <<'PY'
 from pathlib import Path
+import re
 import sys
 
 root = Path(sys.argv[1])
@@ -134,6 +135,94 @@ if p.exists():
     if old in s:
         s = s.replace(old, "                self.private_client = PrivateTxClient(sender=None)")
     p.write_text(s)
+
+# 4. Historical auxiliary bots carried direct credential constants. They are
+# not execution owners in the restored topology. Make them environment/public
+# data clients so only the universal ExecutionOrchestrator owns private orders.
+p = root / "REAL_PROFIT_BOT.py"
+if p.exists():
+    s = p.read_text()
+    if "import os\n" not in s.split("class REAL_PROFIT_BOT", 1)[0]:
+        s = s.replace("import requests\n", "import requests\nimport os\n", 1)
+
+    s = re.sub(
+        r'self\.telegram_bot_token\s*=\s*"[^"]*"',
+        'self.telegram_bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "")',
+        s,
+    )
+    s = re.sub(
+        r'self\.admin_chat_id\s*=\s*"[^"]*"',
+        'self.admin_chat_id = os.getenv("TELEGRAM_ADMIN_CHAT_ID", "")',
+        s,
+    )
+    s = re.sub(
+        r"'apiKey':\s*os\.getenv\('BYBIT_API_KEY',\s*'[^']*'\)",
+        "'apiKey': os.getenv('BYBIT_API_KEY', '')",
+        s,
+    )
+    s = re.sub(
+        r"'secret':\s*os\.getenv\('BYBIT_SECRET',\s*'[^']*'\)",
+        "'secret': os.getenv('BYBIT_SECRET', '')",
+        s,
+    )
+    s = re.sub(
+        r"'apiKey':\s*'[^']*',\s*\n\s*'secret':\s*'[^']*',\s*\n\s*'sandbox': False",
+        "'apiKey': os.getenv('GATEIO_LIVE_API_KEY', os.getenv('GATE_API_KEY', '')),\n"
+        "                'secret': os.getenv('GATEIO_LIVE_SECRET', os.getenv('GATE_SECRET', '')),\n"
+        "                'sandbox': False",
+        s,
+        count=1,
+    )
+    s = s.replace(
+        'print("💰 TRADING EXCHANGE: Gate.io (REAL INCOME GENERATION)")',
+        'print(f"💰 TRADING EXCHANGE: {\'Bybit Testnet\' if self.mode == \'testnet\' else \'Gate.io Live\'}")',
+    )
+    p.write_text(s)
+
+p = root / "enhanced_trading_bot.py"
+if p.exists():
+    s = p.read_text()
+    # This historical helper remains intelligence/public-data only. Private
+    # placement belongs to ExecutionOrchestrator.
+    block_start = s.find("        # Bybit configuration with REAL trading enabled")
+    block_end = s.find("        # Telegram configuration", block_start)
+    if block_start >= 0 and block_end > block_start:
+        replacement = (
+            "        # Public Bybit market-data client; private execution is centralized.\n"
+            "        self.bybit = ccxt.bybit({'enableRateLimit': True})\n\n"
+        )
+        s = s[:block_start] + replacement + s[block_end:]
+
+    s = s.replace(
+        "            exchanges_to_init = ['binance', 'okx', 'coinbase', 'kucoin', 'gateio', 'huobi']",
+        "            exchanges_to_init = ['binance', 'okx', 'coinbase', 'kucoin', 'gateio', 'huobi']\n"
+        "            exchange_aliases = {'gateio': 'gate', 'huobi': 'htx'}",
+    )
+    s = s.replace(
+        "                    exchange_class = getattr(ccxt, exchange_name)",
+        "                    exchange_class = getattr(ccxt, exchange_aliases.get(exchange_name, exchange_name))",
+    )
+    p.write_text(s)
+
+# 5. Keep the 2025 Dynamic Market Scanner alive from public market data even
+# when no private arbitrage credentials are configured.
+p = root / "COMPLETE_ULTIMATE_ORCHESTRATOR.py"
+s = p.read_text()
+old = """        else:
+            logger.warning("⚠️  Need at least 1 exchange for market scanning")
+            self.market_scanner = None"""
+new = """        else:
+            try:
+                public_bybit = ccxt.bybit({'enableRateLimit': True})
+                self.market_scanner = DynamicMarketScanner({'bybit': public_bybit}, self.data_hub)
+                self.advanced_orchestrators['market_scanner'] = self.market_scanner
+                logger.info("✅ 🔍 DYNAMIC MARKET SCANNER WIRED - public Bybit market data")
+            except Exception as e:
+                logger.warning(f"⚠️  Public market scanner unavailable: {e}")
+                self.market_scanner = None"""
+if old in s:
+    s = s.replace(old, new)
+p.write_text(s)
 
 print("LEGACY_2025_RUNTIME_COMPAT_OVERLAYS_OK")
 PY
