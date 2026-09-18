@@ -71,10 +71,16 @@ class UnifiedRPBRuntime(REAL_PROFIT_BOT):
         if not force and now - self._last_epoch_sweep < max(1.0, interval):
             return {"ok": True, "adopted": []}
         self._last_epoch_sweep = now
+        dust_exclusions = {
+            symbol
+            for symbol, record in self.quarantine_store.active().items()
+            if record.get("kind") == "dust"
+        }
         report = recover_current_epoch_to_ledger(
             since_ms=epoch,
             mode="testnet",
             exchange_id=self.execution_exchange_id,
+            exclude_symbols=dust_exclusions,
         )
 
         # recover_current_epoch_to_ledger() uses its own PositionLedger
@@ -533,10 +539,16 @@ def main() -> int:
 
     if mode == "testnet" and epoch > 0:
         try:
+            dust_exclusions = {
+                symbol
+                for symbol, record in PairQuarantineStore().active().items()
+                if record.get("kind") == "dust"
+            }
             report = recover_current_epoch_to_ledger(
                 since_ms=epoch,
                 mode="testnet",
                 exchange_id=exchange_id,
+                exclude_symbols=dust_exclusions,
             )
             print("🔗 RPB EPOCH RECOVERY:", report)
         except Exception as exc:
