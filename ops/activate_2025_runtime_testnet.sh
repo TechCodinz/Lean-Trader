@@ -584,6 +584,27 @@ async def check():
     print("REAL_PROFIT_BOT_PRESENT", bool(getattr(bot, "real_profit_bot", None)))
     print("MARKET_SCANNER_PRESENT", bool(getattr(bot, "market_scanner", None)))
 
+    base_scalper = (getattr(bot, "trading_engines", {}) or {}).get("smart_scalping")
+    if base_scalper is not getattr(bot, "smart_scalping", None):
+        raise SystemExit("DUPLICATE_SMART_SCALPER_STATE_DETECTED")
+    print("SMART_SCALPER_SINGLE_INSTANCE_OK")
+
+    swarm = (getattr(bot, "ai_systems", {}) or {}).get("swarm")
+    if swarm is None or not hasattr(swarm, "collective_decision"):
+        raise SystemExit("SWARM_DECISION_PATH_NOT_CONNECTED")
+    swarm_probe = await swarm.collective_decision(
+        {
+            "symbol": "BTC/USDT",
+            "side": "buy",
+            "confidence": 0.5,
+            "data": {"symbol": "BTC/USDT", "real_market_data": True},
+        }
+    )
+    print("SWARM_REAL_EVIDENCE", swarm_probe)
+    if swarm_probe.get("real_market_data") is not True:
+        raise SystemExit("SWARM_REAL_MARKET_EVIDENCE_FAILED")
+    print("SWARM_REAL_EVIDENCE_OK")
+
     evolution = (getattr(bot, "ai_systems", {}) or {}).get("evolution")
     if evolution is None or not hasattr(evolution, "evo_db"):
         raise SystemExit("EVOLUTION_DATABASE_NOT_CONNECTED")
