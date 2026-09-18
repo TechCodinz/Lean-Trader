@@ -126,7 +126,7 @@ RUN python -m pip install --upgrade pip setuptools wheel
 # Packages already encountered during LeanTrader restoration/import-smoke work.
 RUN pip install --no-cache-dir --prefer-binary \
       pytest pytest-asyncio pytest-cov pytest-mock \
-      numpy pandas scipy scikit-learn joblib \
+      numpy pandas scipy scikit-learn joblib numba tiktoken python-multipart \
       ccxt PyYAML aiohttp psutil python-dotenv redis web3 requests httpx \
       beautifulsoup4 lxml feedparser
 
