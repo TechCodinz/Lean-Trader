@@ -16,6 +16,8 @@ from src.leantrader.execution import inventory as inventory_reconciler
 from src.leantrader.execution import recovery as inventory_recovery
 from src.leantrader.execution import preflight
 from src.leantrader.execution.router import route_order
+from rpb_fill_reconciliation import reconcile_authenticated_receipt
+from rpb_position_lifecycle import reconcile_fill
 
 logger = logging.getLogger(__name__)
 
@@ -443,22 +445,7 @@ class ExecutionOrchestrator:
                            confidence: float,
                            signal: Dict[str, Any],
                            intent=None) -> Optional[Dict[str, Any]]:
-        """Submit one order through the universal execution router.
-
-        This used to size from a fixed $1000 assumption, hand the order to
-        REAL_PROFIT_BOT, and -- if that produced anything at all, including a
-        refusal receipt -- record a position, publish a trade record and log
-        "TRADE EXECUTED". A refusal dict is truthy, so refusals were being
-        counted as fills and fed to the learning path as trade outcomes. There
-        was also a fallback branch that built a trade record out of nothing and
-        marked it simulated.
-
-        Both are gone. The order is sized against the account's real free
-        balance and the venue's own limits, submitted through route_order, and
-        only treated as executed when the router reports execution and the
-        exchange returns an order id. Anything else is classified, counted and
-        returned as a blocker.
-        """
+        """Submit once, then require authenticated fill evidence before ownership."""
         start_time = time.time()
 
         if intent is None:
@@ -475,15 +462,11 @@ class ExecutionOrchestrator:
             'side': side,
             'confidence': confidence,
             'order_type': 'market',
+            'risk_budget': await self._spendable_budget(),
         }
 
-        # What a new buy may actually spend: free cash, not the balance the
-        # account had before it bought anything. Capital already in inventory
-        # is committed, and proposing orders as though it were still cash is
-        # what produced dozens of identical sub-minimum attempts.
-        order_intent['risk_budget'] = await self._spendable_budget()
-
-        price = signal.get('data', {}).get('price') or signal.get('price')
+        signal_data = signal.get('data', {}) if isinstance(signal.get('data'), dict) else {}
+        price = signal_data.get('price') or signal.get('price')
         if price:
             order_intent['price'] = price
         else:
@@ -495,9 +478,6 @@ class ExecutionOrchestrator:
         if override:
             order_intent['exchange_id'] = override
 
-        # Preflight touches the network (markets, balance, ticker) and
-        # route_order blocks on the exchange call, so both run off the event
-        # loop. Holding the loop here stalls every other engine.
         intent.advance(execution_intent.PREFLIGHT)
         prepared, blocked = await asyncio.to_thread(
             preflight.prepare_order, order_intent
@@ -527,18 +507,25 @@ class ExecutionOrchestrator:
         preflight.record_event('submitted')
         intent.advance(execution_intent.ROUTE_ORDER)
 
-        # Identity travels with the order, so the receipt can be tied back to
-        # the signal that produced it.
         payload = prepared.to_payload()
         payload.setdefault('params', {}).update(intent.to_payload())
 
-        receipt = await asyncio.to_thread(route_order, payload)
+        try:
+            receipt = await asyncio.to_thread(route_order, payload)
+        except Exception as exc:
+            detail = f"{type(exc).__name__}: {exc}"[:200]
+            preflight.record_blocker(preflight.EXCHANGE_REJECT, f"{symbol}:{detail}")
+            intent.stop(execution_intent.EXCHANGE_ORDER, preflight.EXCHANGE_REJECT, detail)
+            return {
+                'ok': False,
+                'prepared': True,
+                'blocker': preflight.EXCHANGE_REJECT,
+                'detail': detail,
+                'intent_id': intent.intent_id,
+                'correlation_id': intent.correlation_id,
+            }
 
         blocker = preflight.classify_receipt(receipt)
-        execution_time = time.time() - start_time
-        self.execution_times.append(execution_time)
-        preflight.record_stage_latency('submit_to_receipt', execution_time)
-
         if blocker is not None:
             detail = str((receipt or {}).get('error', ''))[:200]
             preflight.record_blocker(blocker, f"{symbol}:{detail}")
@@ -556,67 +543,129 @@ class ExecutionOrchestrator:
                 'correlation_id': intent.correlation_id,
             }
 
-        order = receipt.get('order') or {}
-        order_id = order.get('id')
-        filled = order.get('filled')
-        avg_price = order.get('average') or order.get('price') or prepared.price
-        status = order.get('status')
-
         preflight.record_event('acknowledged')
-        intent.advance(execution_intent.EXCHANGE_ORDER, str(order_id))
-        if filled:
-            preflight.record_event('fills')
-            intent.succeed(execution_intent.FILL, str(filled))
-        preflight.record_event('positions_opened')
-        intent.succeed(execution_intent.POSITION)
-        preflight.invalidate_balance_cache()
+        order_id = str(((receipt or {}).get('order') or {}).get('id') or '')
+        intent.advance(execution_intent.EXCHANGE_ORDER, order_id)
+
+        # An acknowledgement is not a position. Reuse the already-proven RPB
+        # authenticated reconciliation path and never submit a second order.
+        receipt = await asyncio.to_thread(
+            reconcile_authenticated_receipt,
+            receipt,
+            prepared.symbol,
+            mode=prepared.execution_mode,
+            exchange_id=prepared.exchange_id,
+            timeout_seconds=float(os.getenv('EXECUTION_FILL_RECONCILE_SECONDS', '6')),
+        )
+        fill = reconcile_fill(receipt, prepared.symbol)
+
+        filled = float(fill.get('filled') or 0.0)
+        avg_price = float(fill.get('average') or prepared.price or 0.0)
+        if filled <= 0.0 or avg_price <= 0.0:
+            detail = f"ack_without_authenticated_fill order_id={order_id}"
+            preflight.record_blocker(preflight.EXCHANGE_REJECT, f"{symbol}:{detail}")
+            intent.stop(execution_intent.FILL, preflight.EXCHANGE_REJECT, detail)
+            logger.warning(
+                f"🛑 {prepared.symbol} acknowledged but no authenticated fill "
+                "was observed; no position owner created"
+            )
+            return {
+                'ok': False,
+                'prepared': True,
+                'blocker': preflight.EXCHANGE_REJECT,
+                'detail': detail,
+                'receipt': receipt,
+                'intent_id': intent.intent_id,
+                'correlation_id': intent.correlation_id,
+            }
+
+        preflight.record_event('fills')
+        intent.succeed(execution_intent.FILL, str(filled))
+
+        fee_base = float(fill.get('fee_base') or 0.0)
+        fee_quote = float(fill.get('fee_quote') or 0.0)
+        owned_size = max(0.0, filled - fee_base) if prepared.side == 'buy' else filled
+        if owned_size <= 0.0:
+            detail = "authenticated_fill_has_no_sellable_quantity"
+            preflight.record_blocker(preflight.EXCHANGE_REJECT, f"{symbol}:{detail}")
+            intent.stop(execution_intent.POSITION, preflight.EXCHANGE_REJECT, detail)
+            return {
+                'ok': False,
+                'blocker': preflight.EXCHANGE_REJECT,
+                'detail': detail,
+                'receipt': receipt,
+            }
 
         self.risk_manager.record_position(
             symbol=prepared.symbol,
             side=prepared.side,
-            size=prepared.amount,
-            entry_price=avg_price
+            size=owned_size,
+            entry_price=avg_price,
         )
 
-        # Only facts the exchange returned, plus the intent that produced
-        # them. No stop/target is invented here: nothing has placed one.
+        position = self.risk_manager.open_positions.get(prepared.symbol) or {}
+        metadata = dict(signal_data)
+        metadata.update(signal)
+        position.update(
+            {
+                'entry_order_id': fill.get('order_id') or order_id,
+                'entry_filled': filled,
+                'entry_cost': float(fill.get('cost') or (filled * avg_price)),
+                'entry_fee_quote': fee_quote,
+                'entry_fee_base': fee_base,
+                'source_engine': intent.source_engine,
+                'take_profit_pct': float(metadata.get('take_profit_pct') or 0.0),
+                'stop_loss_pct': float(metadata.get('stop_loss_pct') or 0.0),
+                'target_hold_seconds': float(metadata.get('target_hold_seconds') or 0.0),
+            }
+        )
+        self.risk_manager.open_positions[prepared.symbol] = position
+
+        preflight.record_event('positions_opened')
+        intent.succeed(execution_intent.POSITION)
+        preflight.invalidate_balance_cache()
+
+        execution_time = time.time() - start_time
+        self.execution_times.append(execution_time)
+        preflight.record_stage_latency('submit_to_fill', execution_time)
+
         trade_record = {
             'symbol': prepared.symbol,
             'side': prepared.side,
-            'order_id': order_id,
-            'amount': prepared.amount,
+            'order_id': fill.get('order_id') or order_id,
+            'amount': owned_size,
             'filled': filled,
             'entry_price': avg_price,
-            'notional': prepared.notional,
-            'quote_currency': prepared.quote_currency,
+            'entry_cost': float(fill.get('cost') or 0.0),
+            'entry_fee_quote': fee_quote,
+            'entry_fee_base': fee_base,
             'confidence': confidence,
             'exchange': receipt.get('exchange'),
             'execution_mode': receipt.get('execution_mode'),
             'authority': receipt.get('authority'),
-            'order_status': status,
+            'order_status': str(((receipt or {}).get('order') or {}).get('status') or ''),
             'timestamp': datetime.now(),
             'status': 'open',
             'realized_pnl': None,
             'intent_id': intent.intent_id,
             'correlation_id': intent.correlation_id,
             'source_engine': intent.source_engine,
+            'fill_source': receipt.get('rpb_fill_source', 'exchange_receipt'),
         }
 
         await self.data_hub.publish_trade(trade_record)
-
         self.total_trades += 1
 
-        logger.info("⚡ ORDER ACKNOWLEDGED:")
+        logger.info("✅ AUTHENTICATED POSITION OPENED:")
         logger.info(f"   Symbol: {prepared.symbol}")
         logger.info(f"   Side: {prepared.side.upper()}")
-        logger.info(f"   Order ID: {order_id}")
-        logger.info(f"   Amount: {prepared.amount}")
-        logger.info(f"   Price: {avg_price}")
+        logger.info(f"   Order ID: {trade_record['order_id']}")
         logger.info(f"   Filled: {filled}")
-        logger.info(f"   Status: {status}")
-        logger.info(f"   Venue: {receipt.get('exchange')} "
-                    f"({receipt.get('execution_mode')})")
-        logger.info(f"   Latency: {execution_time:.2f}s")
+        logger.info(f"   Sellable/owned: {owned_size}")
+        logger.info(f"   Average fill: {avg_price}")
+        logger.info(f"   Entry fees quote/base: {fee_quote}/{fee_base}")
+        logger.info(f"   Venue: {receipt.get('exchange')} ({receipt.get('execution_mode')})")
+        logger.info(f"   Reconciled latency: {execution_time:.2f}s")
 
         return receipt
 
@@ -744,76 +793,95 @@ class ExecutionOrchestrator:
             return None
 
     async def monitor_positions(self):
-        """Monitor open positions with ADVANCED FEATURES (Trailing Stop, Partial TP)"""
-
+        """Monitor owned exchange positions; honor specialist-provided lifecycle."""
         for symbol, position in list(self.risk_manager.open_positions.items()):
             try:
-                # Get current price
                 current_price = await self.get_current_price(symbol)
                 if not current_price:
                     continue
 
-                entry_price = position['entry_price']
-                side = position['side']
+                entry_price = float(position['entry_price'])
+                side = str(position['side']).lower()
+                pnl_pct = (
+                    (current_price - entry_price) / entry_price
+                    if side == 'buy'
+                    else (entry_price - current_price) / entry_price
+                )
 
-                # Calculate current P&L
-                if side == 'buy':
-                    pnl_pct = (current_price - entry_price) / entry_price
-                else:
-                    pnl_pct = (entry_price - current_price) / entry_price
+                take_profit = float(position.get('take_profit_pct') or 0.0)
+                stop_loss = float(position.get('stop_loss_pct') or 0.0)
+                target_hold = float(position.get('target_hold_seconds') or 0.0)
+                entered = position.get('timestamp')
+                age = (
+                    (datetime.now() - entered).total_seconds()
+                    if isinstance(entered, datetime)
+                    else 0.0
+                )
 
-                # USE TRAILING STOP if available
+                # Specialist lifecycle takes precedence when it supplied one.
+                if take_profit > 0.0 and pnl_pct >= take_profit:
+                    logger.info(
+                        f"🎯 Specialist take profit: {symbol} ({pnl_pct:.3%})"
+                    )
+                    await self.close_position(symbol, current_price, 'specialist_take_profit')
+                    continue
+
+                if stop_loss > 0.0 and pnl_pct <= -stop_loss:
+                    logger.warning(
+                        f"🛑 Specialist stop loss: {symbol} ({pnl_pct:.3%})"
+                    )
+                    await self.close_position(symbol, current_price, 'specialist_stop_loss')
+                    continue
+
+                if target_hold > 0.0 and age >= target_hold:
+                    logger.info(
+                        f"⏱️ Specialist max hold: {symbol} age={age:.1f}s "
+                        f"pnl={pnl_pct:.3%}"
+                    )
+                    await self.close_position(symbol, current_price, 'specialist_max_hold')
+                    continue
+
                 if self.trailing_stop:
                     new_stop = self.trailing_stop.update(
                         symbol=symbol,
                         current_price=current_price,
                         entry_price=entry_price,
-                        initial_stop=entry_price * 0.99  # 1% initial stop
+                        initial_stop=entry_price * 0.99,
                     )
-
-                    # Check if trailing stop hit
                     if current_price <= new_stop:
-                        logger.info(f"🛑 Trailing stop triggered: {symbol} ({pnl_pct:.2%})")
+                        logger.info(
+                            f"🛑 Trailing stop triggered: {symbol} ({pnl_pct:.2%})"
+                        )
                         await self.close_position(symbol, current_price, 'trailing_stop')
                         continue
 
-                # USE PARTIAL TP if available
                 if self.partial_tp:
-                    tp_orders = await self.partial_tp.check_tp_levels(symbol, current_price)
+                    tp_orders = await self.partial_tp.check_tp_levels(
+                        symbol, current_price
+                    )
                     if tp_orders:
                         for order in tp_orders:
                             logger.info(f"🎯 {order['tp_level']} hit: {symbol}")
-                            # Would execute partial close here
 
-                # Fallback to basic stop loss and take profit
-                else:
-                    # Check stop loss (1% loss)
+                # Historical fallback only when the specialist supplied no
+                # lifecycle parameters.
+                if take_profit <= 0.0 and stop_loss <= 0.0 and target_hold <= 0.0:
                     if pnl_pct < -0.01:
-                        logger.warning(f"🛑 Stop loss triggered: {symbol} ({pnl_pct:.2%})")
+                        logger.warning(
+                            f"🛑 Stop loss triggered: {symbol} ({pnl_pct:.2%})"
+                        )
                         await self.close_position(symbol, current_price, 'stop_loss')
-
-                    # Check take profit (2% profit)
                     elif pnl_pct > 0.02:
-                        logger.info(f"🎯 Take profit triggered: {symbol} ({pnl_pct:.2%})")
+                        logger.info(
+                            f"🎯 Take profit triggered: {symbol} ({pnl_pct:.2%})"
+                        )
                         await self.close_position(symbol, current_price, 'take_profit')
 
             except Exception as e:
                 logger.debug(f"Position monitoring error for {symbol}: {e}")
 
     async def close_position(self, symbol: str, exit_price: float, reason: str):
-        """Submit the closing order, then record realized PnL from the fill.
-
-        This used to compute a PnL from the in-memory entry price and a fetched
-        ticker, publish a "closed" trade record carrying that number, and log a
-        new balance -- without ever sending a closing order. The position stayed
-        open on the exchange while the bot reported it closed and fed the
-        invented PnL to the learning path.
-
-        Now the opposite-side order goes through the universal router first. If
-        it is not acknowledged the position stays open and the attempt is
-        counted; nothing is published. Realized PnL is computed from the price
-        the exchange actually filled at and the fees it actually charged.
-        """
+        """Close only after authenticated exchange fill, then book realized net."""
         position = self.risk_manager.open_positions.get(symbol)
         if not position:
             return None
@@ -847,8 +915,6 @@ class ExecutionOrchestrator:
             logger.error(f"Close order failed for {symbol}: {type(exc).__name__}")
             return None
 
-        preflight.record_stage_latency('close_submit', time.time() - started)
-
         blocker = preflight.classify_receipt(receipt)
         if blocker is not None:
             detail = str((receipt or {}).get('error', ''))[:200]
@@ -858,41 +924,64 @@ class ExecutionOrchestrator:
             )
             return None
 
-        order = receipt.get('order') or {}
-        fill_price = order.get('average') or order.get('price')
-        try:
-            fill_price = float(fill_price)
-        except (TypeError, ValueError):
-            fill_price = 0.0
+        preflight.record_event('acknowledged')
 
-        if fill_price <= 0.0:
-            # Acknowledged but no price to settle against. Leave the position
-            # recorded rather than book a PnL we cannot substantiate.
+        mode = str(receipt.get('execution_mode') or self.mode or 'testnet')
+        exchange_id = str(receipt.get('exchange') or os.getenv('EXECUTION_EXCHANGE_OVERRIDE', 'bybit') or 'bybit')
+        receipt = await asyncio.to_thread(
+            reconcile_authenticated_receipt,
+            receipt,
+            preflight.normalize_symbol(symbol) or symbol,
+            mode=mode,
+            exchange_id=exchange_id,
+            timeout_seconds=float(os.getenv('EXECUTION_FILL_RECONCILE_SECONDS', '6')),
+        )
+        fill = reconcile_fill(receipt, preflight.normalize_symbol(symbol) or symbol)
+
+        sold = min(size, float(fill.get('filled') or 0.0))
+        fill_price = float(fill.get('average') or 0.0)
+        if sold <= 0.0 or fill_price <= 0.0:
             preflight.record_blocker(
-                preflight.NO_ORDER_ID, f"close:{symbol}:no_fill_price"
+                preflight.EXCHANGE_REJECT,
+                f"close:{symbol}:ack_without_authenticated_fill",
             )
             logger.warning(
-                f"🛑 {symbol} close acknowledged without a fill price; "
-                "PnL not booked"
+                f"🛑 {symbol} close acknowledged without authenticated fill; "
+                "position remains owned"
             )
             return None
 
-        entry_fee, exit_fee = self._order_fees(symbol, order, fill_price, size)
+        preflight.record_event('fills')
+
+        fill_cost = float(fill.get('cost') or (sold * fill_price))
+        exit_fee = float(fill.get('fee_quote') or 0.0)
+        owned_before = max(size, 1e-15)
+        portion = min(1.0, sold / owned_before)
+        entry_fee = float(position.get('entry_fee_quote') or 0.0) * portion
+        entry_cost_total = float(position.get('entry_cost') or (entry_price * size))
+        entry_cost = entry_cost_total * portion
 
         gross_pnl = (
-            (fill_price - entry_price) * size
+            fill_cost - entry_cost
             if side == 'buy'
-            else (entry_price - fill_price) * size
+            else entry_cost - fill_cost
         )
         net_pnl = gross_pnl - entry_fee - exit_fee
 
-        # Settle the in-memory book at the real fill, not at the ticker.
-        self.risk_manager.close_position(symbol, fill_price)
-        preflight.record_event('acknowledged')
+        remaining = max(0.0, size - sold)
+        if remaining <= max(1e-12, size * 0.001):
+            self.risk_manager.close_position(symbol, fill_price)
+        else:
+            position['size'] = remaining
+            position['entry_cost'] = entry_cost_total * (1.0 - portion)
+            position['entry_fee_quote'] = float(position.get('entry_fee_quote') or 0.0) * (1.0 - portion)
+            self.risk_manager.open_positions[symbol] = position
+
         preflight.record_event('closes')
         preflight.record_event('close_orders_filled')
         preflight.record_event('reconciled_cycles')
         preflight.invalidate_balance_cache()
+        preflight.record_stage_latency('close_submit_to_fill', time.time() - started)
 
         if net_pnl > 0:
             self.winning_trades += 1
@@ -900,30 +989,38 @@ class ExecutionOrchestrator:
 
         close_record = {
             'symbol': symbol,
-            'order_id': order.get('id'),
+            'order_id': fill.get('order_id') or ((receipt.get('order') or {}).get('id')),
             'side': closing_side,
-            'size': size,
+            'size': sold,
+            'filled': sold,
             'entry_price': entry_price,
             'exit_price': fill_price,
+            'entry_cost': entry_cost,
+            'exit_proceeds': fill_cost,
             'gross_pnl': gross_pnl,
+            'entry_fee_quote': entry_fee,
+            'exit_fee_quote': exit_fee,
             'fees': entry_fee + exit_fee,
             'realized_pnl': net_pnl,
+            'realized_net_pnl': net_pnl,
             'reason': reason,
             'exchange': receipt.get('exchange'),
             'execution_mode': receipt.get('execution_mode'),
+            'fill_source': receipt.get('rpb_fill_source', 'exchange_receipt'),
             'timestamp': datetime.now(),
-            'status': 'closed',
+            'status': 'closed' if remaining <= max(1e-12, size * 0.001) else 'partial_close',
         }
 
         await self.data_hub.publish_trade(close_record)
 
-        logger.info(f"💰 POSITION CLOSED:")
+        logger.info("💰 AUTHENTICATED POSITION SETTLED:")
         logger.info(f"   Symbol: {symbol}")
-        logger.info(f"   Order ID: {order.get('id')}")
+        logger.info(f"   Order ID: {close_record['order_id']}")
         logger.info(f"   Entry: {entry_price}")
         logger.info(f"   Exit fill: {fill_price}")
+        logger.info(f"   Quantity: {sold}")
         logger.info(f"   Gross P&L: {gross_pnl:.8f}")
-        logger.info(f"   Fees: {entry_fee + exit_fee:.8f}")
+        logger.info(f"   Actual fees: {entry_fee + exit_fee:.8f}")
         logger.info(f"   Realized net P&L: {net_pnl:.8f}")
         logger.info(f"   Reason: {reason}")
 
