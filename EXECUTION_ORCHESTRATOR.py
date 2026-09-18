@@ -234,6 +234,9 @@ class ExecutionOrchestrator:
         self.winning_trades = 0
         self.total_profit = 0.0
         self.completed_cycles = 0
+        # Non-executable exchange residue is kept separate from tradable
+        # positions. It is never counted as realized PnL.
+        self.residual_dust = {}
         self.execution_times = deque(maxlen=100)
 
         logger.info("⚡ Execution Orchestrator initialized")
@@ -576,6 +579,10 @@ class ExecutionOrchestrator:
             f"exchange={receipt.get('exchange')} mode={receipt.get('execution_mode')}"
         )
 
+        # The ACK itself can reserve quote currency. Never let a cached
+        # pre-ACK free balance size another order.
+        preflight.invalidate_balance_cache()
+
         # An acknowledgement is not a position. Reuse the already-proven RPB
         # authenticated reconciliation path and never submit a second order.
         receipt = await asyncio.to_thread(
@@ -590,14 +597,64 @@ class ExecutionOrchestrator:
 
         filled = float(fill.get('filled') or 0.0)
         avg_price = float(fill.get('average') or prepared.price or 0.0)
+
+        if filled <= 0.0 or avg_price <= 0.0:
+            # An exchange ACK can reserve quote currency even when no
+            # authenticated fill owner exists. Cancel that exact order rather
+            # than letting stale reservations throttle the next micro-cycle.
+            await self._cancel_ack_without_fill(
+                order_id,
+                prepared.symbol,
+            )
+
+            # Reconcile once more after cancellation. This covers the race
+            # where the order filled just before the cancel reached Bybit.
+            receipt = await asyncio.to_thread(
+                reconcile_authenticated_receipt,
+                receipt,
+                prepared.symbol,
+                mode=prepared.execution_mode,
+                exchange_id=prepared.exchange_id,
+                timeout_seconds=2.0,
+            )
+
+            fill = reconcile_fill(
+                receipt,
+                prepared.symbol,
+            )
+
+            filled = float(
+                fill.get('filled') or 0.0
+            )
+
+            avg_price = float(
+                fill.get('average')
+                or prepared.price
+                or 0.0
+            )
+
         if filled <= 0.0 or avg_price <= 0.0:
             detail = f"ack_without_authenticated_fill order_id={order_id}"
-            preflight.record_blocker(preflight.EXCHANGE_REJECT, f"{symbol}:{detail}")
-            intent.stop(execution_intent.FILL, preflight.EXCHANGE_REJECT, detail)
+
+            preflight.record_blocker(
+                preflight.EXCHANGE_REJECT,
+                f"{symbol}:{detail}",
+            )
+
+            intent.stop(
+                execution_intent.FILL,
+                preflight.EXCHANGE_REJECT,
+                detail,
+            )
+
+            preflight.invalidate_balance_cache()
+
             logger.warning(
                 f"🛑 {prepared.symbol} acknowledged but no authenticated fill "
-                "was observed; no position owner created"
+                "was observed; stale reservation cancellation attempted; "
+                "no position owner created"
             )
+
             return {
                 'ok': False,
                 'prepared': True,
@@ -709,6 +766,349 @@ class ExecutionOrchestrator:
         logger.info(f"   Reconciled latency: {execution_time:.2f}s")
 
         return receipt
+
+    def _residual_execution_limits(self, symbol, price):
+        """Return the venue's amount/cost floor when locally available.
+
+        No order is submitted here. If the exchange metadata does not expose a
+        cost floor, use a tiny conservative fallback solely for residual
+        quarantine. This value is NOT PnL.
+        """
+        normalized = preflight.normalize_symbol(symbol) or symbol
+
+        min_amount = 0.0
+        min_cost = 0.0
+
+        try:
+            broker = preflight.shared_broker()
+
+            candidates = []
+
+            for attr in (
+                "exchange",
+                "client",
+                "_exchange",
+                "ccxt_exchange",
+            ):
+                obj = getattr(broker, attr, None)
+                if obj is not None:
+                    candidates.append(obj)
+
+            candidates.append(broker)
+
+            seen = set()
+
+            for obj in candidates:
+                if obj is None or id(obj) in seen:
+                    continue
+
+                seen.add(id(obj))
+                market = None
+
+                try:
+                    fn = getattr(obj, "market", None)
+                    if callable(fn):
+                        market = fn(normalized)
+                except Exception:
+                    market = None
+
+                if not isinstance(market, dict):
+                    try:
+                        markets = getattr(obj, "markets", None) or {}
+                        market = (
+                            markets.get(normalized)
+                            or markets.get(symbol)
+                        )
+                    except Exception:
+                        market = None
+
+                if not isinstance(market, dict):
+                    continue
+
+                limits = market.get("limits") or {}
+
+                amount_limits = limits.get("amount") or {}
+                cost_limits = limits.get("cost") or {}
+
+                try:
+                    value = float(amount_limits.get("min") or 0.0)
+                    min_amount = max(min_amount, value)
+                except Exception:
+                    pass
+
+                try:
+                    value = float(cost_limits.get("min") or 0.0)
+                    min_cost = max(min_cost, value)
+                except Exception:
+                    pass
+
+        except Exception as exc:
+            logger.debug(
+                f"Residual limit metadata unavailable for {symbol}: {exc}"
+            )
+
+        # Fallback only when the venue supplied no cost floor.
+        # BTC residue currently observed is ~7 cents, so 10 cents is enough
+        # to prevent an endless impossible-order loop without hiding any
+        # meaningful tradable position.
+        if min_cost <= 0.0:
+            try:
+                min_cost = float(
+                    os.getenv(
+                        "RESIDUAL_DUST_FALLBACK_USD",
+                        "0.10",
+                    )
+                )
+            except Exception:
+                min_cost = 0.10
+
+        return {
+            "min_amount": max(0.0, min_amount),
+            "min_cost": max(0.0, min_cost),
+            "reference_price": max(0.0, float(price or 0.0)),
+        }
+
+    def _is_non_executable_residual(self, symbol, size, price):
+        size = max(0.0, float(size or 0.0))
+        price = max(0.0, float(price or 0.0))
+
+        if size <= 0.0:
+            return True, {
+                "min_amount": 0.0,
+                "min_cost": 0.0,
+                "reference_price": price,
+            }
+
+        limits = self._residual_execution_limits(
+            symbol,
+            price,
+        )
+
+        min_amount = float(
+            limits.get("min_amount") or 0.0
+        )
+        min_cost = float(
+            limits.get("min_cost") or 0.0
+        )
+
+        notional = size * price
+
+        amount_too_small = (
+            min_amount > 0.0
+            and size < min_amount
+        )
+
+        cost_too_small = (
+            min_cost > 0.0
+            and price > 0.0
+            and notional < min_cost
+        )
+
+        return (
+            bool(amount_too_small or cost_too_small),
+            limits,
+        )
+
+    def _quarantine_residual(
+        self,
+        symbol,
+        position,
+        size,
+        price,
+        reason,
+        *,
+        count_cycle,
+    ):
+        """Remove only non-executable residue from the tradable position map.
+
+        The asset remains real exchange inventory. It is recorded separately
+        and is never booked as sold or as realized profit.
+        """
+        size = max(0.0, float(size or 0.0))
+        price = max(0.0, float(price or 0.0))
+        notional = size * price
+
+        record = {
+            "symbol": symbol,
+            "size": size,
+            "reference_price": price,
+            "reference_notional": notional,
+            "entry_order_id": position.get("entry_order_id"),
+            "reason": reason,
+            "timestamp": datetime.now().isoformat(),
+            "realized_pnl": None,
+            "realized": False,
+        }
+
+        self.residual_dust[symbol] = record
+
+        # This is deliberately not SmartRiskManager.close_position():
+        # doing that would fabricate a sale/PnL for inventory that remains
+        # at the exchange.
+        self.risk_manager.open_positions.pop(
+            symbol,
+            None,
+        )
+
+        try:
+            import json as _json
+
+            ledger_path = os.getenv(
+                "RESIDUAL_DUST_LEDGER",
+                "/workspace/residual_dust_ledger.jsonl",
+            )
+
+            with open(
+                ledger_path,
+                "a",
+                encoding="utf-8",
+            ) as fh:
+                fh.write(
+                    _json.dumps(
+                        record,
+                        sort_keys=True,
+                    )
+                    + "\n"
+                )
+
+        except Exception as exc:
+            logger.warning(
+                f"Residual dust ledger write failed "
+                f"for {symbol}: {type(exc).__name__}"
+            )
+
+        if count_cycle:
+            self.completed_cycles += 1
+
+        preflight.invalidate_balance_cache()
+
+        logger.warning(
+            f"RUNTIME_PROOF RESIDUAL_DUST_QUARANTINED "
+            f"symbol={symbol} "
+            f"size={size:.12g} "
+            f"reference_notional={notional:.8f} "
+            f"reason={reason}"
+        )
+
+        if count_cycle:
+            logger.info(
+                f"RUNTIME_PROOF TRADABLE_CYCLE_COMPLETED_WITH_DUST "
+                f"cycle={self.completed_cycles} "
+                f"symbol={symbol} "
+                f"residual={size:.12g}"
+            )
+
+        return record
+
+    async def _cancel_ack_without_fill(
+        self,
+        order_id,
+        symbol,
+    ):
+        """Cancel only the acknowledged order that failed reconciliation."""
+        if not order_id:
+            return False
+
+        normalized = (
+            preflight.normalize_symbol(symbol)
+            or symbol
+        )
+
+        def _cancel():
+            broker = preflight.shared_broker()
+
+            objects = []
+
+            # Prefer the actual ccxt client when exposed.
+            for attr in (
+                "exchange",
+                "client",
+                "_exchange",
+                "ccxt_exchange",
+            ):
+                obj = getattr(
+                    broker,
+                    attr,
+                    None,
+                )
+
+                if obj is not None:
+                    objects.append(obj)
+
+            objects.append(broker)
+
+            seen = set()
+            last_error = None
+
+            for obj in objects:
+                if obj is None or id(obj) in seen:
+                    continue
+
+                seen.add(id(obj))
+
+                fn = getattr(
+                    obj,
+                    "cancel_order",
+                    None,
+                )
+
+                if not callable(fn):
+                    continue
+
+                attempts = (
+                    lambda: fn(order_id, normalized),
+                    lambda: fn(
+                        order_id,
+                        symbol=normalized,
+                    ),
+                    lambda: fn(order_id),
+                )
+
+                for call in attempts:
+                    try:
+                        return call()
+                    except TypeError as exc:
+                        last_error = exc
+                        continue
+                    except Exception as exc:
+                        last_error = exc
+
+                        # If the order already filled/closed, cancellation may
+                        # fail. The caller performs one final reconciliation.
+                        break
+
+            if last_error is not None:
+                raise last_error
+
+            raise RuntimeError(
+                "no_cancel_order_interface"
+            )
+
+        cancelled = False
+
+        try:
+            await asyncio.to_thread(_cancel)
+            cancelled = True
+
+            logger.info(
+                f"RUNTIME_PROOF STALE_ACK_CANCEL_REQUESTED "
+                f"symbol={normalized} "
+                f"order_id={order_id}"
+            )
+
+        except Exception as exc:
+            logger.warning(
+                f"RUNTIME_PROOF STALE_ACK_CANCEL_UNCONFIRMED "
+                f"symbol={normalized} "
+                f"order_id={order_id} "
+                f"error={type(exc).__name__}"
+            )
+
+        # An ACK can reserve quote currency even when we never create a
+        # position owner. Never carry the pre-ACK balance cache forward.
+        preflight.invalidate_balance_cache()
+
+        return cancelled
 
     async def _spendable_budget(self) -> float:
         """Free cash, after reconciling what is already held.
@@ -960,6 +1360,36 @@ class ExecutionOrchestrator:
         if blocker is not None:
             detail = str((receipt or {}).get('error', ''))[:200]
             preflight.record_blocker(blocker, f"close:{symbol}:{detail}")
+
+            is_dust, limits = self._is_non_executable_residual(
+                symbol,
+                size,
+                current_price,
+            )
+
+            if is_dust:
+                dust = self._quarantine_residual(
+                    symbol,
+                    position,
+                    size,
+                    current_price,
+                    (
+                        f"exchange_non_executable_residual:"
+                        f"min_amount={limits.get('min_amount')}:"
+                        f"min_cost={limits.get('min_cost')}"
+                    ),
+                    count_cycle=True,
+                )
+
+                return {
+                    'symbol': symbol,
+                    'status': 'tradable_closed_with_dust',
+                    'realized_pnl': 0.0,
+                    'realized_net_pnl': 0.0,
+                    'residual_dust': dust,
+                    'reason': reason,
+                }
+
             logger.warning(
                 f"🛑 {symbol} close NOT placed ({blocker}): position remains open"
             )
@@ -1015,13 +1445,72 @@ class ExecutionOrchestrator:
         net_pnl = gross_pnl - entry_fee - exit_fee
 
         remaining = max(0.0, size - sold)
-        if remaining <= max(1e-12, size * 0.001):
-            self.risk_manager.close_position(symbol, fill_price)
+        close_epsilon = max(1e-12, size * 0.001)
+        dust_quarantined = False
+
+        if remaining <= close_epsilon:
+            self.risk_manager.close_position(
+                symbol,
+                fill_price,
+            )
         else:
-            position['size'] = remaining
-            position['entry_cost'] = entry_cost_total * (1.0 - portion)
-            position['entry_fee_quote'] = float(position.get('entry_fee_quote') or 0.0) * (1.0 - portion)
-            self.risk_manager.open_positions[symbol] = position
+            is_dust, limits = self._is_non_executable_residual(
+                symbol,
+                remaining,
+                fill_price,
+            )
+
+            if is_dust:
+                residual_position = dict(position)
+                residual_position['size'] = remaining
+                residual_position['entry_cost'] = (
+                    entry_cost_total
+                    * (1.0 - portion)
+                )
+                residual_position['entry_fee_quote'] = (
+                    float(
+                        position.get(
+                            'entry_fee_quote'
+                        )
+                        or 0.0
+                    )
+                    * (1.0 - portion)
+                )
+
+                self._quarantine_residual(
+                    symbol,
+                    residual_position,
+                    remaining,
+                    fill_price,
+                    (
+                        f"post_close_non_executable_residual:"
+                        f"min_amount={limits.get('min_amount')}:"
+                        f"min_cost={limits.get('min_cost')}"
+                    ),
+                    count_cycle=False,
+                )
+
+                dust_quarantined = True
+
+            else:
+                position['size'] = remaining
+                position['entry_cost'] = (
+                    entry_cost_total
+                    * (1.0 - portion)
+                )
+                position['entry_fee_quote'] = (
+                    float(
+                        position.get(
+                            'entry_fee_quote'
+                        )
+                        or 0.0
+                    )
+                    * (1.0 - portion)
+                )
+
+                self.risk_manager.open_positions[
+                    symbol
+                ] = position
 
         preflight.record_event('closes')
         preflight.record_event('close_orders_filled')
@@ -1074,12 +1563,37 @@ class ExecutionOrchestrator:
             'execution_mode': receipt.get('execution_mode'),
             'fill_source': receipt.get('rpb_fill_source', 'exchange_receipt'),
             'timestamp': datetime.now(),
-            'status': 'closed' if remaining <= max(1e-12, size * 0.001) else 'partial_close',
+            'status': (
+                'closed_with_dust'
+                if dust_quarantined
+                else (
+                    'closed'
+                    if remaining <= close_epsilon
+                    else 'partial_close'
+                )
+            ),
+            'residual_dust_size': (
+                remaining
+                if dust_quarantined
+                else 0.0
+            ),
+            'residual_dust_realized': False,
         }
 
         await self.data_hub.publish_trade(close_record)
-        if close_record['status'] == 'closed':
+        if close_record['status'] in (
+            'closed',
+            'closed_with_dust',
+        ):
             self.completed_cycles += 1
+
+            if close_record['status'] == 'closed_with_dust':
+                logger.info(
+                    f"RUNTIME_PROOF TRADABLE_CYCLE_COMPLETED_WITH_DUST "
+                    f"cycle={self.completed_cycles} "
+                    f"symbol={symbol} "
+                    f"residual={remaining:.12g}"
+                )
 
         logger.info(
             f"RUNTIME_PROOF REALIZED_NET_AFTER_COSTS symbol={symbol} net={net_pnl:.8f} "
