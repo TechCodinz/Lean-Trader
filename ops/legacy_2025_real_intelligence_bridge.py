@@ -771,6 +771,97 @@ def _real_initialize_ai_clients(self):
         print("ℹ️ OpenAI intelligence provider not configured")
 
 
+async def _real_statistical_arbitrage(self):
+    """Preserve the 2025 pairs/z-score strategy, replace its random ratio."""
+    import numpy as np
+
+    signals = []
+    for asset1, asset2, expected_corr in getattr(self, "pairs", []):
+        try:
+            t1, t2 = await asyncio.gather(
+                asyncio.to_thread(_FEED.ticker, asset1),
+                asyncio.to_thread(_FEED.ticker, asset2),
+            )
+            p1 = _f((t1 or {}).get("last") or (t1 or {}).get("close"))
+            p2 = _f((t2 or {}).get("last") or (t2 or {}).get("close"))
+            if p1 <= 0.0 or p2 <= 0.0:
+                continue
+
+            ratio = p1 / p2
+            key = (asset1, asset2, expected_corr)
+            history = self.ratio_history[key]
+            ratios = list(history)
+
+            if len(ratios) >= 20:
+                mean_ratio = float(np.mean(ratios))
+                std_ratio = float(np.std(ratios))
+                if std_ratio > 0.0:
+                    z_score = (ratio - mean_ratio) / std_ratio
+                    if z_score > 2.0:
+                        signals.append(
+                            {
+                                "type": "stat_arb",
+                                "symbol": asset1,
+                                "side": "sell",
+                                "confidence": min(0.90, 0.70 + abs(z_score) * 0.05),
+                                "reasoning": (
+                                    f"Real pairs ratio {asset1}/{asset2} "
+                                    f"{z_score:.2f} std devs above observed mean"
+                                ),
+                                "strategy": "Statistical Arbitrage",
+                                "z_score": z_score,
+                                "observed_ratio": ratio,
+                                "asset1_price": p1,
+                                "asset2_price": p2,
+                                "expected_corr": expected_corr,
+                                "real_market_data": True,
+                                "market_data_source": "bybit_public_production",
+                                "timestamp": time.time(),
+                            }
+                        )
+                    elif z_score < -2.0:
+                        signals.append(
+                            {
+                                "type": "stat_arb",
+                                "symbol": asset1,
+                                "side": "buy",
+                                "confidence": min(0.90, 0.70 + abs(z_score) * 0.05),
+                                "reasoning": (
+                                    f"Real pairs ratio {asset1}/{asset2} "
+                                    f"{z_score:.2f} std devs below observed mean"
+                                ),
+                                "strategy": "Statistical Arbitrage",
+                                "z_score": z_score,
+                                "observed_ratio": ratio,
+                                "asset1_price": p1,
+                                "asset2_price": p2,
+                                "expected_corr": expected_corr,
+                                "real_market_data": True,
+                                "market_data_source": "bybit_public_production",
+                                "timestamp": time.time(),
+                            }
+                        )
+
+            history.append(ratio)
+        except Exception:
+            continue
+    return signals
+
+
+async def _real_ultra_current_price(self, symbol: str) -> float:
+    """Give the historical UltraScalping monitor a real observed price."""
+    try:
+        ticker = await asyncio.to_thread(_FEED.ticker, symbol)
+        return _f((ticker or {}).get("last") or (ticker or {}).get("close"))
+    except Exception:
+        return 0.0
+
+
+async def _no_simulated_arbitrage_execution(self, *_args, **_kwargs) -> bool:
+    """Never book the old simulated 95%-success arbitrage as real PnL."""
+    return False
+
+
 async def _real_dynamic_scanning(self):
     interval = max(15.0, _f(os.getenv("DYNAMIC_SCAN_SECONDS", "60"), 60.0))
     while True:
@@ -872,6 +963,26 @@ def install() -> None:
     # Dynamic scanner: existing scanning logic remains; its loop now also feeds
     # the CentralDataHub and emits its already-defined trending signals.
     dynamic.DynamicMarketScanner.run_continuous_scanning = _real_dynamic_scanning
+
+    # Other historical specialist modules stay present, but no random/simulated
+    # result is permitted to become execution evidence.
+    try:
+        import HEDGE_FUND_ARSENAL as hedge
+        hedge.StatisticalArbitrage.find_pairs_trades = _real_statistical_arbitrage
+    except Exception:
+        pass
+
+    try:
+        import ultra_scalping_engine as ultra_scalp
+        ultra_scalp.UltraScalpingEngine._get_current_price = _real_ultra_current_price
+    except Exception:
+        pass
+
+    try:
+        import ultra_arbitrage_engine as ultra_arb
+        ultra_arb.UltraArbitrageEngine._simulate_arbitrage_execution = _no_simulated_arbitrage_execution
+    except Exception:
+        pass
 
     # LearningOrchestrator already exists in the 2025 topology; replace only
     # its no-op Evolution handoff with a real evidence handoff.
