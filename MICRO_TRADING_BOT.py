@@ -104,9 +104,7 @@ class MICRO_GATE_BOT:
         try:
             balance = (
                 route_balance(
-                    exchange_id=(
-                        self.exchange_id
-                    )
+                    mode=os.getenv("EXECUTION_MODE", "testnet"),
                 )
                 or {}
             )
