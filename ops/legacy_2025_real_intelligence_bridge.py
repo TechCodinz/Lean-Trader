@@ -261,6 +261,63 @@ def _real_session_pairs(original):
     return wrapped
 
 
+async def _real_smart_scan(self):
+    """Run the historical SmartScalper and annotate only observed evidence."""
+    original = getattr(self, "_legacy_real_original_scan_markets", None)
+    if original is None:
+        return []
+    signals = await original()
+    for signal in signals or []:
+        if not isinstance(signal, dict):
+            continue
+        symbol = str(signal.get("symbol") or "")
+        try:
+            snap = await asyncio.to_thread(_FEED.snapshot, symbol)
+        except Exception:
+            snap = {}
+        price = _f(snap.get("price"))
+        if price > 0.0:
+            signal["price"] = price
+        signal["real_market_data"] = bool(price > 0.0)
+        signal["market_data_source"] = snap.get("source", "bybit_public_production")
+    return signals
+
+
+async def _real_learning_update_evolution(self, trade_data):
+    """Feed authenticated trade outcomes into the existing Evolution instance."""
+    evolution = (getattr(self, "ai_systems", {}) or {}).get("evolution")
+    if evolution is None or not isinstance(trade_data, dict):
+        return
+
+    record = {
+        "timestamp": trade_data.get("timestamp") or time.time(),
+        "symbol": trade_data.get("symbol"),
+        "side": trade_data.get("side"),
+        "status": trade_data.get("status"),
+        "realized_net_pnl": _f(
+            trade_data.get("realized_net_pnl")
+            if trade_data.get("realized_net_pnl") is not None
+            else trade_data.get("realized_pnl")
+        ),
+        "fill_source": trade_data.get("fill_source"),
+        "execution_mode": trade_data.get("execution_mode"),
+        "exchange": trade_data.get("exchange"),
+        "evidence": "central_data_hub_trade",
+    }
+
+    history = getattr(evolution, "performance_history", None)
+    if isinstance(history, list):
+        history.append(record)
+        del history[:-2000]
+
+    connection = getattr(evolution, "live_bot_connection", None)
+    if isinstance(connection, dict):
+        feed = connection.setdefault("performance_feed", [])
+        feed.append(record)
+        del feed[:-2000]
+        connection["last_trade_time"] = record["timestamp"]
+
+
 def _real_evolution_scalping_signals(self):
     """Keep the 2025 5-second scalper thread, remove its RNG signal source."""
     signals = []
@@ -604,6 +661,9 @@ def install() -> None:
     smart.SmartScalpingEngine.analyze_all_timeframes = _real_analyze_all_timeframes
     original_pairs = smart.MarketSession.get_optimal_pairs
     smart.MarketSession.get_optimal_pairs = staticmethod(_real_session_pairs(original_pairs))
+    if not hasattr(smart.SmartScalpingEngine, "_legacy_real_original_scan_markets"):
+        smart.SmartScalpingEngine._legacy_real_original_scan_markets = smart.SmartScalpingEngine.scan_markets
+        smart.SmartScalpingEngine.scan_markets = _real_smart_scan
 
     # Evolution: keep the historical threads/cadence/model arsenal, but remove
     # RNG as trading/performance evidence.
@@ -617,6 +677,14 @@ def install() -> None:
     # Dynamic scanner: existing scanning logic remains; its loop now also feeds
     # the CentralDataHub and emits its already-defined trending signals.
     dynamic.DynamicMarketScanner.run_continuous_scanning = _real_dynamic_scanning
+
+    # LearningOrchestrator already exists in the 2025 topology; replace only
+    # its no-op Evolution handoff with a real evidence handoff.
+    try:
+        import COMPLETE_UNIFIED_ORCHESTRATOR as unified
+        unified.LearningOrchestrator.update_evolution = _real_learning_update_evolution
+    except Exception:
+        pass
 
     _INSTALLED = True
     print("LEGACY_2025_REAL_INTELLIGENCE_BRIDGE_INSTALLED")
