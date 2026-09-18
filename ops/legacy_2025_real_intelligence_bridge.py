@@ -431,18 +431,204 @@ def _real_market_conditions(self):
     def avg(key: str) -> float:
         return sum(_f(row.get(key)) for row in rows) / len(rows)
 
-    momentum = avg("momentum")
-    trend = avg("trend")
-    # This is a price-action direction measure, not external social sentiment.
-    directional = max(-1.0, min(1.0, (momentum + trend) * 100.0))
+    raw_volatility = avg("volatility")
+    raw_momentum = avg("momentum")
+    raw_trend = avg("trend")
+    directional = max(-1.0, min(1.0, (raw_momentum + raw_trend) * 100.0))
     return {
-        "volatility": avg("volatility"),
-        "volume": avg("volume"),
-        "momentum": momentum,
-        "trend": trend,
+        "volatility": max(0.0, min(1.0, raw_volatility * 1000.0)),
+        "volume": max(0.0, min(2.0, avg("volume"))),
+        "momentum": max(0.0, min(1.0, 0.5 + raw_momentum * 100.0)),
+        "trend": max(-1.0, min(1.0, raw_trend * 100.0)),
         "market_sentiment": directional,
+        "raw_volatility": raw_volatility,
+        "raw_momentum": raw_momentum,
+        "raw_trend": raw_trend,
         "evidence": "bybit_public_production_ohlcv",
     }
+
+
+def _real_generate_training_data(self, pair):
+    """Return real public OHLCV-derived features; never synthesize training rows."""
+    candles = _FEED.ohlcv(pair, "1m", 160)
+    valid = [
+        row for row in candles
+        if isinstance(row, (list, tuple)) and len(row) >= 6 and _f(row[4]) > 0.0
+    ]
+    closes = [_f(row[4]) for row in valid]
+    volumes = [max(0.0, _f(row[5])) for row in valid]
+    features = []
+    targets = []
+    for idx in range(21, len(closes) - 1):
+        window = closes[: idx + 1]
+        vol_window = volumes[max(0, idx - 10):idx]
+        vol_mean = sum(vol_window) / len(vol_window) if vol_window else 0.0
+        features.append(
+            [
+                (closes[idx] / closes[idx - 1] - 1.0),
+                (closes[idx] / closes[idx - 3] - 1.0),
+                (_ema(window[-30:], 5) / _ema(window[-40:], 13) - 1.0)
+                if _ema(window[-40:], 13) > 0.0
+                else 0.0,
+                (_rsi(window[-30:], 14) - 50.0) / 50.0,
+                volumes[idx] / vol_mean if vol_mean > 0.0 else 1.0,
+            ]
+        )
+        targets.append(closes[idx + 1] / closes[idx] - 1.0)
+
+    return {
+        "pair": pair,
+        "price_data": closes,
+        "volume_data": volumes,
+        "features": features,
+        "targets": targets,
+        "evidence": "bybit_public_production_ohlcv",
+    }
+
+
+def _real_train_on_testnet_data(self):
+    """Train compatible prediction models only on observed market rows."""
+    import numpy as np
+
+    rows = []
+    targets = []
+    for pair in list(getattr(self, "crypto_pairs", FAST_CRYPTO_PAIRS))[:10]:
+        try:
+            dataset = self.generate_testnet_data(pair)
+            rows.extend(dataset.get("features") or [])
+            targets.extend(dataset.get("targets") or [])
+        except Exception:
+            continue
+
+    if len(rows) < 40 or len(targets) != len(rows):
+        print(f"🧪 Real-data training deferred: {len(rows)} samples")
+        return
+
+    X = np.asarray(rows, dtype=float)
+    y = np.asarray(targets, dtype=float)
+    trained = 0
+    for model_name, model in getattr(self, "prediction_models", {}).items():
+        if not hasattr(model, "fit"):
+            continue
+        try:
+            model.fit(X, y)
+            trained += 1
+        except Exception:
+            continue
+    print(
+        f"✅ Real-data Evolution training completed: "
+        f"samples={len(rows)} models={trained}"
+    )
+
+
+def _real_validate_testnet_strategies(self):
+    """Validation summary comes from actual completed trade outcomes."""
+    perf = self.get_bot_performance()
+    print(
+        "🧪 Strategy validation evidence: "
+        f"completed={perf.get('total_trades', 0)} "
+        f"win_rate={_f(perf.get('win_rate')):.2%} "
+        f"realized_net={_f(perf.get('realized_net_pnl')):.8f}"
+    )
+    return perf
+
+
+def _performance_score(perf: Dict[str, Any]) -> float:
+    trades = int(_f(perf.get("total_trades")))
+    if trades <= 0:
+        return 0.0
+    win = max(0.0, min(1.0, _f(perf.get("win_rate"))))
+    pf = _f(perf.get("profit_factor"))
+    pf_component = 1.0 if math.isinf(pf) else max(0.0, min(1.0, pf / 2.0))
+    pnl = _f(perf.get("realized_net_pnl"))
+    pnl_component = 1.0 if pnl > 0.0 else 0.0
+    return max(0.0, min(1.0, 0.55 * win + 0.30 * pf_component + 0.15 * pnl_component))
+
+
+def _real_evolve_existing_models(self):
+    """Update model score from realized outcomes instead of random increments."""
+    self.evolution_cycle = _f(getattr(self, "evolution_cycle", 0.0)) + 1.0
+    perf = self.get_bot_performance()
+    score = _performance_score(perf)
+
+    if int(_f(perf.get("total_trades"))) > 0:
+        for model_dict_name in (
+            "technical_models",
+            "sentiment_models",
+            "arbitrage_models",
+            "volatility_models",
+            "momentum_models",
+            "volume_models",
+            "risk_models",
+            "forex_models",
+            "stock_models",
+            "commodity_models",
+        ):
+            model_dict = getattr(self, model_dict_name, {}) or {}
+            for model_data in model_dict.values():
+                if isinstance(model_data, dict) and "performance" in model_data:
+                    previous = _f(model_data.get("performance"))
+                    model_data["performance"] = 0.85 * previous + 0.15 * score
+    print(
+        f"🔄 Evidence Evolution cycle {self.evolution_cycle:.0f} "
+        f"score={score:.4f} completed_trades={int(_f(perf.get('total_trades')))}"
+    )
+
+
+def _real_update_model_performance(self):
+    perf = self.get_bot_performance()
+    score = _performance_score(perf)
+    if int(_f(perf.get("total_trades"))) <= 0:
+        print("ℹ️ Model performance unchanged: no authenticated closes yet")
+        return
+    for model_dict_name in (
+        "technical_models",
+        "sentiment_models",
+        "arbitrage_models",
+        "volatility_models",
+        "momentum_models",
+        "volume_models",
+        "risk_models",
+        "forex_models",
+        "stock_models",
+        "commodity_models",
+    ):
+        for model_data in (getattr(self, model_dict_name, {}) or {}).values():
+            if isinstance(model_data, dict) and "performance" in model_data:
+                previous = _f(model_data.get("performance"))
+                model_data["performance"] = 0.90 * previous + 0.10 * score
+    print(f"✅ Model performance updated from realized evidence: {score:.4f}")
+
+
+def _real_pattern_analysis(self):
+    hub = getattr(self, "data_hub", None)
+    trades = list(getattr(hub, "recent_trades", []) or []) if hub is not None else []
+    by_source: Dict[str, Dict[str, float]] = {}
+    for trade in trades:
+        if not isinstance(trade, dict):
+            continue
+        pnl_value = trade.get("realized_net_pnl")
+        if pnl_value is None:
+            pnl_value = trade.get("realized_pnl")
+        if pnl_value is None:
+            continue
+        source = str(trade.get("source_engine") or trade.get("strategy") or "unknown")
+        row = by_source.setdefault(source, {"trades": 0.0, "net": 0.0, "wins": 0.0})
+        pnl = _f(pnl_value)
+        row["trades"] += 1.0
+        row["net"] += pnl
+        if pnl > 0.0:
+            row["wins"] += 1.0
+    return {
+        "source_performance": by_source,
+        "completed_outcomes": int(sum(x["trades"] for x in by_source.values())),
+        "evidence": "central_data_hub_realized_trade_outcomes",
+    }
+
+
+def _no_synthetic_placeholder(*_args, **_kwargs):
+    """Historical placeholder lane stays present but emits no fabricated event."""
+    return []
 
 
 def _real_bot_performance(self):
@@ -670,6 +856,15 @@ def install() -> None:
     evolution.ULTIMATE_EVOLUTION_ENGINE.generate_scalping_signals = _real_evolution_scalping_signals
     evolution.ULTIMATE_EVOLUTION_ENGINE.get_current_market_conditions = _real_market_conditions
     evolution.ULTIMATE_EVOLUTION_ENGINE.get_bot_performance = _real_bot_performance
+    evolution.ULTIMATE_EVOLUTION_ENGINE.generate_testnet_data = _real_generate_training_data
+    evolution.ULTIMATE_EVOLUTION_ENGINE.train_on_testnet_data = _real_train_on_testnet_data
+    evolution.ULTIMATE_EVOLUTION_ENGINE.validate_testnet_strategies = _real_validate_testnet_strategies
+    evolution.ULTIMATE_EVOLUTION_ENGINE.evolve_existing_models = _real_evolve_existing_models
+    evolution.ULTIMATE_EVOLUTION_ENGINE.update_model_performance = _real_update_model_performance
+    evolution.ULTIMATE_EVOLUTION_ENGINE.analyze_trading_patterns = _real_pattern_analysis
+    evolution.ULTIMATE_EVOLUTION_ENGINE.scan_for_moon_gems = _no_synthetic_placeholder
+    evolution.ULTIMATE_EVOLUTION_ENGINE.find_arbitrage_opportunities = _no_synthetic_placeholder
+    evolution.ULTIMATE_EVOLUTION_ENGINE.execute_fx_trades = _no_synthetic_placeholder
     evolution.ULTIMATE_EVOLUTION_ENGINE.init_evolution_database = _real_evolution_database
     evolution.ULTIMATE_EVOLUTION_ENGINE.connect_to_live_bot = _real_connect_to_runtime
     evolution.ULTIMATE_EVOLUTION_ENGINE.initialize_ai_clients = _real_initialize_ai_clients
