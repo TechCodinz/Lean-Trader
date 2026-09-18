@@ -324,15 +324,32 @@ chmod 600 "$ENV_FILE"
 echo
 echo "=== MIRROR CURRENT TESTNET SECRET AUTHORITY ==="
 SECRET_MOUNT_ARGS=()
+SECRET_ROOT="$STATE_ROOT/secrets"
+rm -rf "$SECRET_ROOT"
+mkdir -p "$SECRET_ROOT"
+chmod 700 "$SECRET_ROOT"
 
+declare -A SECRET_DEST_SEEN=()
+
+add_secret_mount() {
+  local spec="$1"
+  local dest="$2"
+  [ -n "$dest" ] || return 0
+  if [ -z "${SECRET_DEST_SEEN[$dest]:-}" ]; then
+    SECRET_MOUNT_ARGS+=(--mount "$spec")
+    SECRET_DEST_SEEN["$dest"]=1
+  fi
+}
+
+# First reuse ordinary bind/volume mounts when Docker exposes them.
 while IFS='|' read -r mtype source name dest; do
   [ -n "$dest" ] || continue
   case "$dest" in
     /run/secrets/*)
       if [ "$mtype" = "bind" ] && [ -n "$source" ] && [ -e "$source" ]; then
-        SECRET_MOUNT_ARGS+=(--mount "type=bind,src=$source,dst=$dest,readonly")
+        add_secret_mount "type=bind,src=$source,dst=$dest,readonly" "$dest"
       elif [ "$mtype" = "volume" ] && [ -n "$name" ]; then
-        SECRET_MOUNT_ARGS+=(--mount "type=volume,src=$name,dst=$dest,readonly")
+        add_secret_mount "type=volume,src=$name,dst=$dest,readonly" "$dest"
       fi
       ;;
   esac
@@ -341,13 +358,52 @@ done < <(
     --format '{{range .Mounts}}{{printf "%s|%s|%s|%s\n" .Type .Source .Name .Destination}}{{end}}'
 )
 
-if [ "${#SECRET_MOUNT_ARGS[@]}" -eq 0 ]; then
-  echo "No reusable /run/secrets mount found on current authenticated RPB."
-  echo "Refusing cutover; current RPB remains untouched."
-  exit 1
+# Some Compose/runtime setups create credential files inside the container
+# instead of exposing them as .Mounts. Reuse only paths already configured by
+# the healthy authenticated RPB, copy them without printing contents, and mount
+# them read-only at the exact same path in the restored runtime.
+while IFS='=' read -r env_key secret_path; do
+  [ -n "$env_key" ] || continue
+  [ -n "$secret_path" ] || continue
+  case "$env_key" in
+    BYBIT_*_FILE|CCXT_*_FILE)
+      if docker exec "$CURRENT_RPB" sh -c 'test -r "$1"' sh "$secret_path" >/dev/null 2>&1; then
+        safe_name="$(printf '%s' "$env_key" | tr '[:upper:]' '[:lower:]')"
+        host_copy="$SECRET_ROOT/$safe_name"
+        docker cp "$CURRENT_RPB:$secret_path" "$host_copy" >/dev/null
+        chmod 600 "$host_copy"
+        add_secret_mount "type=bind,src=$host_copy,dst=$secret_path,readonly" "$secret_path"
+        echo "$env_key=READY_FROM_CURRENT_RPB"
+      fi
+      ;;
+  esac
+done < <(
+  docker inspect "$CURRENT_RPB" \
+    --format '{{range .Config.Env}}{{println .}}{{end}}' \
+    | grep -E '^(BYBIT|CCXT)_[A-Z0-9_]*_FILE=' || true
+)
+
+if [ "${#SECRET_MOUNT_ARGS[@]}" -gt 0 ]; then
+  echo "Testnet credential files mirrored without exposing secret values."
+else
+  echo "No file-based credentials mirrored; authenticated preflight will test direct env credentials."
 fi
 
-echo "Mirrored current RPB secret mounts without exposing secret values."
+echo
+echo "=== CURRENT RPB AUTHORITY PROOF — READ ONLY ==="
+docker exec "$CURRENT_RPB" python - <<'PY' || true
+try:
+    from src.leantrader.execution.router import execution_status
+    row = execution_status(mode="testnet", exchange_id="bybit")
+    print({
+        "execution_mode": row.get("execution_mode"),
+        "authority": row.get("authority"),
+        "exchange": row.get("exchange"),
+        "authenticated": bool(row.get("authenticated")),
+    })
+except Exception as exc:
+    print({"current_rpb_status_probe": type(exc).__name__})
+PY
 
 for key in ANTHROPIC_API_KEY OPENAI_API_KEY HUGGINGFACE_TOKEN QISKIT_IBM_TOKEN; do
   if grep -q "^\${key}=." "$ENV_FILE"; then
@@ -726,6 +782,16 @@ if free is None:
     raise SystemExit("AUTHENTICATED_TESTNET_BALANCE_UNAVAILABLE")
 
 print("AUTHENTICATED_TESTNET_FREE_USDT", round(float(free), 8))
+
+from src.leantrader.execution.broker_ccxt import BrokerCCXT
+public = BrokerCCXT(execution_mode="paper", exchange_id="bybit")
+ticker = public.fetch_ticker("BTC/USDT") or {}
+last = float(ticker.get("last") or ticker.get("close") or 0.0)
+candles = public.fetch_ohlcv("BTC/USDT", timeframe="1m", limit=30) or []
+if last <= 0.0 or len(candles) < 20:
+    raise SystemExit("PRODUCTION_PUBLIC_MARKET_DATA_UNAVAILABLE")
+print("PRODUCTION_PUBLIC_BTC_LAST", round(last, 8))
+print("PRODUCTION_PUBLIC_1M_CANDLES", len(candles))
 print("AUTHENTICATED_TESTNET_PREFLIGHT_OK")
 PY
 
@@ -760,20 +826,32 @@ for _ in $(seq 1 18); do
     echo "Credential mount failure detected during 2025 startup."
     break
   fi
+  if printf '%s\n' "$LOGS" | grep -q 'Evolution database error'; then
+    echo "Evolution database failed during 2025 startup."
+    break
+  fi
+  if printf '%s\n' "$LOGS" | grep -q "Enhanced loop error: 'total_profit'"; then
+    echo "Historical execution-stat compatibility failure detected."
+    break
+  fi
 
   DECISION_OK=0
   EXECUTION_OK=0
   SCALPER_OK=0
   MARKET_OK=0
   BRIDGE_OK=0
+  EVOLUTION_OK=0
+  CRYPTO_SCALPER_OK=0
 
   printf '%s\n' "$LOGS" | grep -Eq 'Decision loop started|Decision:' && DECISION_OK=1 || true
   printf '%s\n' "$LOGS" | grep -Eq 'EXECUTION LOOP STARTED|EXECUTING:' && EXECUTION_OK=1 || true
   printf '%s\n' "$LOGS" | grep -Eq 'SMART SCALPING LOOP STARTED|Scalper generated' && SCALPER_OK=1 || true
   printf '%s\n' "$LOGS" | grep -q 'REAL_MARKET_SCAN' && MARKET_OK=1 || true
   printf '%s\n' "$LOGS" | grep -q 'LEGACY_2025_REAL_INTELLIGENCE_BRIDGE_INSTALLED' && BRIDGE_OK=1 || true
+  printf '%s\n' "$LOGS" | grep -Eq 'Evolution database initialized|Evidence Evolution cycle' && EVOLUTION_OK=1 || true
+  printf '%s\n' "$LOGS" | grep -Eq 'BTC/USDT|ETH/USDT|SOL/USDT|DOGE/USDT|XRP/USDT|ADA/USDT|BNB/USDT' && CRYPTO_SCALPER_OK=1 || true
 
-  if [ "$DECISION_OK" -eq 1 ] && [ "$EXECUTION_OK" -eq 1 ] && [ "$SCALPER_OK" -eq 1 ] && [ "$MARKET_OK" -eq 1 ] && [ "$BRIDGE_OK" -eq 1 ]; then
+  if [ "$DECISION_OK" -eq 1 ] && [ "$EXECUTION_OK" -eq 1 ] && [ "$SCALPER_OK" -eq 1 ] && [ "$MARKET_OK" -eq 1 ] && [ "$BRIDGE_OK" -eq 1 ] && [ "$EVOLUTION_OK" -eq 1 ] && [ "$CRYPTO_SCALPER_OK" -eq 1 ]; then
     READY=1
     break
   fi
@@ -800,7 +878,7 @@ docker ps --filter "name=$LEGACY_CONTAINER"   --format 'NAME={{.Names}} STATUS={
 
 echo
 echo "=== ENGINE START EVIDENCE ==="
-docker logs --since 3m "$LEGACY_CONTAINER" 2>&1   | grep -E 'AUTHENTICATED_TESTNET|REAL_MARKET_SCAN|REAL_SMART_SCALPER|LEGACY_2025_REAL_INTELLIGENCE|AUTHENTICATED POSITION|AUTHENTICATED POSITION SETTLED|Realized net P&L|ALL 50\+ ORCHESTRATORS RUNNING|Decision loop started|EXECUTION LOOP STARTED|SMART SCALPING LOOP STARTED|Scalper generated|Published .* signals|Decision:|EXECUTING:|SUBMITTING|Evolution|Sentient|Swarm|Learning loop started|Scouting loop started|ERROR|Traceback'   | tail -n 240 || true
+docker logs --since 3m "$LEGACY_CONTAINER" 2>&1   | grep -E 'AUTHENTICATED_TESTNET|PRODUCTION_PUBLIC|REAL_MARKET_SCAN|REAL_SMART_SCALPER|LEGACY_2025_REAL_INTELLIGENCE|AUTHENTICATED POSITION|AUTHENTICATED POSITION SETTLED|Realized net P&L|ALL 50\+ ORCHESTRATORS RUNNING|Decision loop started|EXECUTION LOOP STARTED|SMART SCALPING LOOP STARTED|Scalper generated|Published .* signals|Decision:|EXECUTING:|SUBMITTING|ORDER ACKNOWLEDGED|Evolution database initialized|Evidence Evolution cycle|Evolution|Sentient|Swarm|Learning loop started|Scouting loop started|ERROR|Traceback'   | tail -n 240 || true
 
 echo
 echo "=== CONTAINER MODE EVIDENCE ==="
