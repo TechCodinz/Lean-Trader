@@ -15,6 +15,7 @@ from rpb_fill_reconciliation import (
 from rpb_runtime_hardening import (
     PairQuarantineStore,
     PendingExecutionStore,
+    assess_testnet_execution_book,
     definitive_exchange_reject_reason,
     extract_order_id,
     is_dust_block,
@@ -36,7 +37,9 @@ class UnifiedRPBRuntime(REAL_PROFIT_BOT):
         self._last_epoch_sweep = 0.0
         self._pending_notice_at = 0.0
         self._exit_reason_context = ""
-        self.blocked_pairs.update(self.quarantine_store.symbols())
+        for q_symbol, q_record in self.quarantine_store.active().items():
+            if q_record.get("kind") != "testnet_liquidity":
+                self.blocked_pairs.add(q_symbol)
         self._apply_active_dust_quarantines()
 
     # ----------------------------------------------------- ownership recovery
@@ -212,6 +215,93 @@ class UnifiedRPBRuntime(REAL_PROFIT_BOT):
             self._pending_notice_at = now
         return False
 
+    # ------------------------------------------------ execution liquidity
+
+    def _testnet_entry_liquidity_gate(self, symbol: str) -> Dict[str, Any] | None:
+        """Require a genuinely executable two-sided Bybit Testnet book.
+
+        Production market data remains the signal source. This gate only asks
+        whether Bybit Testnet can actually support the small entry and a later
+        exit before authenticated capital is committed.
+        """
+        if self.mode != "testnet" or self.execution_exchange_id != "bybit":
+            return None
+
+        existing = self.quarantine_store.get(symbol)
+        if existing.get("kind") == "testnet_liquidity":
+            return {
+                "ok": False,
+                "prepared": False,
+                "blocker": "TESTNET_LIQUIDITY_UNAVAILABLE",
+                "detail": str(existing.get("detail") or existing.get("reason") or ""),
+                "stage": "execution_liquidity",
+            }
+
+        target_quote = float(os.getenv("RPB_EXECUTABLE_FLOOR_USD", "5.10") or 5.10)
+        max_spread_bps = float(
+            os.getenv("RPB_TESTNET_MAX_ENTRY_SPREAD_BPS", "250") or 250
+        )
+        min_depth_multiple = float(
+            os.getenv("RPB_TESTNET_MIN_DEPTH_MULTIPLE", "1.25") or 1.25
+        )
+        ttl_seconds = float(
+            os.getenv("RPB_TESTNET_LIQUIDITY_QUARANTINE_SECONDS", "60") or 60
+        )
+
+        try:
+            from src.leantrader.execution.broker_ccxt import BrokerCCXT
+
+            broker = BrokerCCXT(
+                execution_mode="testnet",
+                exchange_id="bybit",
+                market_mode="spot",
+            )
+            exchange = broker._make_exchange("testnet", authenticated=False)  # noqa: SLF001
+            orderbook = exchange.fetch_order_book(symbol, limit=10) or {}
+            assessment = assess_testnet_execution_book(
+                orderbook,
+                target_quote=target_quote,
+                max_spread_bps=max_spread_bps,
+                min_depth_multiple=min_depth_multiple,
+            )
+        except Exception as exc:
+            assessment = {
+                "ok": False,
+                "reason": "orderbook_unavailable",
+                "error": type(exc).__name__,
+                "spread_bps": None,
+                "bid_depth_quote": 0.0,
+                "ask_depth_quote": 0.0,
+            }
+
+        if assessment.get("ok"):
+            return None
+
+        reason = str(assessment.get("reason") or "testnet_liquidity_unavailable")
+        spread = assessment.get("spread_bps")
+        bid_depth = float(assessment.get("bid_depth_quote") or 0.0)
+        ask_depth = float(assessment.get("ask_depth_quote") or 0.0)
+        detail = (
+            f"{reason}; spread_bps={spread}; "
+            f"bid_depth=${bid_depth:.4f}; ask_depth=${ask_depth:.4f}; "
+            f"target=${target_quote:.4f}"
+        )
+        self.quarantine_store.add(
+            symbol,
+            kind="testnet_liquidity",
+            reason=reason,
+            detail=detail,
+            ttl_seconds=max(5.0, ttl_seconds),
+        )
+        print(f"🌊 TESTNET LIQUIDITY SKIP: {symbol} {detail}")
+        return {
+            "ok": False,
+            "prepared": False,
+            "blocker": "TESTNET_LIQUIDITY_UNAVAILABLE",
+            "detail": detail,
+            "stage": "execution_liquidity",
+        }
+
     # ----------------------------------------------------------- execution
 
     def execute_trade(self, symbol, signal, price, amount=None, confidence=0.0):
@@ -227,6 +317,11 @@ class UnifiedRPBRuntime(REAL_PROFIT_BOT):
                 "detail": "previous acknowledged order still awaiting authenticated fill state",
                 "stage": "ownership",
             }
+
+        if side == "buy":
+            liquidity_block = self._testnet_entry_liquidity_gate(symbol)
+            if liquidity_block is not None:
+                return liquidity_block
 
         receipt = super().execute_trade(
             symbol,
