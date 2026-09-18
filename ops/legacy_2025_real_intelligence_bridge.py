@@ -805,10 +805,15 @@ async def _real_swarm_market_data(self, symbol: str, timeframe: str):
 
 
 async def _real_swarm_collective_decision(self, signal=None):
-    """On-demand 2025 swarm consensus over real data for the current signal."""
+    """Fast on-demand 2025 swarm consensus over real data for current signal."""
     source = signal if isinstance(signal, dict) else {}
     data = source.get("data") if isinstance(source.get("data"), dict) else {}
-    symbol = str(source.get("symbol") or data.get("symbol") or data.get("pair") or "BTC/USDT")
+    symbol = str(
+        source.get("symbol")
+        or data.get("symbol")
+        or data.get("pair")
+        or "BTC/USDT"
+    )
     if "/" not in symbol or not symbol.upper().endswith("/USDT"):
         return {
             "action": "hold",
@@ -817,6 +822,15 @@ async def _real_swarm_collective_decision(self, signal=None):
             "symbol": symbol,
             "real_market_data": False,
         }
+
+    now = time.time()
+    cache = getattr(self, "_real_consensus_cache", None)
+    if not isinstance(cache, dict):
+        cache = {}
+        self._real_consensus_cache = cache
+    cached = cache.get(symbol)
+    if cached and now - _f(cached.get("timestamp")) <= 2.0:
+        return dict(cached["decision"])
 
     frame = await _real_swarm_market_data(None, symbol, "1m")
     if frame is None:
@@ -828,60 +842,73 @@ async def _real_swarm_collective_decision(self, signal=None):
             "real_market_data": False,
         }
 
-    # Reuse all historical agent specializations, but share one observed frame
-    # so collective intelligence does not multiply network/API traffic.
-    async def analyze(agent):
-        try:
-            if agent.specialization == "scalping":
-                return await agent._analyze_scalping(frame, symbol, "1m")
-            if agent.specialization == "arbitrage":
-                return await agent._analyze_arbitrage(frame, symbol, "1m")
-            if agent.specialization == "trend":
-                return await agent._analyze_trend(frame, symbol, "1m")
-            if agent.specialization == "black_swan":
-                return await agent._analyze_black_swan(frame, symbol, "1m")
-            return await agent._analyze_general(frame, symbol, "1m")
-        except Exception:
-            return None
+    # Historical agents of one specialization run identical deterministic
+    # analysis on the same frame. Evaluate one representative per specialty
+    # and retain all 100 agents as vote weights; this is mathematically
+    # equivalent without serializing the fast decision path.
+    groups: Dict[str, List[Any]] = {}
+    for agent in getattr(self, "agents", []):
+        groups.setdefault(str(getattr(agent, "specialization", "general")), []).append(agent)
 
-    votes = await asyncio.gather(
-        *(analyze(agent) for agent in getattr(self, "agents", [])),
-        return_exceptions=True,
+    weighted_votes = []
+    for specialization, agents in groups.items():
+        if not agents:
+            continue
+        agent = agents[0]
+        try:
+            if specialization == "scalping":
+                result = await agent._analyze_scalping(frame, symbol, "1m")
+            elif specialization == "arbitrage":
+                result = await agent._analyze_arbitrage(frame, symbol, "1m")
+            elif specialization == "trend":
+                result = await agent._analyze_trend(frame, symbol, "1m")
+            elif specialization == "black_swan":
+                result = await agent._analyze_black_swan(frame, symbol, "1m")
+            else:
+                result = await agent._analyze_general(frame, symbol, "1m")
+        except Exception:
+            result = None
+        if result is not None and getattr(result, "signal_type", None) in {"buy", "sell"}:
+            weighted_votes.append((result, len(agents)))
+
+    buy_count = sum(weight for row, weight in weighted_votes if row.signal_type == "buy")
+    sell_count = sum(weight for row, weight in weighted_votes if row.signal_type == "sell")
+    buy_weight = sum(
+        _f(row.confidence) * weight
+        for row, weight in weighted_votes
+        if row.signal_type == "buy"
     )
-    valid = [
-        row for row in votes
-        if not isinstance(row, Exception)
-        and row is not None
-        and getattr(row, "signal_type", None) in {"buy", "sell"}
-    ]
-    buys = [row for row in valid if row.signal_type == "buy"]
-    sells = [row for row in valid if row.signal_type == "sell"]
-    buy_weight = sum(_f(row.confidence) for row in buys)
-    sell_weight = sum(_f(row.confidence) for row in sells)
+    sell_weight = sum(
+        _f(row.confidence) * weight
+        for row, weight in weighted_votes
+        if row.signal_type == "sell"
+    )
 
     if buy_weight <= 0.0 and sell_weight <= 0.0:
         action = "hold"
         confidence = 0.0
     elif buy_weight > sell_weight:
         action = "buy"
-        confidence = buy_weight / max(1.0, len(buys))
+        confidence = buy_weight / max(1, buy_count)
     elif sell_weight > buy_weight:
         action = "sell"
-        confidence = sell_weight / max(1.0, len(sells))
+        confidence = sell_weight / max(1, sell_count)
     else:
         action = "hold"
         confidence = 0.0
 
-    return {
+    decision = {
         "action": action,
         "confidence": max(0.0, min(0.99, confidence)),
-        "agent_count": len(valid),
-        "buy_votes": len(buys),
-        "sell_votes": len(sells),
+        "agent_count": buy_count + sell_count,
+        "buy_votes": buy_count,
+        "sell_votes": sell_count,
         "symbol": symbol,
         "real_market_data": True,
         "market_data_source": "bybit_public_production",
     }
+    cache[symbol] = {"timestamp": now, "decision": dict(decision)}
+    return decision
 
 
 async def _real_swarm_performance_metrics(self):
