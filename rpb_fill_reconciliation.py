@@ -12,7 +12,7 @@ It never creates orders and never grants execution authority.
 from __future__ import annotations
 
 import time
-from typing import Any, Dict, Iterable, List
+from typing import Any, Dict, Iterable, List, Optional, Set
 
 
 def _f(value: Any, default: float = 0.0) -> float:
@@ -308,6 +308,7 @@ def recover_current_epoch_to_ledger(
     since_ms: int,
     mode: str = "testnet",
     exchange_id: str = "bybit",
+    exclude_symbols: Optional[Set[str]] = None,
 ) -> Dict[str, Any]:
     """Idempotently attach current-epoch authenticated fills to the RPB ledger."""
     from rpb_position_lifecycle import PositionLedger
@@ -322,6 +323,9 @@ def recover_current_epoch_to_ledger(
     balance = exchange.fetch_balance() or {}
     trades = exchange.fetch_my_trades(None, int(since_ms), 100) or []
     reconstructed = reconstruct_epoch_positions(trades, balance, since_ms=int(since_ms))
+    excluded = {str(symbol) for symbol in (exclude_symbols or set())}
+    if excluded:
+        reconstructed = [row for row in reconstructed if row.get("symbol") not in excluded]
 
     ledger = PositionLedger()
     adopted: List[str] = []
@@ -355,4 +359,5 @@ def recover_current_epoch_to_ledger(
         "reconstructed": [row["symbol"] for row in reconstructed],
         "adopted": adopted,
         "already_owned": already_owned,
+        "excluded": sorted(excluded),
     }
