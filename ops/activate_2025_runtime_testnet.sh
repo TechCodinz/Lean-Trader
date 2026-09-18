@@ -46,6 +46,18 @@ echo "legacy_date=$(git -C "$LEGACY" show -s --format=%cI HEAD)"
 # historical brain does not fall back to simulated trades or synthetic closes.
 rsync -a --delete "$SOURCE/src/leantrader/" "$LEGACY/src/leantrader/"
 cp "$SOURCE/EXECUTION_ORCHESTRATOR.py" "$LEGACY/EXECUTION_ORCHESTRATOR.py"
+
+# Modern authenticated execution requires these two top-level reconciliation
+# modules. They do not replace the October-2025 brain; they only preserve
+# authenticated ACK -> fill -> position -> close -> realized-net semantics.
+for dep in rpb_fill_reconciliation.py rpb_position_lifecycle.py; do
+    if [ ! -f "$SOURCE/$dep" ]; then
+        echo "Missing authenticated execution dependency: $SOURCE/$dep"
+        exit 1
+    fi
+    cp "$SOURCE/$dep" "$LEGACY/$dep"
+done
+
 cp "$SOURCE/ops/legacy_2025_real_intelligence_bridge.py" "$LEGACY/LEGACY_2025_REAL_INTELLIGENCE_BRIDGE.py"
 
 # Apply compatibility overlays only; the October-2025 signal/decision strategy stays intact.
@@ -391,7 +403,7 @@ fi
 
 echo
 echo "=== CURRENT RPB AUTHORITY PROOF — READ ONLY ==="
-docker exec "$CURRENT_RPB" python - <<'PY' || true
+docker exec -i "$CURRENT_RPB" python - <<'PY' || true
 try:
     from src.leantrader.execution.router import execution_status
     row = execution_status(mode="testnet", exchange_id="bybit")
@@ -882,7 +894,7 @@ docker logs --since 3m "$LEGACY_CONTAINER" 2>&1   | grep -E 'AUTHENTICATED_TESTN
 
 echo
 echo "=== CONTAINER MODE EVIDENCE ==="
-docker exec "$LEGACY_CONTAINER" python - <<'PY'
+docker exec -i "$LEGACY_CONTAINER" python - <<'PY'
 import os
 print({
     "TRADING_MODE": os.getenv("TRADING_MODE"),

@@ -36,7 +36,7 @@ done
 
 echo
 echo "=== AUTHENTICATED BYBIT TESTNET RUNTIME PROBE ==="
-docker exec "$LEGACY_CONTAINER" python - <<'PY' || exit 1
+docker exec -i "$LEGACY_CONTAINER" python - <<'PY' || rollback_postcheck
 from src.leantrader.execution.router import execution_status, route_balance
 
 status = execution_status(mode="testnet", exchange_id="bybit")
@@ -104,7 +104,7 @@ fi
 
 echo
 echo "=== FINAL MODE ==="
-docker exec "$LEGACY_CONTAINER" python - <<'PY'
+docker exec -i "$LEGACY_CONTAINER" python - <<'PY'
 import os
 print({
     "TRADING_MODE": os.getenv("TRADING_MODE"),
