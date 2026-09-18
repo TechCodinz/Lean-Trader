@@ -164,7 +164,7 @@ import sys
 
 modules = [
     # previously repaired/core validation
-    "pytest", "numpy", "pandas", "scipy", "sklearn", "ccxt",
+    "pytest", "numpy", "pandas", "scipy", "sklearn", "numba", "tiktoken", "multipart", "ccxt",
     "yaml", "aiohttp", "psutil", "dotenv", "redis", "web3",
     # 2025 runtime imports
     "bs4", "lxml", "feedparser", "tensorflow", "keras", "torch",
