@@ -206,14 +206,82 @@ print("LEGACY_2025_DEPENDENCIES_OK")
 PY
 
 echo
-echo "=== COMPILE RESTORED 2025 PYTHON TREE ==="
+echo "=== APPLY NON-STRATEGY 2025 SOURCE REPAIRS ==="
+# These are parser/import repairs only. They do not alter trading thresholds,
+# signals, sizing, execution mode, or strategy behavior.
+python3 - "$LEGACY" <<'PY'
+from pathlib import Path
+import sys
+
+root = Path(sys.argv[1])
+
+# Historical test_api_connections.py was already listed in the 2025 repair
+# scripts as a syntax-error file. Repair only object naming + typing imports.
+p = root / "test_api_connections.py"
+if p.exists():
+    s = p.read_text()
+    if "from typing import Dict, Any" not in s:
+        s = s.replace("import sys\n", "import sys\nfrom typing import Dict, Any\n", 1)
+    s = s.replace("self.ExchangeManager() = ExchangeManager()", "self.exchange_manager = ExchangeManager()")
+    s = s.replace("self.ExchangeManager()", "self.exchange_manager")
+    p.write_text(s)
+
+# Historical tools/market_data_ultra.py contains a multiline f-string that is
+# invalid Python. Preserve the same URL/values and only repair the parser form.
+p = root / "tools" / "market_data_ultra.py"
+if p.exists():
+    s = p.read_text()
+    old = '''                f"https://cryptopanic.com/api/v1/posts/?auth_token={
+                    self.api_keys.get(
+                        'cryptopanic', '')}&currencies={symbol}",'''
+    new = '''                f"https://cryptopanic.com/api/v1/posts/?auth_token={self.api_keys.get('cryptopanic', '')}&currencies={symbol}",'''
+    if old in s:
+        s = s.replace(old, new)
+    p.write_text(s)
+
+# Package markers restored during the later module-repair work.
+for pkgdir in (root / "src" / "leantrader" / "agents", root / "src" / "leantrader" / "production"):
+    if pkgdir.is_dir():
+        (pkgdir / "__init__.py").touch()
+
+print("LEGACY_2025_SOURCE_REPAIRS_APPLIED")
+PY
+
+echo
+echo "=== SOURCE SYNTAX CHECK — NO PYC WRITES ==="
 docker run --rm \
-  --env-file "$ENV_FILE" \
-  -v "$LEGACY:/app" \
+  -v "$LEGACY:/app:ro" \
   -w /app \
   "$LEGACY_IMAGE" \
-  python -m compileall -q . || exit 1
-echo "LEGACY_2025_COMPILE_OK"
+  python - <<'PY'
+from pathlib import Path
+import sys
+
+root = Path("/app")
+bad = []
+checked = 0
+skip_parts = {".git", "__pycache__", ".venv", "venv", "runtime", "node_modules"}
+
+for p in sorted(root.rglob("*.py")):
+    if any(part in skip_parts for part in p.parts):
+        continue
+    try:
+        src = p.read_text(encoding="utf-8", errors="replace")
+        compile(src, str(p.relative_to(root)), "exec", dont_inherit=True)
+        checked += 1
+    except SyntaxError as exc:
+        bad.append((str(p.relative_to(root)), exc.lineno, exc.msg))
+    except Exception as exc:
+        bad.append((str(p.relative_to(root)), None, f"{type(exc).__name__}: {exc}"))
+
+print("SYNTAX_CHECKED", checked)
+if bad:
+    print("SYNTAX_ERRORS", len(bad))
+    for row in bad:
+        print(row)
+    sys.exit(1)
+print("LEGACY_2025_SOURCE_SYNTAX_OK")
+PY
 
 echo
 echo "=== IMPORT SMOKE TEST — NO TRADING ==="
