@@ -36,6 +36,7 @@ def assess_testnet_execution_book(
     max_spread_bps: float = 250.0,
     min_depth_multiple: float = 1.25,
     depth_levels: int = 5,
+    max_roundtrip_friction_bps: Optional[float] = None,
 ) -> Dict[str, Any]:
     """Decide whether a Testnet spot book can support a small round trip.
 
@@ -98,6 +99,52 @@ def assess_testnet_execution_book(
         1.0, float(min_depth_multiple or 1.0)
     )
 
+    def _buy_base_for_quote(levels, quote_budget):
+        remaining_quote = max(0.0, float(quote_budget or 0.0))
+        acquired_base = 0.0
+        spent_quote = 0.0
+        for price, qty in levels[:depth_levels]:
+            level_quote = price * qty
+            take_quote = min(remaining_quote, level_quote)
+            if take_quote <= 0.0:
+                break
+            acquired_base += take_quote / price
+            spent_quote += take_quote
+            remaining_quote -= take_quote
+            if remaining_quote <= 1e-12:
+                break
+        return acquired_base, spent_quote, remaining_quote
+
+    def _sell_base_for_quote(levels, base_qty):
+        remaining_base = max(0.0, float(base_qty or 0.0))
+        proceeds_quote = 0.0
+        sold_base = 0.0
+        for price, qty in levels[:depth_levels]:
+            take_base = min(remaining_base, qty)
+            if take_base <= 0.0:
+                break
+            sold_base += take_base
+            proceeds_quote += take_base * price
+            remaining_base -= take_base
+            if remaining_base <= 1e-12:
+                break
+        return sold_base, proceeds_quote, remaining_base
+
+    acquired_base, spent_quote, buy_shortfall = _buy_base_for_quote(
+        asks,
+        max(0.0, float(target_quote or 0.0)),
+    )
+    sold_base, exit_quote, sell_shortfall = _sell_base_for_quote(
+        bids,
+        acquired_base,
+    )
+    roundtrip_friction_bps = None
+    if spent_quote > 0.0 and buy_shortfall <= 1e-12 and sell_shortfall <= 1e-12:
+        roundtrip_friction_bps = max(
+            0.0,
+            ((spent_quote - exit_quote) / spent_quote) * 10_000.0,
+        )
+
     if best_ask <= best_bid or spread_bps < 0.0:
         return {
             "ok": False,
@@ -122,7 +169,12 @@ def assess_testnet_execution_book(
             "required_depth_quote": required_depth,
         }
 
-    if bid_depth + 1e-12 < required_depth or ask_depth + 1e-12 < required_depth:
+    if (
+        bid_depth + 1e-12 < required_depth
+        or ask_depth + 1e-12 < required_depth
+        or buy_shortfall > 1e-12
+        or sell_shortfall > 1e-12
+    ):
         return {
             "ok": False,
             "reason": "insufficient_roundtrip_depth",
@@ -132,6 +184,26 @@ def assess_testnet_execution_book(
             "bid_depth_quote": bid_depth,
             "ask_depth_quote": ask_depth,
             "required_depth_quote": required_depth,
+            "roundtrip_friction_bps": roundtrip_friction_bps,
+        }
+
+    if (
+        max_roundtrip_friction_bps is not None
+        and roundtrip_friction_bps is not None
+        and roundtrip_friction_bps
+        > max(0.0, float(max_roundtrip_friction_bps or 0.0))
+    ):
+        return {
+            "ok": False,
+            "reason": "roundtrip_friction_too_high",
+            "spread_bps": spread_bps,
+            "best_bid": best_bid,
+            "best_ask": best_ask,
+            "bid_depth_quote": bid_depth,
+            "ask_depth_quote": ask_depth,
+            "required_depth_quote": required_depth,
+            "roundtrip_friction_bps": roundtrip_friction_bps,
+            "max_roundtrip_friction_bps": max_roundtrip_friction_bps,
         }
 
     return {
@@ -143,6 +215,7 @@ def assess_testnet_execution_book(
         "bid_depth_quote": bid_depth,
         "ask_depth_quote": ask_depth,
         "required_depth_quote": required_depth,
+        "roundtrip_friction_bps": roundtrip_friction_bps,
     }
 
 
