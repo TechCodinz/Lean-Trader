@@ -69,6 +69,42 @@ if "self.trading_engines['real_profit'] = RealProfitBot(mode=self.mode)" not in 
     raise SystemExit("failed to mode-wire historical RealProfitBot")
 p.write_text(s)
 
+# 2. Repair the historical swarm handoff: the old decision loop called a
+# method that did not exist and, when a result existed, blended confidence even
+# when directions disagreed. The real-evidence bridge supplies the method.
+p = root / "COMPLETE_UNIFIED_ORCHESTRATOR.py"
+s = p.read_text()
+s = s.replace(
+    "swarm_decision = await self.swarm.collective_decision()",
+    "swarm_decision = await self.swarm.collective_decision(signal)",
+)
+old = """                        # Boost confidence if swarm agrees
+                        if swarm_decision:
+                            swarm_conf = swarm_decision.get('confidence', 0.0)
+                            if swarm_conf > 0:
+                                signal_confidence = min(0.95, (signal_confidence + swarm_conf) / 2)"""
+new = """                        # Swarm may strengthen the specialist only when its
+                        # real-market direction agrees. Opposing/hold consensus
+                        # is informative but does not globally veto the specialist.
+                        if swarm_decision:
+                            swarm_conf = float(swarm_decision.get('confidence', 0.0) or 0.0)
+                            swarm_action = str(swarm_decision.get('action', 'hold')).lower()
+                            specialist_action = str(signal_side or 'hold').lower()
+                            if (
+                                swarm_decision.get('real_market_data') is True
+                                and swarm_conf > 0
+                                and swarm_action == specialist_action
+                            ):
+                                signal_confidence = min(
+                                    0.99,
+                                    max(float(signal_confidence or 0.0), swarm_conf),
+                                )"""
+if old in s:
+    s = s.replace(old, new)
+if "collective_decision(signal)" not in s:
+    raise SystemExit("failed to connect swarm to the current decision signal")
+p.write_text(s)
+
 # 2. Remove only the standalone RPB task from CompleteUltimateOrchestrator.
 # Smart Scalper -> DataHub -> UnifiedDecisionEngine -> ExecutionOrchestrator
 # remains the order-producing path.
@@ -89,6 +125,23 @@ if start >= 0 and end > start:
 
 if "asyncio.to_thread(self.real_profit_bot.run)" in s:
     raise SystemExit("standalone RealProfitBot execution loop still present")
+
+# Use one SmartScalpingEngine instance across base and advanced orchestration,
+# preserving its learned session performance instead of duplicating state.
+s = s.replace(
+    """            self.smart_scalping = SmartScalpingEngine(
+                ultra_core=ultra_core_instance,
+                risk_engine=self.risk_engine
+            )""",
+    """            self.smart_scalping = (
+                self.trading_engines.get('smart_scalping')
+                if hasattr(self, 'trading_engines')
+                else None
+            ) or SmartScalpingEngine(
+                ultra_core=ultra_core_instance,
+                risk_engine=self.risk_engine
+            )""",
+)
 
 # Modern authenticated ExecutionOrchestrator reports realized_net_profit.
 s = s.replace(
@@ -599,6 +652,21 @@ print("EVOLUTION_REAL_SCALPER_SIGNAL_COUNT", len(signals))
 if any(not row.get("real_market_data") for row in signals):
     raise SystemExit("EVOLUTION_SCALPER_SYNTHETIC_SIGNAL_DETECTED")
 print("EVOLUTION_REAL_MARKET_PATH_OK")
+
+# Known historical signal-producing placeholders must now be real or inert.
+import HEDGE_FUND_ARSENAL as hedge
+import ultra_swarm_consciousness as swarm
+import ultra_arbitrage_engine as ultra_arb
+
+if hedge.StatisticalArbitrage.find_pairs_trades.__name__ != "_real_statistical_arbitrage":
+    raise SystemExit("HEDGE_FUND_SYNTHETIC_RATIO_STILL_ACTIVE")
+if swarm.SwarmAgent._get_market_data.__name__ != "_real_swarm_market_data":
+    raise SystemExit("SWARM_SYNTHETIC_MARKET_DATA_STILL_ACTIVE")
+if swarm.SwarmConsciousness._execute_testnet_trade.__name__ != "_no_simulated_swarm_trade":
+    raise SystemExit("SWARM_SIMULATED_EXECUTION_STILL_ACTIVE")
+if ultra_arb.UltraArbitrageEngine._simulate_arbitrage_execution.__name__ != "_no_simulated_arbitrage_execution":
+    raise SystemExit("ULTRA_ARB_SIMULATED_EXECUTION_STILL_ACTIVE")
+print("KNOWN_SYNTHETIC_EXECUTION_SOURCES_NEUTRALIZED")
 PY
 
 echo
