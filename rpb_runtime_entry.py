@@ -76,6 +76,15 @@ class UnifiedRPBRuntime(REAL_PROFIT_BOT):
             mode="testnet",
             exchange_id=self.execution_exchange_id,
         )
+
+        # recover_current_epoch_to_ledger() uses its own PositionLedger
+        # instance and persists any newly adopted authenticated positions.
+        # Reload this runtime's ledger before filtering permanent dust;
+        # otherwise the runtime keeps a stale in-memory view while the file
+        # silently contains re-adopted dust positions.
+        if self.lifecycle_enabled and self.ledger is not None:
+            self.ledger.load()
+
         self._apply_active_dust_quarantines()
         if report.get("adopted"):
             print(
