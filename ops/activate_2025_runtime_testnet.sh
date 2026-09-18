@@ -8,6 +8,7 @@ CURRENT_RPB="leantrader-rpb-testnet"
 CURRENT_INTEL="leantrader-intelligence-only"
 LEGACY_CONTAINER="leantrader-2025-testnet"
 ENV_FILE="/opt/leantrader/leantrader-2025-testnet.env"
+LEGACY_IMAGE="leantrader-2025-runtime:local"
 
 cd "$SOURCE"
 
@@ -93,19 +94,54 @@ for key in ANTHROPIC_API_KEY OPENAI_API_KEY HUGGINGFACE_TOKEN QISKIT_IBM_TOKEN; 
   fi
 done
 
-IMAGE="$(docker inspect "$CURRENT_RPB" --format '{{.Config.Image}}')"
-echo "runtime_image=$IMAGE"
+BASE_IMAGE="$(docker inspect "$CURRENT_RPB" --format '{{.Config.Image}}')"
+echo "base_runtime_image=$BASE_IMAGE"
+
+# RUN_BOT.py loads /app/.env after process environment setup. Replace the
+# historical tracked .env inside this detached worktree with the current safe
+# Testnet environment so old credentials or old mode values cannot override it.
+cp "$ENV_FILE" "$LEGACY/.env"
+chmod 600 "$LEGACY/.env"
+
+echo
+echo "=== BUILD 2025 COMPATIBILITY IMAGE ==="
+cat > /tmp/Dockerfile.leantrader-2025 <<EOF
+FROM $BASE_IMAGE
+RUN python -c "import bs4" 2>/dev/null || pip install --no-cache-dir beautifulsoup4==4.12.3
+RUN python -c "import tensorflow" 2>/dev/null || pip install --no-cache-dir "tensorflow>=2.13,<2.18"
+RUN python -c "from langchain.agents import Tool; from langchain.memory import ConversationBufferMemory" 2>/dev/null || pip install --no-cache-dir "langchain==0.3.27"
+RUN python -c "import aiogram" 2>/dev/null || pip install --no-cache-dir "aiogram>=3,<4"
+RUN python -c "import stripe" 2>/dev/null || pip install --no-cache-dir stripe
+RUN python -c "import qrcode" 2>/dev/null || pip install --no-cache-dir qrcode
+RUN python -c "import anthropic" 2>/dev/null || pip install --no-cache-dir anthropic
+RUN python -c "import openai" 2>/dev/null || pip install --no-cache-dir openai
+EOF
+
+docker build -t "$LEGACY_IMAGE" -f /tmp/Dockerfile.leantrader-2025 /tmp
+
+echo
+echo "=== 2025 IMPORT DEPENDENCY CHECK ==="
+docker run --rm "$LEGACY_IMAGE" python - <<'PY'
+import bs4
+import tensorflow
+from langchain.agents import Tool
+from langchain.memory import ConversationBufferMemory
+import aiogram
+import stripe
+import qrcode
+print("LEGACY_2025_DEPENDENCIES_OK")
+PY
 
 echo
 echo "=== IMPORT SMOKE TEST — NO TRADING ==="
-docker run --rm   --name leantrader-2025-import-smoke   --env-file "$ENV_FILE"   -v "$LEGACY:/app"   -w /app   "$IMAGE"   python -c 'from COMPLETE_ULTIMATE_ORCHESTRATOR import CompleteUltimateOrchestrator; print("LEGACY_2025_IMPORT_OK")'
+docker run --rm   --name leantrader-2025-import-smoke   --env-file "$ENV_FILE"   -v "$LEGACY:/app"   -w /app   "$LEGACY_IMAGE"   python -c 'from COMPLETE_ULTIMATE_ORCHESTRATOR import CompleteUltimateOrchestrator; print("LEGACY_2025_IMPORT_OK")'
 
 echo
 echo "=== CUTOVER TO 2025 CONTROLLER ==="
 docker rm -f "$LEGACY_CONTAINER" >/dev/null 2>&1 || true
 docker stop "$CURRENT_RPB" >/dev/null 2>&1 || true
 
-docker run -d   --name "$LEGACY_CONTAINER"   --restart unless-stopped   --env-file "$ENV_FILE"   -v "$LEGACY:/app"   -w /app   "$IMAGE"   python RUN_BOT.py --testnet >/dev/null
+docker run -d   --name "$LEGACY_CONTAINER"   --restart unless-stopped   --env-file "$ENV_FILE"   -v "$LEGACY:/app"   -w /app   "$LEGACY_IMAGE"   python RUN_BOT.py --testnet >/dev/null
 
 sleep 25
 
