@@ -572,6 +572,74 @@ print("LEGACY_2025_SOURCE_REPAIRS_APPLIED")
 PY
 
 echo
+
+# FIX_RPB_OS_SCOPE_20260918
+# Historical REAL_PROFIT_BOT has an indented `import os` inside a function.
+# Python therefore treats `os` as local throughout that function, breaking
+# earlier os.getenv(...) calls. Keep os module-level only.
+python3 - "$LEGACY/REAL_PROFIT_BOT.py" <<'PYFIX_RPB_OS'
+from pathlib import Path
+import re
+import sys
+
+path = Path(sys.argv[1])
+src = path.read_text()
+
+original_trailing_newline = src.endswith("\n")
+lines = src.splitlines()
+
+out = []
+removed = []
+
+for lineno, line in enumerate(lines, 1):
+    stripped = line.strip()
+    indent = len(line) - len(line.lstrip())
+
+    if indent > 0 and re.fullmatch(
+        r'import\s+os(?:\s+as\s+os)?',
+        stripped
+    ):
+        removed.append(lineno)
+        continue
+
+    out.append(line)
+
+src = "\n".join(out)
+
+if not re.search(r'(?m)^import\s+os(?:\s|$)', src):
+    src = "import os\n" + src
+
+if original_trailing_newline:
+    src += "\n"
+
+compile(src, str(path), "exec")
+path.write_text(src)
+
+remaining_local_os = [
+    lineno
+    for lineno, line in enumerate(src.splitlines(), 1)
+    if line[:1].isspace()
+    and re.fullmatch(
+        r'import\s+os(?:\s+as\s+os)?',
+        line.strip()
+    )
+]
+
+if remaining_local_os:
+    raise SystemExit(
+        "LOCAL_IMPORT_OS_REMAINS: "
+        + ",".join(map(str, remaining_local_os))
+    )
+
+print(
+    "REAL_PROFIT_BOT_OS_SCOPE_FIXED",
+    "removed_lines=" + (
+        ",".join(map(str, removed)) if removed else "none"
+    )
+)
+PYFIX_RPB_OS
+
+
 echo "=== SOURCE SYNTAX CHECK — NO PYC WRITES ==="
 docker run --rm -i \
   -v "$LEGACY:/legacy:ro" \
