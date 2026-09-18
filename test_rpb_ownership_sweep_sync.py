@@ -50,10 +50,17 @@ class TestOwnershipSweepLedgerSync(unittest.TestCase):
             "rpb_runtime_entry.recover_current_epoch_to_ledger",
             return_value={
                 "ok": True,
-                "adopted": ["ETH/USDT", "MNT/USDT"],
+                "adopted": [],
             },
-        ):
+        ) as recover:
             runtime._recover_epoch_ownership(force=True)
+
+        recover.assert_called_once_with(
+            since_ms=1789648101000,
+            mode="testnet",
+            exchange_id="bybit",
+            exclude_symbols={"ETH/USDT", "MNT/USDT"},
+        )
 
         self.assertEqual(runtime.ledger.load_calls, 1)
         self.assertEqual(set(runtime.ledger.positions), {"DOT/USDT"})
