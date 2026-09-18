@@ -248,15 +248,14 @@ PY
 
 echo
 echo "=== SOURCE SYNTAX CHECK — NO PYC WRITES ==="
-docker run --rm \
-  -v "$LEGACY:/app:ro" \
-  -w /app \
+docker run --rm -i \
+  -v "$LEGACY:/legacy:ro" \
   "$LEGACY_IMAGE" \
   python - <<'PY'
 from pathlib import Path
 import sys
 
-root = Path("/app")
+root = Path("/legacy")
 bad = []
 checked = 0
 skip_parts = {".git", "__pycache__", ".venv", "venv", "runtime", "node_modules"}
@@ -287,10 +286,9 @@ echo "=== IMPORT SMOKE TEST — NO TRADING ==="
 docker run --rm \
   --name leantrader-2025-import-smoke \
   --env-file "$ENV_FILE" \
-  -v "$LEGACY:/app" \
-  -w /app \
+  -v "$LEGACY:/legacy:ro" \
   "$LEGACY_IMAGE" \
-  python -c 'from COMPLETE_ULTIMATE_ORCHESTRATOR import CompleteUltimateOrchestrator; print("LEGACY_2025_IMPORT_OK")'
+  sh -lc 'cp -a /legacy /tmp/leantrader-2025 && cd /tmp/leantrader-2025 && python -c '"'"'from COMPLETE_ULTIMATE_ORCHESTRATOR import CompleteUltimateOrchestrator; print("LEGACY_2025_IMPORT_OK")'"'"''
 
 echo
 echo "=== CUTOVER TO 2025 CONTROLLER ==="
