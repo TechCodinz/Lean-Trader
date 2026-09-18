@@ -959,15 +959,15 @@ for _ in $(seq 1 18); do
 
   LOGS="$(docker logs --since 5m "$LEGACY_CONTAINER" 2>&1 || true)"
 
-  if printf '%s\n' "$LOGS" | grep -q 'configured credential file does not exist'; then
+  if grep -q 'configured credential file does not exist' <<<"$LOGS"; then
     echo "Credential mount failure detected during 2025 startup."
     break
   fi
-  if printf '%s\n' "$LOGS" | grep -q 'Evolution database error'; then
+  if grep -q 'Evolution database error' <<<"$LOGS"; then
     echo "Evolution database failed during 2025 startup."
     break
   fi
-  if printf '%s\n' "$LOGS" | grep -q "Enhanced loop error: 'total_profit'"; then
+  if grep -q "Enhanced loop error: 'total_profit'" <<<"$LOGS"; then
     echo "Historical execution-stat compatibility failure detected."
     break
   fi
@@ -980,13 +980,13 @@ for _ in $(seq 1 18); do
   EVOLUTION_OK=0
   CRYPTO_SCALPER_OK=0
 
-  printf '%s\n' "$LOGS" | grep -Eq 'Decision Engine wired|Decision:' && DECISION_OK=1 || true
-  printf '%s\n' "$LOGS" | grep -Eq 'EXECUTION ORCHESTRATOR WIRED|EXECUTING:' && EXECUTION_OK=1 || true
-  printf '%s\n' "$LOGS" | grep -Eq 'SMART SCALPING ENGINE WIRED|Scalper generated' && SCALPER_OK=1 || true
-  printf '%s\n' "$LOGS" | grep -Eq 'REAL_MARKET_SCAN .*hub_market=[1-9][0-9]*' && MARKET_OK=1 || true
-  printf '%s\n' "$LOGS" | grep -q 'LEGACY_2025_REAL_INTELLIGENCE_BRIDGE_INSTALLED' && BRIDGE_OK=1 || true
-  printf '%s\n' "$LOGS" | grep -Eq 'Evolution database initialized|Evidence Evolution cycle' && EVOLUTION_OK=1 || true
-  printf '%s\n' "$LOGS" | grep -Eq 'BTC/USDT|ETH/USDT|SOL/USDT|DOGE/USDT|XRP/USDT|ADA/USDT|BNB/USDT' && CRYPTO_SCALPER_OK=1 || true
+  grep -Eq 'Decision Engine wired|Decision:' <<<"$LOGS" && DECISION_OK=1 || true
+  grep -Eq 'EXECUTION ORCHESTRATOR WIRED|EXECUTING:' <<<"$LOGS" && EXECUTION_OK=1 || true
+  grep -Eq 'SMART SCALPING ENGINE WIRED|Scalper generated' <<<"$LOGS" && SCALPER_OK=1 || true
+  grep -Eq 'REAL_MARKET_SCAN .*hub_market=[1-9][0-9]*' <<<"$LOGS" && MARKET_OK=1 || true
+  grep -q 'LEGACY_2025_REAL_INTELLIGENCE_BRIDGE_INSTALLED' <<<"$LOGS" && BRIDGE_OK=1 || true
+  grep -Eq 'Evolution database initialized|Evidence Evolution cycle' <<<"$LOGS" && EVOLUTION_OK=1 || true
+  grep -Eq 'BTC/USDT|ETH/USDT|SOL/USDT|DOGE/USDT|XRP/USDT|ADA/USDT|BNB/USDT' <<<"$LOGS" && CRYPTO_SCALPER_OK=1 || true
 
   if [ "$DECISION_OK" -eq 1 ] && [ "$EXECUTION_OK" -eq 1 ] && [ "$SCALPER_OK" -eq 1 ] && [ "$MARKET_OK" -eq 1 ] && [ "$BRIDGE_OK" -eq 1 ] && [ "$EVOLUTION_OK" -eq 1 ] && [ "$CRYPTO_SCALPER_OK" -eq 1 ]; then
     READY=1

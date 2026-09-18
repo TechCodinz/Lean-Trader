@@ -28,7 +28,7 @@ LOGS="$(docker logs --since 10m "$LEGACY_CONTAINER" 2>&1 || true)"
 
 for marker in   'Learning Orchestrator wired'   'Scouting Orchestrator wired'   'Decision Engine wired'   'EXECUTION ORCHESTRATOR WIRED'   'SMART SCALPING ENGINE WIRED'   'LEGACY_2025_REAL_INTELLIGENCE_BRIDGE_INSTALLED'   'REAL_MARKET_SCAN'   'Evolution database initialized'
 do
-  printf '%s\n' "$LOGS" | grep -q "$marker" || {
+  grep -q "$marker" <<<"$LOGS" || {
     echo "missing_runtime_marker=$marker"
     rollback_postcheck
   }
@@ -63,7 +63,7 @@ PY
 
 echo
 echo "=== ENGINE + MARKET PROOF ==="
-printf '%s\n' "$LOGS"   | grep -E 'Learning Orchestrator wired|Scouting Orchestrator wired|Decision Engine wired|EXECUTION ORCHESTRATOR WIRED|SMART SCALPING ENGINE WIRED|REAL_MARKET_SCAN|Scalper generated|Published .* signals|Decision:|EXECUTING:|Evolution database initialized|Evidence Evolution cycle'   | tail -n 220 || true
+grep -E 'Learning Orchestrator wired|Scouting Orchestrator wired|Decision Engine wired|EXECUTION ORCHESTRATOR WIRED|SMART SCALPING ENGINE WIRED|REAL_MARKET_SCAN|Scalper generated|Published .* signals|Decision:|EXECUTING:|Evolution database initialized|Evidence Evolution cycle' <<<"$LOGS" | tail -n 220 || true
 
 echo
 echo "=== AUTHENTICATED LIFECYCLE PROOF WINDOW ==="
