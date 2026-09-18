@@ -158,7 +158,31 @@ chmod 600 "$ENV_FILE"
 echo
 echo "=== MIRROR CURRENT TESTNET SECRET AUTHORITY ==="
 SECRET_MOUNT_ARGS=()
-while IFS=
+
+while IFS='|' read -r mtype source name dest; do
+  [ -n "$dest" ] || continue
+  case "$dest" in
+    /run/secrets/*)
+      if [ "$mtype" = "bind" ] && [ -n "$source" ] && [ -e "$source" ]; then
+        SECRET_MOUNT_ARGS+=(--mount "type=bind,src=$source,dst=$dest,readonly")
+      elif [ "$mtype" = "volume" ] && [ -n "$name" ]; then
+        SECRET_MOUNT_ARGS+=(--mount "type=volume,src=$name,dst=$dest,readonly")
+      fi
+      ;;
+  esac
+done < <(
+  docker inspect "$CURRENT_RPB" \
+    --format '{{range .Mounts}}{{printf "%s|%s|%s|%s\n" .Type .Source .Name .Destination}}{{end}}'
+)
+
+if [ "${#SECRET_MOUNT_ARGS[@]}" -eq 0 ]; then
+  echo "No reusable /run/secrets mount found on current authenticated RPB."
+  echo "Refusing cutover; current RPB remains untouched."
+  exit 1
+fi
+
+echo "Mirrored current RPB secret mounts without exposing secret values."
+
 for key in ANTHROPIC_API_KEY OPENAI_API_KEY HUGGINGFACE_TOKEN QISKIT_IBM_TOKEN; do
   if grep -q "^\${key}=." "$ENV_FILE"; then
     echo "$key=SET"
@@ -508,355 +532,6 @@ docker ps --filter "name=$LEGACY_CONTAINER"   --format 'NAME={{.Names}} STATUS={
 echo
 echo "=== ENGINE START EVIDENCE ==="
 docker logs --since 3m "$LEGACY_CONTAINER" 2>&1   | grep -E 'AUTHENTICATED_TESTNET|ALL 50\+ ORCHESTRATORS RUNNING|Decision loop started|EXECUTION LOOP STARTED|SMART SCALPING LOOP STARTED|Scalper generated|Published .* signals|Decision:|EXECUTING:|SUBMITTING|ORDER ACKNOWLEDGED|Trade executed|Evolution|Sentient|Swarm|Learning loop started|Scouting loop started|ERROR|Traceback'   | tail -n 240 || true
-
-echo
-echo "=== CONTAINER MODE EVIDENCE ==="
-docker exec "$LEGACY_CONTAINER" python - <<'PY'
-import os
-print({
-    "TRADING_MODE": os.getenv("TRADING_MODE"),
-    "EXECUTION_MODE": os.getenv("EXECUTION_MODE"),
-    "USE_TESTNET": os.getenv("USE_TESTNET"),
-    "ENABLE_LIVE": os.getenv("ENABLE_LIVE"),
-    "ANTHROPIC_API_KEY": bool(os.getenv("ANTHROPIC_API_KEY")),
-    "OPENAI_API_KEY": bool(os.getenv("OPENAI_API_KEY")),
-    "HUGGINGFACE_TOKEN": bool(os.getenv("HUGGINGFACE_TOKEN")),
-})
-PY
-
-echo
-echo "2025 controller is now the active Testnet runtime."
-\t' read -r mtype source name dest; do
-  [ -n "$dest" ] || continue
-  case "$dest" in
-    /run/secrets/*)
-      if [ "$mtype" = "bind" ] && [ -n "$source" ] && [ -e "$source" ]; then
-        SECRET_MOUNT_ARGS+=(--mount "type=bind,src=$source,dst=$dest,readonly")
-      elif [ "$mtype" = "volume" ] && [ -n "$name" ]; then
-        SECRET_MOUNT_ARGS+=(--mount "type=volume,src=$name,dst=$dest,readonly")
-      fi
-      ;;
-  esac
-done < <(
-  docker inspect "$CURRENT_RPB" \
-    --format '{{range .Mounts}}{{printf "%s\t%s\t%s\t%s\n" .Type .Source .Name .Destination}}{{end}}'
-)
-
-if [ "${#SECRET_MOUNT_ARGS[@]}" -gt 0 ]; then
-  echo "Mirrored current RPB /run/secrets mounts: ${#SECRET_MOUNT_ARGS[@]} argument(s)"
-else
-  # Fallback: securely read the already-authorized Testnet files from the
-  # healthy RPB and put only their values in this chmod-600 env file.
-  KEY_FILE="$(grep '^BYBIT_TESTNET_API_KEY_FILE=' "$ENV_FILE" | tail -n1 | cut -d= -f2- || true)"
-  SECRET_FILE="$(grep '^BYBIT_TESTNET_API_SECRET_FILE=' "$ENV_FILE" | tail -n1 | cut -d= -f2- || true)"
-
-  if [ -n "$KEY_FILE" ] && [ -n "$SECRET_FILE" ]; then
-    KEY_VALUE="$(docker exec -e SECRET_PATH="$KEY_FILE" "$CURRENT_RPB" sh -c 'cat "$SECRET_PATH"' | tr -d '\r\n')"
-    SECRET_VALUE="$(docker exec -e SECRET_PATH="$SECRET_FILE" "$CURRENT_RPB" sh -c 'cat "$SECRET_PATH"' | tr -d '\r\n')"
-
-    if [ -z "$KEY_VALUE" ] || [ -z "$SECRET_VALUE" ]; then
-      echo "Unable to recover authenticated Testnet credentials from current RPB."
-      exit 1
-    fi
-
-    sed -i '/^BYBIT_TESTNET_API_KEY_FILE=/d;/^BYBIT_TESTNET_API_SECRET_FILE=/d' "$ENV_FILE"
-    sed -i '/^BYBIT_TESTNET_API_KEY=/d;/^BYBIT_TESTNET_API_SECRET=/d' "$ENV_FILE"
-    printf 'BYBIT_TESTNET_API_KEY=%s\n' "$KEY_VALUE" >> "$ENV_FILE"
-    printf 'BYBIT_TESTNET_API_SECRET=%s\n' "$SECRET_VALUE" >> "$ENV_FILE"
-    unset KEY_VALUE SECRET_VALUE
-    echo "Authenticated Testnet credentials transferred into protected env file."
-  fi
-fi
-
-for key in ANTHROPIC_API_KEY OPENAI_API_KEY HUGGINGFACE_TOKEN QISKIT_IBM_TOKEN; do
-  if grep -q "^\${key}=." "$ENV_FILE"; then
-    echo "$key=SET"
-  else
-    echo "$key=UNSET"
-  fi
-done
-
-BASE_IMAGE="$(docker inspect "$CURRENT_RPB" --format '{{.Config.Image}}')"
-echo "base_runtime_image=$BASE_IMAGE"
-
-# Historical RUN_BOT.py loads /app/.env itself.  Replace only this detached
-# 2025 worktree's tracked .env with the currently authenticated Testnet
-# environment so stale 2025 secrets/mode values cannot override Docker env.
-cp "$ENV_FILE" "$LEGACY/.env"
-chmod 600 "$LEGACY/.env"
-
-# Package markers that were part of the later import-smoke repairs.  They do
-# not change trading logic; they make restored packages importable when the
-# corresponding directories exist.
-for pkgdir in "$LEGACY/src/leantrader/agents" "$LEGACY/src/leantrader/production"; do
-  if [ -d "$pkgdir" ]; then
-    touch "$pkgdir/__init__.py"
-  fi
-done
-
-echo
-echo "=== REQUIRE PRE-VERIFIED 2025 COMPATIBILITY IMAGE ==="
-if ! docker image inspect "$LEGACY_IMAGE" >/dev/null 2>&1; then
-  echo "Missing $LEGACY_IMAGE. Run ops/bootstrap_2025_runtime_dependencies.sh first."
-  exit 1
-fi
-docker run --rm "$LEGACY_IMAGE" pip check
-echo "LEGACY_2025_IMAGE_READY"
-
-echo
-echo "=== COMPLETE DEPENDENCY IMPORT MATRIX ==="
-docker run --rm -i "$LEGACY_IMAGE" python - <<'PY'
-import importlib
-import sys
-
-modules = [
-    # previously repaired/core validation
-    "pytest", "numpy", "pandas", "scipy", "sklearn", "numba", "tiktoken", "multipart", "ccxt",
-    "yaml", "aiohttp", "psutil", "dotenv", "redis", "web3",
-    # 2025 runtime imports
-    "bs4", "lxml", "feedparser", "tensorflow", "keras", "torch",
-    "transformers", "xgboost", "lightgbm", "catboost", "joblib",
-    "yfinance", "websocket", "websockets", "requests", "httpx",
-    "eth_account", "eth_utils", "matplotlib", "seaborn", "plotly",
-    "nltk", "textblob", "vaderSentiment", "langchain",
-    "langchain_community", "anthropic", "openai", "telegram", "aiogram",
-    "fastapi", "uvicorn", "sqlalchemy", "stripe", "qrcode", "pytz",
-    "dateutil", "networkx", "cryptography", "bcrypt", "schedule",
-    "loguru", "toml", "optuna", "statsmodels", "prometheus_client",
-    "tweepy", "praw", "discord", "celery", "qiskit",
-    "qiskit_aer", "qiskit_ibm_runtime",
-]
-failed = []
-for name in modules:
-    try:
-        importlib.import_module(name)
-        print(f"IMPORT_OK {name}")
-    except Exception as exc:
-        failed.append((name, type(exc).__name__, str(exc)[:240]))
-        print(f"IMPORT_FAIL {name} {type(exc).__name__}: {str(exc)[:240]}")
-
-# TA-Lib is historically used by specialist/older engines. Require it when the
-# wheel installed successfully; report separately if the platform cannot load
-# it, before any trading cutover.
-for name in ("talib", "ta"):
-    try:
-        importlib.import_module(name)
-        print(f"IMPORT_OK {name}")
-    except Exception as exc:
-        failed.append((name, type(exc).__name__, str(exc)[:240]))
-        print(f"IMPORT_FAIL {name} {type(exc).__name__}: {str(exc)[:240]}")
-
-if failed:
-    print("DEPENDENCY_MATRIX_FAILED", failed)
-    sys.exit(1)
-print("LEGACY_2025_DEPENDENCIES_OK")
-PY
-
-echo
-echo "=== APPLY NON-STRATEGY 2025 SOURCE REPAIRS ==="
-# These are parser/import repairs only. They do not alter trading thresholds,
-# signals, sizing, execution mode, or strategy behavior.
-python3 - "$LEGACY" <<'PY'
-from pathlib import Path
-import sys
-
-root = Path(sys.argv[1])
-
-# Historical test_api_connections.py was already listed in the 2025 repair
-# scripts as a syntax-error file. Repair only object naming + typing imports.
-p = root / "test_api_connections.py"
-if p.exists():
-    s = p.read_text()
-    if "from typing import Dict, Any" not in s:
-        s = s.replace("import sys\n", "import sys\nfrom typing import Dict, Any\n", 1)
-    s = s.replace("self.ExchangeManager() = ExchangeManager()", "self.exchange_manager = ExchangeManager()")
-    s = s.replace("self.ExchangeManager()", "self.exchange_manager")
-    p.write_text(s)
-
-# Historical tools/market_data_ultra.py contains a multiline f-string that is
-# invalid Python. Preserve the same URL/values and only repair the parser form.
-p = root / "tools" / "market_data_ultra.py"
-if p.exists():
-    s = p.read_text()
-    old = '''                f"https://cryptopanic.com/api/v1/posts/?auth_token={
-                    self.api_keys.get(
-                        'cryptopanic', '')}&currencies={symbol}",'''
-    new = '''                f"https://cryptopanic.com/api/v1/posts/?auth_token={self.api_keys.get('cryptopanic', '')}&currencies={symbol}",'''
-    if old in s:
-        s = s.replace(old, new)
-    p.write_text(s)
-
-# The October-2025 auto-fix pass accidentally inserted a typing import
-# inside two function bodies. Restore the syntax without changing behavior.
-p = root / "run_live_meme.py"
-if p.exists():
-    s = p.read_text()
-    s = s.replace(
-        "    from utils import load_config\nfrom typing import Callable\n\n    cfg =",
-        "    from utils import load_config\n\n    cfg =",
-    )
-    p.write_text(s)
-
-p = root / "run_unified.py"
-if p.exists():
-    s = p.read_text()
-    s = s.replace(
-        "    try:\n        import os\nfrom typing import Callable\n\n        run_daemons =",
-        "    try:\n        import os\n\n        run_daemons =",
-    )
-    # The 2025 static/ruff reports show trader_core as an expected import for
-    # run_unified.py; restore that import if the broken auto-fix removed it.
-    if "from trader_core import TraderCore" not in s:
-        s = s.replace(
-            "import argparse\n",
-            "import argparse\n\nfrom trader_core import TraderCore\n",
-            1,
-        )
-    p.write_text(s)
-
-# Package markers restored during the later module-repair work.
-for pkgdir in (root / "src" / "leantrader" / "agents", root / "src" / "leantrader" / "production"):
-    if pkgdir.is_dir():
-        (pkgdir / "__init__.py").touch()
-
-print("LEGACY_2025_SOURCE_REPAIRS_APPLIED")
-PY
-
-echo
-echo "=== SOURCE SYNTAX CHECK — NO PYC WRITES ==="
-docker run --rm -i \
-  -v "$LEGACY:/legacy:ro" \
-  "$LEGACY_IMAGE" \
-  python - <<'PY'
-from pathlib import Path
-import sys
-
-root = Path("/legacy")
-bad = []
-checked = 0
-skip_parts = {".git", "__pycache__", ".venv", "venv", "runtime", "node_modules"}
-
-for p in sorted(root.rglob("*.py")):
-    if any(part in skip_parts for part in p.parts):
-        continue
-    try:
-        src = p.read_text(encoding="utf-8", errors="replace")
-        compile(src, str(p.relative_to(root)), "exec", dont_inherit=True)
-        checked += 1
-    except SyntaxError as exc:
-        bad.append((str(p.relative_to(root)), exc.lineno, exc.msg))
-    except Exception as exc:
-        bad.append((str(p.relative_to(root)), None, f"{type(exc).__name__}: {exc}"))
-
-print("SYNTAX_CHECKED", checked)
-if bad:
-    print("SYNTAX_ERRORS", len(bad))
-    for row in bad:
-        print(row)
-    sys.exit(1)
-print("LEGACY_2025_SOURCE_SYNTAX_OK")
-PY
-
-echo
-echo "=== IMPORT SMOKE TEST — NO TRADING ==="
-docker run --rm \
-  --name leantrader-2025-import-smoke \
-  --env-file "$ENV_FILE" \
-  -v "$LEGACY:/legacy:ro" \
-  "$LEGACY_IMAGE" \
-  sh -lc 'cp -a /legacy /tmp/leantrader-2025 && cd /tmp/leantrader-2025 && python -c '"'"'from COMPLETE_ULTIMATE_ORCHESTRATOR import CompleteUltimateOrchestrator; print("LEGACY_2025_IMPORT_OK")'"'"''
-
-echo
-echo "=== FULL 2025 INITIALIZE + WIRE SMOKE — NO LOOPS / NO ORDERS ==="
-docker run --rm -i \
-  --name leantrader-2025-wire-smoke \
-  --env-file "$ENV_FILE" \
-  -v "$LEGACY:/legacy:ro" \
-  "$LEGACY_IMAGE" \
-  sh -lc 'cp -a /legacy /tmp/leantrader-2025 && cd /tmp/leantrader-2025 && python -' <<'PY'
-import asyncio
-
-from COMPLETE_ULTIMATE_ORCHESTRATOR import CompleteUltimateOrchestrator
-
-async def check():
-    bot = CompleteUltimateOrchestrator(mode="testnet")
-    await bot.initialize_all_systems()
-    await bot.wire_all_systems()
-
-    base = set(getattr(bot, "orchestrators", {}) or {})
-    advanced = set(getattr(bot, "advanced_orchestrators", {}) or {})
-
-    required_base = {"learning", "scouting", "decision"}
-    required_advanced = {"execution", "smart_scalping"}
-
-    missing_base = sorted(required_base - base)
-    missing_advanced = sorted(required_advanced - advanced)
-
-    print("WIRE_BASE", sorted(base))
-    print("WIRE_ADVANCED", sorted(advanced))
-    print("SMART_SCALPING_PRESENT", bool(getattr(bot, "smart_scalping", None)))
-    print("SENTIENT_BRAIN_PRESENT", bool(getattr(bot, "sentient_brain", None)))
-    print("REAL_PROFIT_BOT_PRESENT", bool(getattr(bot, "real_profit_bot", None)))
-
-    if missing_base or missing_advanced:
-        raise SystemExit(
-            f"WIRE_SMOKE_FAILED base={missing_base} advanced={missing_advanced}"
-        )
-
-    print("LEGACY_2025_WIRE_OK")
-
-asyncio.run(check())
-PY
-
-echo
-echo "=== CUTOVER TO 2025 CONTROLLER ==="
-docker rm -f "$LEGACY_CONTAINER" >/dev/null 2>&1 || true
-docker stop "$CURRENT_RPB" >/dev/null 2>&1 || true
-
-docker run -d   --name "$LEGACY_CONTAINER"   --restart unless-stopped   --env-file "$ENV_FILE"   -v "$LEGACY:/app"   -w /app   "$LEGACY_IMAGE"   python RUN_BOT.py --testnet >/dev/null
-
-echo "Waiting for 2025 controller engine loops to come online..."
-READY=0
-for _ in $(seq 1 18); do
-  sleep 10
-
-  if ! docker ps --format '{{.Names}}' | grep -qx "$LEGACY_CONTAINER"; then
-    break
-  fi
-
-  LOGS="$(docker logs --since 5m "$LEGACY_CONTAINER" 2>&1 || true)"
-
-  if printf '%s\n' "$LOGS" | grep -q 'Decision loop started' \
-     && printf '%s\n' "$LOGS" | grep -q 'EXECUTION LOOP STARTED' \
-     && printf '%s\n' "$LOGS" | grep -q 'SMART SCALPING LOOP STARTED' \
-     && printf '%s\n' "$LOGS" | grep -q 'ALL 50+ ORCHESTRATORS RUNNING'; then
-    READY=1
-    break
-  fi
-done
-
-if [ "$READY" -ne 1 ]; then
-  echo "2025 controller did not reach the required engine-ready state."
-  echo "Restoring previous RPB runtime."
-  docker logs --tail 320 "$LEGACY_CONTAINER" 2>&1 || true
-  docker rm -f "$LEGACY_CONTAINER" >/dev/null 2>&1 || true
-  docker start "$CURRENT_RPB" >/dev/null 2>&1 || true
-  exit 1
-fi
-
-# The restored 2025 controller has proven that its decision, execution and
-# smart-scalping loops are online. Only now retire the old intelligence-only
-# sidecar to free memory/CPU. The previous RPB remains stopped but available
-# for rollback.
-docker stop "$CURRENT_INTEL" >/dev/null 2>&1 || true
-
-echo
-echo "=== 2025 RUNTIME STATUS ==="
-docker ps --filter "name=$LEGACY_CONTAINER"   --format 'NAME={{.Names}} STATUS={{.Status}} IMAGE={{.Image}}'
-
-echo
-echo "=== ENGINE START EVIDENCE ==="
-docker logs --since 3m "$LEGACY_CONTAINER" 2>&1   | grep -E 'ALL 50\+ ORCHESTRATORS RUNNING|Decision loop started|EXECUTION LOOP STARTED|SMART SCALPING LOOP STARTED|Scalper generated|Published .* signals|Decision:|EXECUTING:|SUBMITTING|ORDER ACKNOWLEDGED|Trade executed|Evolution|Sentient|Swarm|Learning loop started|Scouting loop started|ERROR|Traceback'   | tail -n 240 || true
 
 echo
 echo "=== CONTAINER MODE EVIDENCE ==="
