@@ -415,6 +415,45 @@ class ExecutionOrchestrator:
                     )
                     return
 
+            # Hard restoration invariant: the historical controller declared
+            # an 80% execution threshold. Enforce it immediately before any
+            # authenticated execution path so lower-confidence decisions
+            # cannot bypass it.
+            if float(confidence or 0.0) < float(self.min_confidence):
+                logger.info(
+                    f"RUNTIME_PROOF CONFIDENCE_GATE_SKIP "
+                    f"symbol={symbol} side={action} "
+                    f"confidence={float(confidence or 0.0):.4f} "
+                    f"minimum={float(self.min_confidence):.4f}"
+                )
+                return
+
+            gate_ok, gate_detail = await self._testnet_execution_gate(
+                symbol,
+                action,
+                confidence,
+            )
+
+            if not gate_ok:
+                preflight.record_blocker(
+                    preflight.EXCHANGE_REJECT,
+                    f"{symbol}:execution_gate:{gate_detail}",
+                )
+
+                logger.info(
+                    f"RUNTIME_PROOF EXECUTION_GATE_SKIP "
+                    f"symbol={symbol} side={action} "
+                    f"reason={gate_detail}"
+                )
+
+                return
+
+            logger.info(
+                f"RUNTIME_PROOF EXECUTION_GATE_ACCEPT "
+                f"symbol={symbol} side={action} "
+                f"detail={gate_detail}"
+            )
+
             # Check risk management
             can_trade, reason = self.risk_manager.can_open_position(symbol, action)
             if not can_trade:
@@ -1116,6 +1155,406 @@ class ExecutionOrchestrator:
         preflight.invalidate_balance_cache()
 
         return cancelled
+
+    async def _testnet_execution_gate(
+        self,
+        symbol,
+        side,
+        confidence,
+    ):
+        """Fail-closed execution eligibility for the restored Bybit Testnet brain.
+
+        Intelligence may scan the broad production universe, but execution is
+        allowed only where the authenticated Testnet can actually trade.
+        """
+        mode = str(
+            self.mode or "testnet"
+        ).lower()
+
+        if mode != "testnet":
+            return False, "non_testnet_execution_blocked"
+
+        normalized = (
+            preflight.normalize_symbol(symbol)
+            or symbol
+        )
+
+        if (
+            not normalized
+            or normalized == "UNKNOWN"
+            or "/" not in normalized
+        ):
+            return False, "invalid_symbol"
+
+        side = str(side or "").lower()
+
+        if side not in ("buy", "sell"):
+            return False, "invalid_side"
+
+        now = time.time()
+
+        # Keep one public Testnet market-data client per execution owner.
+        exchange = getattr(
+            self,
+            "_testnet_gate_exchange",
+            None,
+        )
+
+        if exchange is None:
+            import ccxt.async_support as _ccxt_async
+
+            exchange = _ccxt_async.bybit({
+                "enableRateLimit": True,
+                "options": {
+                    "defaultType": "spot",
+                },
+            })
+
+            exchange.set_sandbox_mode(True)
+
+            self._testnet_gate_exchange = exchange
+            self._testnet_gate_markets_at = 0.0
+            self._testnet_gate_tickers = {}
+            self._testnet_gate_balance = None
+            self._testnet_gate_balance_at = 0.0
+
+        markets_age = (
+            now
+            - float(
+                getattr(
+                    self,
+                    "_testnet_gate_markets_at",
+                    0.0,
+                )
+            )
+        )
+
+        if (
+            not getattr(exchange, "markets", None)
+            or markets_age > 300.0
+        ):
+            try:
+                await asyncio.wait_for(
+                    exchange.load_markets(
+                        reload=bool(
+                            getattr(
+                                exchange,
+                                "markets",
+                                None,
+                            )
+                        )
+                    ),
+                    timeout=12.0,
+                )
+
+                self._testnet_gate_markets_at = (
+                    time.time()
+                )
+
+            except Exception as exc:
+                return (
+                    False,
+                    f"testnet_market_load_failed:"
+                    f"{type(exc).__name__}",
+                )
+
+        market = (
+            exchange.markets.get(normalized)
+            if getattr(exchange, "markets", None)
+            else None
+        )
+
+        if not isinstance(market, dict):
+            return False, "not_listed_on_testnet"
+
+        if market.get("active") is False:
+            return False, "inactive_on_testnet"
+
+        limits = market.get("limits") or {}
+
+        try:
+            min_amount = float(
+                ((limits.get("amount") or {}).get("min"))
+                or 0.0
+            )
+        except Exception:
+            min_amount = 0.0
+
+        try:
+            min_cost = float(
+                ((limits.get("cost") or {}).get("min"))
+                or 0.0
+            )
+        except Exception:
+            min_cost = 0.0
+
+        ticker_cache = getattr(
+            self,
+            "_testnet_gate_tickers",
+            {},
+        )
+
+        cached = ticker_cache.get(normalized)
+
+        if (
+            cached
+            and now - cached[0] <= 8.0
+        ):
+            ticker = cached[1]
+        else:
+            try:
+                ticker = await asyncio.wait_for(
+                    exchange.fetch_ticker(
+                        normalized
+                    ),
+                    timeout=4.0,
+                )
+
+            except Exception as exc:
+                return (
+                    False,
+                    f"testnet_ticker_failed:"
+                    f"{type(exc).__name__}",
+                )
+
+            ticker_cache[normalized] = (
+                time.time(),
+                ticker,
+            )
+
+            self._testnet_gate_tickers = (
+                ticker_cache
+            )
+
+        try:
+            bid = float(
+                ticker.get("bid") or 0.0
+            )
+        except Exception:
+            bid = 0.0
+
+        try:
+            ask = float(
+                ticker.get("ask") or 0.0
+            )
+        except Exception:
+            ask = 0.0
+
+        if bid <= 0.0 or ask <= 0.0:
+            return False, "no_two_sided_testnet_book"
+
+        mid = (
+            (bid + ask) / 2.0
+            if bid > 0.0 and ask > 0.0
+            else 0.0
+        )
+
+        spread = (
+            (ask - bid) / mid
+            if mid > 0.0
+            else 1.0
+        )
+
+        try:
+            max_spread = float(
+                os.getenv(
+                    "TESTNET_MAX_EXECUTION_SPREAD",
+                    "0.02",
+                )
+            )
+        except Exception:
+            max_spread = 0.02
+
+        if (
+            spread < 0.0
+            or spread > max_spread
+        ):
+            return (
+                False,
+                f"testnet_spread_too_wide:"
+                f"{spread:.6f}",
+            )
+
+        balance_age = (
+            now
+            - float(
+                getattr(
+                    self,
+                    "_testnet_gate_balance_at",
+                    0.0,
+                )
+            )
+        )
+
+        balance = getattr(
+            self,
+            "_testnet_gate_balance",
+            None,
+        )
+
+        if (
+            not isinstance(balance, dict)
+            or balance_age > 2.0
+        ):
+            try:
+                balance = await asyncio.to_thread(
+                    route_balance,
+                    mode="testnet",
+                    exchange_id="bybit",
+                )
+
+            except Exception as exc:
+                return (
+                    False,
+                    f"authenticated_balance_failed:"
+                    f"{type(exc).__name__}",
+                )
+
+            self._testnet_gate_balance = (
+                balance
+            )
+
+            self._testnet_gate_balance_at = (
+                time.time()
+            )
+
+        free_map = (
+            (balance or {}).get("free")
+            or {}
+        )
+
+        if side == "buy":
+            try:
+                free_usdt = float(
+                    free_map.get("USDT")
+                    or (
+                        (balance or {})
+                        .get("USDT", {})
+                        .get("free")
+                    )
+                    or 0.0
+                )
+            except Exception:
+                free_usdt = 0.0
+
+            if free_usdt <= 0.0:
+                return False, "no_free_usdt"
+
+            # Restored sizing formula observed in the authenticated
+            # runtime: 0.25 + 0.25 * confidence.
+            try:
+                conf = max(
+                    0.0,
+                    min(
+                        1.0,
+                        float(confidence or 0.0),
+                    ),
+                )
+            except Exception:
+                conf = 0.0
+
+            expected_fraction = (
+                0.25
+                + 0.25 * conf
+            )
+
+            expected_notional = (
+                free_usdt
+                * expected_fraction
+            )
+
+            amount_floor_cost = (
+                min_amount * ask
+                if min_amount > 0.0
+                else 0.0
+            )
+
+            required_notional = max(
+                min_cost,
+                amount_floor_cost,
+            )
+
+            # Small buffer for price movement/precision.
+            required_notional *= 1.02
+
+            if (
+                required_notional > 0.0
+                and expected_notional
+                < required_notional
+            ):
+                return (
+                    False,
+                    f"notional_below_testnet_min:"
+                    f"expected={expected_notional:.6f}:"
+                    f"required={required_notional:.6f}",
+                )
+
+            return (
+                True,
+                f"buy_ok:"
+                f"spread={spread:.6f}:"
+                f"budget={expected_notional:.6f}:"
+                f"min={required_notional:.6f}",
+            )
+
+        base = normalized.split("/", 1)[0]
+
+        try:
+            free_base = float(
+                free_map.get(base)
+                or (
+                    (balance or {})
+                    .get(base, {})
+                    .get("free")
+                )
+                or 0.0
+            )
+        except Exception:
+            free_base = 0.0
+
+        if free_base <= 0.0:
+            return False, "no_spot_inventory"
+
+        if (
+            min_amount > 0.0
+            and free_base < min_amount
+        ):
+            return (
+                False,
+                f"inventory_below_min_amount:"
+                f"free={free_base:.12g}:"
+                f"min={min_amount:.12g}",
+            )
+
+        inventory_notional = (
+            free_base * bid
+        )
+
+        required_cost = (
+            min_cost * 1.02
+            if min_cost > 0.0
+            else 0.0
+        )
+
+        if (
+            required_cost > 0.0
+            and inventory_notional
+            < required_cost
+        ):
+            return (
+                False,
+                f"inventory_below_min_cost:"
+                f"value={inventory_notional:.8f}:"
+                f"min={required_cost:.8f}",
+            )
+
+        return (
+            True,
+            f"sell_ok:"
+            f"spread={spread:.6f}:"
+            f"inventory={free_base:.12g}:"
+            f"value={inventory_notional:.8f}",
+        )
 
     async def _spendable_budget(self) -> float:
         """Free cash, after reconciling what is already held.
