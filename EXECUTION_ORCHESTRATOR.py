@@ -427,31 +427,8 @@ class ExecutionOrchestrator:
                     f"action=allow_historical_route"
                 )
 
-            gate_ok, gate_detail = await self._testnet_execution_gate(
-                symbol,
-                action,
-                confidence,
-            )
-
-            if not gate_ok:
-                preflight.record_blocker(
-                    preflight.EXCHANGE_REJECT,
-                    f"{symbol}:execution_gate:{gate_detail}",
-                )
-
-                logger.info(
-                    f"RUNTIME_PROOF EXECUTION_GATE_SKIP "
-                    f"symbol={symbol} side={action} "
-                    f"reason={gate_detail}"
-                )
-
-                return
-
-            logger.info(
-                f"RUNTIME_PROOF EXECUTION_GATE_ACCEPT "
-                f"symbol={symbol} side={action} "
-                f"detail={gate_detail}"
-            )
+            # Historical 2025 routing restored: no venue-specific eligibility gate
+            # is allowed to narrow strategy/scalper candidate routing here.
 
             # Check risk management
             can_trade, reason = self.risk_manager.can_open_position(symbol, action)
