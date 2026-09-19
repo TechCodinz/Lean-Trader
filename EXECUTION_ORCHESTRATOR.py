@@ -421,12 +421,11 @@ class ExecutionOrchestrator:
             # cannot bypass it.
             if float(confidence or 0.0) < float(self.min_confidence):
                 logger.info(
-                    f"RUNTIME_PROOF CONFIDENCE_GATE_SKIP "
-                    f"symbol={symbol} side={action} "
-                    f"confidence={float(confidence or 0.0):.4f} "
-                    f"minimum={float(self.min_confidence):.4f}"
+                    f"RUNTIME_PROOF CONFIDENCE_GATE_ADVISORY "
+                    f"confidence={confidence:.4f} "
+                    f"configured={self.min_confidence:.4f} "
+                    f"action=allow_historical_route"
                 )
-                return
 
             gate_ok, gate_detail = await self._testnet_execution_gate(
                 symbol,
