@@ -1389,6 +1389,170 @@ def prepare_order(
         amount = _amount_to_precision(exchange, symbol, amount)
         price = _price_to_precision(exchange, symbol, price)
 
+        # A real BUY must be executable in both directions.
+        #
+        # Bybit can charge the entry fee in base currency. A minimum-sized
+        # purchase can therefore be legal on entry but become impossible to
+        # sell after the fee and amount precision are applied.
+        #
+        # Example observed on Testnet:
+        #   BUY SOL 0.009
+        #   owned after fee 0.008991
+        #   sell precision -> 0.008
+        #   exit value < venue minimum
+        #
+        # Increase only to the next real venue amount increment needed for
+        # the resulting post-fee inventory to remain legally closable.
+        if (
+            side == "buy"
+            and requested_amount <= 0.0
+            and amount
+            and amount > 0.0
+            and price
+            and price > 0.0
+        ):
+            def round_trip_exit_state(entry_amount):
+                after_entry_fee = max(
+                    0.0,
+                    float(entry_amount)
+                    * max(
+                        0.0,
+                        1.0 - float(fee_rate or 0.0),
+                    ),
+                )
+
+                executable_exit_amount = _amount_to_precision(
+                    exchange,
+                    symbol,
+                    after_entry_fee,
+                )
+
+                executable_exit_amount = max(
+                    0.0,
+                    float(executable_exit_amount or 0.0),
+                )
+
+                executable_exit_notional = (
+                    executable_exit_amount
+                    * float(price)
+                )
+
+                amount_ok = (
+                    not min_amount
+                    or executable_exit_amount + 1e-15
+                    >= float(min_amount)
+                )
+
+                notional_ok = (
+                    not min_notional
+                    or executable_exit_notional + 1e-12
+                    >= float(min_notional)
+                )
+
+                return (
+                    bool(amount_ok and notional_ok),
+                    after_entry_fee,
+                    executable_exit_amount,
+                    executable_exit_notional,
+                )
+
+            (
+                round_trip_ok,
+                post_fee_amount,
+                executable_exit_amount,
+                executable_exit_notional,
+            ) = round_trip_exit_state(amount)
+
+            original_amount = float(amount)
+
+            attempts = 0
+
+            while (
+                not round_trip_ok
+                and attempts < 64
+            ):
+                attempts += 1
+
+                # Discover the venue's next real amount increment through the
+                # exchange's own precision function rather than inventing a
+                # decimal step.
+                bump = max(
+                    abs(float(amount)) * 1e-10,
+                    1e-12,
+                )
+
+                next_amount = None
+
+                for _ in range(64):
+                    candidate = _amount_to_precision(
+                        exchange,
+                        symbol,
+                        float(amount) + bump,
+                    )
+
+                    candidate = float(
+                        candidate or 0.0
+                    )
+
+                    if candidate > float(amount) + 1e-15:
+                        next_amount = candidate
+                        break
+
+                    bump *= 2.0
+
+                if (
+                    next_amount is None
+                    or next_amount <= float(amount)
+                ):
+                    break
+
+                candidate_notional = (
+                    next_amount
+                    * float(price)
+                )
+
+                if (
+                    candidate_notional
+                    > float(spendable) + 1e-12
+                ):
+                    break
+
+                amount = next_amount
+
+                (
+                    round_trip_ok,
+                    post_fee_amount,
+                    executable_exit_amount,
+                    executable_exit_notional,
+                ) = round_trip_exit_state(amount)
+
+            if not round_trip_ok:
+                return blocked(
+                    CAPITAL_BELOW_EXECUTABLE_MINIMUM,
+                    (
+                        f"{symbol} entry can be opened but resulting "
+                        f"post-fee inventory cannot satisfy a real exit; "
+                        f"entry_amount={float(amount):.12g} "
+                        f"post_fee={post_fee_amount:.12g} "
+                        f"exit_amount={executable_exit_amount:.12g} "
+                        f"exit_notional={executable_exit_notional:.8f} "
+                        f"min_amount={float(min_amount or 0.0):.12g} "
+                        f"min_notional={float(min_notional or 0.0):.8f} "
+                        f"spendable={float(spendable):.8f}"
+                    ),
+                    "round_trip_executability",
+                )
+
+            if float(amount) > original_amount + 1e-15:
+                sizing_reason = (
+                    f"{sizing_reason}; raised from "
+                    f"{original_amount:.12g} to "
+                    f"{float(amount):.12g} so post-fee inventory "
+                    f"remains exchange-executable on exit "
+                    f"(exit_amount={executable_exit_amount:.12g}, "
+                    f"exit_notional={executable_exit_notional:.8f})"
+                )
+
     if not amount or amount <= 0.0 or math.isnan(amount):
         return blocked(
             PRECISION_COLLAPSED_TO_ZERO,
