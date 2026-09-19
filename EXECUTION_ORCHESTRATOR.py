@@ -806,147 +806,232 @@ class ExecutionOrchestrator:
 
         return receipt
 
-    def _residual_execution_limits(self, symbol, price):
-        """Return the venue's amount/cost floor when locally available.
+    def _residual_execution_limits(self, symbol, price, size=None):
+        """Read actual authenticated-Testnet venue limits for residue.
 
-        No order is submitted here. If the exchange metadata does not expose a
-        cost floor, use a tiny conservative fallback solely for residual
-        quarantine. This value is NOT PnL.
+        No arbitrary dollar fallback is permitted here. If the venue metadata
+        cannot be established, residual executability remains unknown and the
+        position stays owned.
         """
-        normalized = preflight.normalize_symbol(symbol) or symbol
+        normalized = (
+            preflight.normalize_symbol(symbol)
+            or symbol
+        )
 
-        min_amount = 0.0
-        min_cost = 0.0
-
-        try:
-            broker = preflight.shared_broker()
-
-            candidates = []
-
-            for attr in (
-                "exchange",
-                "client",
-                "_exchange",
-                "ccxt_exchange",
-            ):
-                obj = getattr(broker, attr, None)
-                if obj is not None:
-                    candidates.append(obj)
-
-            candidates.append(broker)
-
-            seen = set()
-
-            for obj in candidates:
-                if obj is None or id(obj) in seen:
-                    continue
-
-                seen.add(id(obj))
-                market = None
-
-                try:
-                    fn = getattr(obj, "market", None)
-                    if callable(fn):
-                        market = fn(normalized)
-                except Exception:
-                    market = None
-
-                if not isinstance(market, dict):
-                    try:
-                        markets = getattr(obj, "markets", None) or {}
-                        market = (
-                            markets.get(normalized)
-                            or markets.get(symbol)
-                        )
-                    except Exception:
-                        market = None
-
-                if not isinstance(market, dict):
-                    continue
-
-                limits = market.get("limits") or {}
-
-                amount_limits = limits.get("amount") or {}
-                cost_limits = limits.get("cost") or {}
-
-                try:
-                    value = float(amount_limits.get("min") or 0.0)
-                    min_amount = max(min_amount, value)
-                except Exception:
-                    pass
-
-                try:
-                    value = float(cost_limits.get("min") or 0.0)
-                    min_cost = max(min_cost, value)
-                except Exception:
-                    pass
-
-        except Exception as exc:
-            logger.debug(
-                f"Residual limit metadata unavailable for {symbol}: {exc}"
-            )
-
-        # Fallback only when the venue supplied no cost floor.
-        # BTC residue currently observed is ~7 cents, so 10 cents is enough
-        # to prevent an endless impossible-order loop without hiding any
-        # meaningful tradable position.
-        if min_cost <= 0.0:
-            try:
-                min_cost = float(
-                    os.getenv(
-                        "RESIDUAL_DUST_FALLBACK_USD",
-                        "0.10",
-                    )
-                )
-            except Exception:
-                min_cost = 0.10
-
-        return {
-            "min_amount": max(0.0, min_amount),
-            "min_cost": max(0.0, min_cost),
-            "reference_price": max(0.0, float(price or 0.0)),
+        result = {
+            "known": False,
+            "min_amount": 0.0,
+            "min_cost": 0.0,
+            "reference_price": max(
+                0.0,
+                float(price or 0.0),
+            ),
+            "rounded_amount": max(
+                0.0,
+                float(size or 0.0),
+            ),
         }
 
+        try:
+            override = os.getenv(
+                "EXECUTION_EXCHANGE_OVERRIDE",
+                "",
+            ).strip().lower()
+
+            broker = preflight.shared_broker(
+                execution_mode=(
+                    self.mode
+                    or "testnet"
+                ),
+                exchange_id=(
+                    override
+                    or "bybit"
+                ),
+            )
+
+            markets = (
+                preflight.load_markets_cached(
+                    broker
+                )
+                or {}
+            )
+
+            market = markets.get(
+                normalized
+            )
+
+            if not isinstance(
+                market,
+                dict,
+            ):
+                return result
+
+            limits = (
+                market.get("limits")
+                or {}
+            )
+
+            try:
+                result["min_amount"] = max(
+                    0.0,
+                    float(
+                        (
+                            limits.get("amount")
+                            or {}
+                        ).get("min")
+                        or 0.0
+                    ),
+                )
+            except Exception:
+                pass
+
+            try:
+                result["min_cost"] = max(
+                    0.0,
+                    float(
+                        (
+                            limits.get("cost")
+                            or {}
+                        ).get("min")
+                        or 0.0
+                    ),
+                )
+            except Exception:
+                pass
+
+            if size is not None:
+                try:
+                    client = broker._make_exchange(
+                        broker.resolve_mode(),
+                        authenticated=False,
+                    )
+
+                    rounded = (
+                        client.amount_to_precision(
+                            normalized,
+                            float(size),
+                        )
+                    )
+
+                    result["rounded_amount"] = max(
+                        0.0,
+                        float(rounded or 0.0),
+                    )
+
+                except Exception:
+                    # Keep the exact residual amount if precision conversion
+                    # itself is unavailable. Venue min_amount/min_cost still
+                    # provide strict evidence when present.
+                    pass
+
+            result["known"] = True
+
+        except Exception as exc:
+            logger.warning(
+                f"RUNTIME_PROOF RESIDUAL_LIMIT_LOOKUP_FAILED "
+                f"symbol={normalized} "
+                f"error={type(exc).__name__}"
+            )
+
+        return result
+
+
     def _is_non_executable_residual(self, symbol, size, price):
-        size = max(0.0, float(size or 0.0))
-        price = max(0.0, float(price or 0.0))
+        size = max(
+            0.0,
+            float(size or 0.0),
+        )
+
+        price = max(
+            0.0,
+            float(price or 0.0),
+        )
 
         if size <= 0.0:
             return True, {
+                "known": True,
                 "min_amount": 0.0,
                 "min_cost": 0.0,
                 "reference_price": price,
+                "rounded_amount": 0.0,
             }
 
         limits = self._residual_execution_limits(
             symbol,
             price,
+            size=size,
         )
 
-        min_amount = float(
-            limits.get("min_amount") or 0.0
-        )
-        min_cost = float(
-            limits.get("min_cost") or 0.0
+        if not limits.get("known"):
+            logger.warning(
+                f"RUNTIME_PROOF RESIDUAL_EXECUTABILITY_UNKNOWN "
+                f"symbol={symbol} "
+                f"size={size:.12g}"
+            )
+
+            return False, limits
+
+        rounded_amount = max(
+            0.0,
+            float(
+                limits.get(
+                    "rounded_amount"
+                )
+                or 0.0
+            ),
         )
 
-        notional = size * price
+        min_amount = max(
+            0.0,
+            float(
+                limits.get(
+                    "min_amount"
+                )
+                or 0.0
+            ),
+        )
+
+        min_cost = max(
+            0.0,
+            float(
+                limits.get(
+                    "min_cost"
+                )
+                or 0.0
+            ),
+        )
+
+        notional = (
+            rounded_amount
+            * price
+        )
+
+        precision_zero = (
+            rounded_amount <= 0.0
+        )
 
         amount_too_small = (
             min_amount > 0.0
-            and size < min_amount
+            and rounded_amount
+            < min_amount
         )
 
         cost_too_small = (
             min_cost > 0.0
             and price > 0.0
-            and notional < min_cost
+            and notional
+            < min_cost
         )
 
         return (
-            bool(amount_too_small or cost_too_small),
+            bool(
+                precision_zero
+                or amount_too_small
+                or cost_too_small
+            ),
             limits,
         )
+
 
     def _quarantine_residual(
         self,
@@ -1427,11 +1512,7 @@ class ExecutionOrchestrator:
             try:
                 free_usdt = float(
                     free_map.get("USDT")
-                    or (
-                        (balance or {})
-                        .get("USDT", {})
-                        .get("free")
-                    )
+                    or ((balance or {}).get("USDT", {}).get("free"))
                     or 0.0
                 )
             except Exception:
@@ -1440,61 +1521,15 @@ class ExecutionOrchestrator:
             if free_usdt <= 0.0:
                 return False, "no_free_usdt"
 
-            # Restored sizing formula observed in the authenticated
-            # runtime: 0.25 + 0.25 * confidence.
-            try:
-                conf = max(
-                    0.0,
-                    min(
-                        1.0,
-                        float(confidence or 0.0),
-                    ),
-                )
-            except Exception:
-                conf = 0.0
-
-            expected_fraction = (
-                0.25
-                + 0.25 * conf
-            )
-
-            expected_notional = (
-                free_usdt
-                * expected_fraction
-            )
-
-            amount_floor_cost = (
-                min_amount * ask
-                if min_amount > 0.0
-                else 0.0
-            )
-
-            required_notional = max(
-                min_cost,
-                amount_floor_cost,
-            )
-
-            # Small buffer for price movement/precision.
-            required_notional *= 1.02
-
-            if (
-                required_notional > 0.0
-                and expected_notional
-                < required_notional
-            ):
-                return (
-                    False,
-                    f"notional_below_testnet_min:"
-                    f"expected={expected_notional:.6f}:"
-                    f"required={required_notional:.6f}",
-                )
-
+            # Market/liquidity gate only.
+            # Canonical preflight owns sizing, venue minimums,
+            # precision and authenticated balance enforcement.
             return (
                 True,
-                f"buy_ok:"
+                f"buy_market_ok:"
                 f"spread={spread:.6f}:"
-                f"budget={expected_notional:.6f}:"
-                f"min={required_notional:.6f}",
+                f"free_usdt={free_usdt:.6f}:"
+                f"sizing=canonical_preflight",
             )
 
         base = normalized.split("/", 1)[0]

@@ -1336,6 +1336,31 @@ def prepare_order(
             policy=policy,
         )
 
+        # If the ordinary adaptive fraction lands below the already-computed
+        # legal minimum ticket, but that minimum ticket is affordable inside
+        # the authenticated spendable/risk budget, use the canonical venue
+        # floor rather than rejecting a trade that the account can execute.
+        if (
+            ticket.total_cost > 0.0
+            and notional + 1e-12 < ticket.total_cost
+            and ticket.total_cost <= spendable + 1e-12
+        ):
+            old_notional = float(notional)
+
+            notional = float(
+                ticket.total_cost
+            )
+
+            sizing_reason = (
+                f"{sizing_reason}; raised from "
+                f"{old_notional:.8f} to canonical minimum "
+                f"executable ticket {notional:.8f}"
+            )
+
+            record_event(
+                "minimum_ticket_floor_applied"
+            )
+
     if notional <= 0.0:
         blocker = (
             BELOW_MIN_NOTIONAL
