@@ -21,6 +21,22 @@ logger = logging.getLogger('SCANNER_TO_EXTRACTOR')
 
 from DYNAMIC_MARKET_SCANNER import DynamicMarketScanner
 from STEADY_PROFIT_EXTRACTOR import SteadyProfitExtractor
+# 2025 Memory systems
+try:
+    from pattern_memory import PatternMemory, record as pm_record, recall as pm_recall
+    _HAS_PM = True
+except ImportError:
+    _HAS_PM = False
+try:
+    from brain import Memory as BrainMemory
+    _HAS_BM = True
+except ImportError:
+    _HAS_BM = False
+try:
+    from traders_core.memory import Memory as CoreMemory
+    _HAS_CM = True
+except ImportError:
+    _HAS_CM = False
 import ccxt.async_support as ccxt
 
 
@@ -116,6 +132,18 @@ async def main():
     data_hub = LiveDataHub()
     execution = LiveExecutionEngine()
     extractor = SteadyProfitExtractor(data_hub=data_hub, execution_engine=execution)
+
+    # Initialize 2025 memory systems
+    _pm = PatternMemory() if _HAS_PM else None
+    _bm = BrainMemory() if _HAS_BM else None
+    _cm = CoreMemory() if _HAS_CM else None
+    if _pm: logger.info("🧠 PatternMemory connected")
+    if _bm: logger.info("🧠 BrainMemory connected")
+    if _cm: logger.info("🧠 CoreMemory connected")
+    # Store for signal producer and execution hooks
+    data_hub.pattern_memory = _pm
+    data_hub.brain_memory = _bm
+    data_hub.core_memory = _cm
 
     logger.info("🔗 Wired: Scanner -> Extractor (your 2025 design)")
 

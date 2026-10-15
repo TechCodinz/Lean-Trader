@@ -2,6 +2,7 @@
 import json
 import os
 import time
+from typing import Dict, List, Any
 
 MEM_PATH = os.path.join("runtime", "brain.json")
 
