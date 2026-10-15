@@ -88,8 +88,9 @@ class SteadyProfitExtractor:
         confidence = signal.get('confidence', 0)
         side = signal.get('side', 'BUY')
         
-        # Must be fast-moving pair
-        if symbol not in self.fast_pairs:
+        # Must be fast-moving pair (normalize perp format: BTC/USDT:USDT -> BTC/USDT)
+        _base = symbol.split(':')[0]
+        if _base not in self.fast_pairs and symbol not in self.fast_pairs:
             return None
         
         # Must have decent confidence
@@ -97,7 +98,12 @@ class SteadyProfitExtractor:
             return None
         
         # Calculate position size for profit extraction
-        balance = 42.0  # Will get from exchange in production
+        # Get live balance from exchange
+        try:
+            _bal = self.execution.ex.fetch_balance()
+            balance = float(_bal.get('total', {}).get('USDT', 42.0) or 42.0)
+        except Exception:
+            balance = 42.0  # Fallback
         position_size = balance * 0.30  # Use 30% of balance per trade
         
         if position_size < 5:  # Minimum $5 position
