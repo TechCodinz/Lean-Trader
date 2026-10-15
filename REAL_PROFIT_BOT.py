@@ -1,6 +1,21 @@
 #!/usr/bin/env python3
 from ADAPTIVE_PAIR_SELECTOR import AdaptivePairSelector
+# VAST UNIVERSE (2025) - 70+ pairs, not just 5 Tier 1
+try:
+    from EXPANDED_MARKET_UNIVERSE import FULL_MARKET_UNIVERSE, get_market_universe_for_balance
+    _HAS_VAST = True
+    print(f"🌐 Vast Universe loaded: {len(FULL_MARKET_UNIVERSE)} pairs")
+except ImportError:
+    _HAS_VAST = False
+    FULL_MARKET_UNIVERSE = []
 # Cross-timeframe + advanced enhancements (2025 nervous system)
+# Signal Bus integration (nervous system routing)
+try:
+    from signal_bus import publish_signal, publish_decision, publish_outcome, get_pending_decisions
+    _HAS_BUS = True
+except ImportError:
+    _HAS_BUS = False
+
 try:
     from SMART_SCALPING_ENGINE import MultiTimeframeAnalyzer, MarketSession
     _HAS_SCALPER = True
@@ -466,13 +481,34 @@ class REAL_PROFIT_BOT:
         while self.running:
             try:
                 # Dynamic pair selection by wallet size (2025)
-                _pairs = self.crypto_pairs
-                if getattr(self, 'pair_selector', None):
+                # VAST UNIVERSE: Use 70+ pairs, not 5-tier limit
+                # The 2025 design scans the full universe with 85% gate
+                # Fast low-price growers (Meme, Gaming, AI) included
+                if _HAS_VAST and FULL_MARKET_UNIVERSE:
                     try:
                         _bal = self.check_gate_balance()
-                        _pairs = self.pair_selector.get_active_pairs(_bal)
+                        _pairs = get_market_universe_for_balance(_bal)
+                    except Exception:
+                        _pairs = FULL_MARKET_UNIVERSE
+                else:
+                    _pairs = self.crypto_pairs
+                    if getattr(self, 'pair_selector', None):
+                        try:
+                            _bal = self.check_gate_balance()
+                            _pairs = self.pair_selector.get_active_pairs(_bal)
+                        except Exception:
+                            pass
+                # CHECK SIGNAL BUS for brain/sensor decisions (nervous system)
+                bus_decisions = {}
+                if _HAS_BUS:
+                    try:
+                        for fpath, dec in get_pending_decisions(min_confidence=85):
+                            sym = dec.get('symbol')
+                            if sym:
+                                bus_decisions[sym] = dec
                     except Exception:
                         pass
+                
                 for symbol in _pairs:
                     signal, confidence, price, change, volume = self.analyze_market(symbol)
                     if signal != "HOLD":
@@ -503,6 +539,12 @@ class REAL_PROFIT_BOT:
                         trade_result = self.execute_trade(symbol, signal, price)
 
                         if trade_result:
+                            # PUBLISH OUTCOME to bus (for learners)
+                            if _HAS_BUS:
+                                try:
+                                    publish_outcome('rpb', symbol, signal, price, position_size, True)
+                                except Exception:
+                                    pass
                             position_size = self.position_sizes.get(symbol, 0.01)
                             profit = abs(
                                 price * position_size * (confidence / 100) * 0.05
