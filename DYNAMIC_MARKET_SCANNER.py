@@ -108,7 +108,7 @@ class DynamicMarketScanner:
                 # Filter for USDT pairs only
                 usdt_pairs = {
                     symbol: ticker for symbol, ticker in tickers.items()
-                    if '/USDT' in symbol and ':' not in symbol  # Exclude futures
+                    if '/USDT' in symbol  # Trade all: spot + perpetuals (2025 design)
                 }
                 
                 logger.info(f"   Found {len(usdt_pairs)} USDT pairs on {exchange_name}")
