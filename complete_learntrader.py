@@ -446,7 +446,14 @@ class CompleteLearntraderBot:
         )
 
         # Generate realistic forex data
-        base_price = 1.1000 if 'EUR' in symbol else 1.2500
+        # Live price (fallback to hardcoded)
+        try:
+            import ccxt
+            _ex = ccxt.bybit({'enableRateLimit': True})
+            _t = _ex.fetch_ticker(symbol)
+            base_price = float(_t.get('last', 1.1000 if 'EUR' in symbol else 1.2500) or 1.0)
+        except Exception:
+            base_price = 1.1000 if 'EUR' in symbol else 1.2500
 
         data = []
         price = base_price

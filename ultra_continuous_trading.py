@@ -128,7 +128,15 @@ class UltraContinuousTradingOrchestrator:
         self.active_sessions: Dict[str, TradingSession] = {}
         self.completed_sessions: List[TradingSession] = []
         self.daily_balance = 48.0  # Starting with $48
-        self.total_balance = 48.0
+        # Live balance (fallback to 48.0)
+        try:
+            import ccxt
+            _ex = ccxt.bybit({'enableRateLimit': True})
+            _ex.set_sandbox_mode(True)
+            _bal = _ex.fetch_balance()
+            self.total_balance = float(_bal.get('total', {}).get('USDT', 48.0) or 48.0)
+        except Exception:
+            self.total_balance = 48.0
         self.daily_profit = 0.0
         self.total_profit = 0.0
 

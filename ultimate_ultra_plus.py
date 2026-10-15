@@ -680,7 +680,14 @@ class FXTrainerEngine:
                     continue
 
                 # Mock price (would fetch real price)
-                price = 1.1234 if 'EUR' in pair else 1900 if 'XAU' in pair else 1.0
+                # Live price (fallback to hardcoded)
+                try:
+                    import ccxt
+                    _ex = ccxt.bybit({'enableRateLimit': True})
+                    _t = _ex.fetch_ticker(pair)
+                    price = float(_t.get('last', 1.0) or 1.0)
+                except Exception:
+                    price = 1.1234 if 'EUR' in pair else 1900 if 'XAU' in pair else 1.0
 
                 if not self.deduplicator.is_duplicate('fx_trainer', pair, signal, price):
                     signal_data = {

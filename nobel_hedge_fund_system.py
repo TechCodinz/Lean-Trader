@@ -177,8 +177,17 @@ class NobelHedgeFundSystem:
     
     def __init__(self):
         self.running = False
-        self.initial_balance = 10000.0
-        self.current_balance = 10000.0
+        # Live balance (fallback to 10000.0)
+        try:
+            import ccxt
+            _ex = ccxt.bybit({'enableRateLimit': True})
+            _ex.set_sandbox_mode(True)
+            _bal = _ex.fetch_balance()
+            _live = float(_bal.get('total', {}).get('USDT', 10000.0) or 10000.0)
+        except Exception:
+            _live = 10000.0
+        self.initial_balance = _live
+        self.current_balance = _live
         self.total_pnl = 0.0
         self.max_drawdown = 0.0
         self.sharpe_ratio = 0.0
