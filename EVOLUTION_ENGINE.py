@@ -177,15 +177,47 @@ class ULTIMATE_EVOLUTION_ENGINE:
             print(f"❌ LangChain agent error: {e}")
 
     def initialize_ai_clients(self):
-        """Initialize AI clients for advanced capabilities"""
+        """Initialize AI clients for advanced capabilities (key-ready)"""
+        import os
+        self.anthropic_client = None
+        self.openai_client = None
         try:
-            # Initialize Anthropic client (would need API key)
-            # self.anthropic_client = anthropic.Anthropic(api_key="your-key")
+            # Check for keys in container secrets (activate when added)
+            anth_key = None
+            openai_key = None
+            for path, name in [
+                ('/run/secrets/anthropic_api_key', 'anthropic'),
+                ('/run/secrets/openai_api_key', 'openai'),
+            ]:
+                try:
+                    with open(path) as f:
+                        key = f.read().strip()
+                        if key:
+                            if name == 'anthropic':
+                                anth_key = key
+                            else:
+                                openai_key = key
+                except FileNotFoundError:
+                    pass
 
-            # Initialize OpenAI client (would need API key)
-            # self.openai_client = openai.OpenAI(api_key="your-key")
+            if anth_key:
+                try:
+                    import anthropic
+                    self.anthropic_client = anthropic.Anthropic(api_key=anth_key)
+                    print("✅ Anthropic client activated")
+                except Exception as e:
+                    print(f"Anthropic init failed: {e}")
 
-            print("🤖 AI clients initialized (API keys needed for full functionality)")
+            if openai_key:
+                try:
+                    import openai
+                    self.openai_client = openai.OpenAI(api_key=openai_key)
+                    print("✅ OpenAI client activated")
+                except Exception as e:
+                    print(f"OpenAI init failed: {e}")
+
+            if not anth_key and not openai_key:
+                print("🤖 AI clients ready (add keys to /run/secrets/ to activate)")
 
         except Exception as e:
             print(f"❌ AI clients error: {e}")
@@ -1656,7 +1688,7 @@ class ULTIMATE_EVOLUTION_ENGINE:
                     model['spawn_time'],
                     json.dumps(model.get('parent_models', [])),
                     json.dumps(self.get_current_market_conditions()),
-                    json.dumps(model),
+                    json.dumps(model, default=lambda obj: obj.isoformat() if hasattr(obj, 'isoformat') else str(obj)),
                 ),
             )
             self.evo_db.commit()
