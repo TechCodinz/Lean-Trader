@@ -190,7 +190,7 @@ async def main():
     # 2025 PATTERN: Run RPB directly (bypass 2026 orchestrator)
     from REAL_PROFIT_BOT import RealProfitBot
     print("⏳ Starting Real Profit Bot (2025 pattern)...")
-    bot = RealProfitBot()
+    bot = RealProfitBot(mode=mode)
     # RPB runs its own trading loop (sync, not async)
     import threading
     rpb_thread = threading.Thread(target=bot.run_real_profit_trading, daemon=True)
