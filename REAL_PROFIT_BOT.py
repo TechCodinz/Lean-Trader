@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
 from ADAPTIVE_PAIR_SELECTOR import AdaptivePairSelector
+try:
+    from sizer import suggest_size
+    _HAS_SIZER = True
+except ImportError:
+    _HAS_SIZER = False
 # VAST UNIVERSE (2025) - 70+ pairs, not just 5 Tier 1
 try:
     from EXPANDED_MARKET_UNIVERSE import FULL_MARKET_UNIVERSE, get_market_universe_for_balance
@@ -380,8 +385,21 @@ class REAL_PROFIT_BOT:
             target_position_usd = max(3.50, min(balance * 0.25, 12.0))  # Min $3.50, 25% of balance, or $12 max
             
             # Get base size and scale it to target USD value
-            base_size = self.base_position_sizes.get(symbol, 0.01)
-            position_size = (target_position_usd / price) if price > 0 else base_size
+            # Use 2025 sizer (0.25% risk/trade, session-adjusted)
+            _use_sizer = False
+            if _HAS_SIZER:
+                try:
+                    _bal_val = float(balance) if 'balance' in dir() else 10.0
+                    _sig = {'entry': price, 'sl': price * 0.98, 'market': 'crypto-spot', 'tf': '15m'}
+                    _sized = suggest_size(_sig, _bal_val)
+                    position_size = float(_sized.get('qty', 0))
+                    print(f"📐 Sizer: {position_size} units (0.25% risk)")
+                    _use_sizer = True
+                except Exception as _e:
+                    print(f"⚠️ Sizer failed: {_e}, using default")
+            if not _use_sizer:
+                base_size = self.base_position_sizes.get(symbol, 0.01)
+                position_size = (target_position_usd / price) if price > 0 else base_size
 
             # Check if we have enough balance first
             balance = self.check_gate_balance()
