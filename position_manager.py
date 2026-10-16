@@ -5,6 +5,8 @@ logger = logging.getLogger('POSITION_MGR')
 
 # Track open extractor positions: {symbol: {entry, qty, tp, sl, side}}
 open_positions = {}
+trailing = TrailingStopManager(trail_percent=0.02)
+partial_tp = PartialTPManager()
 def load_positions():
     try:
         import json
