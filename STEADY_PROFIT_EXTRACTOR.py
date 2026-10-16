@@ -16,6 +16,7 @@ Monthly Target: $300-1200 profit (7-28x returns!)
 
 import asyncio
 import logging
+from critical_features_addon import CompoundEngine
 from typing import Dict, List, Optional
 from datetime import datetime, timedelta
 from collections import deque
@@ -33,6 +34,7 @@ class SteadyProfitExtractor:
         self.execution = execution_engine
         
         # Profit targets (scales with balance)
+        self.compounder = CompoundEngine(initial_capital=31.20, compound_rate=0.5)
         self.min_profit_per_trade = 0.01  # $0.50 minimum
         self.target_profit_pct = 0.008  # 0.8% per trade (conservative)
         self.max_trades_per_day = 30
@@ -106,7 +108,7 @@ class SteadyProfitExtractor:
             balance = float(_bal.get('total', {}).get('USDT', 42.0) or 42.0)
         except Exception:
             balance = 42.0  # Fallback
-        position_size = balance * 0.30  # Use 30% of balance per trade
+        position_size = self.compounder.calculate_position_size(base_size=balance * 0.30)  # Use 30% of balance per trade
         
         if position_size < 5:  # Minimum $5 position
             position_size = min(balance * 0.50, 10)  # Use up to 50% if balance is low
