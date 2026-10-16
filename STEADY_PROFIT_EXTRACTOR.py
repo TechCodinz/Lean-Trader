@@ -91,10 +91,12 @@ class SteadyProfitExtractor:
         # Must be fast-moving pair (normalize perp format: BTC/USDT:USDT -> BTC/USDT)
         _base = symbol.split(':')[0]
         if _base not in self.fast_pairs and symbol not in self.fast_pairs:
+            logger.info(f'🚫 BLOCKED {symbol}: not in fast_pairs')
             return None
         
         # Must have decent confidence
         if confidence < 0.70:
+            logger.info(f'🚫 BLOCKED {symbol}: confidence {confidence:.2f} < 0.70')
             return None
         
         # Calculate position size for profit extraction
@@ -112,7 +114,8 @@ class SteadyProfitExtractor:
         # Calculate targets
         price = signal.get('price', 0)
         if price == 0:
-            return None  # Need price
+            logger.info(f'🚫 BLOCKED {symbol}: price is zero')
+            return None
         
         if side.upper() == 'BUY':
             stop_loss = price * (1 - self.stop_loss_pct)
