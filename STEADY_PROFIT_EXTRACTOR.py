@@ -16,7 +16,8 @@ Monthly Target: $300-1200 profit (7-28x returns!)
 
 import asyncio
 import logging
-from critical_features_addon import CompoundEngine
+from critical_features_addon import CompoundEngine, EmergencyStop
+from EXECUTION_ORCHESTRATOR import SmartPositionSizer
 from typing import Dict, List, Optional
 from datetime import datetime, timedelta
 from collections import deque
@@ -34,6 +35,8 @@ class SteadyProfitExtractor:
         self.execution = execution_engine
         
         # Profit targets (scales with balance)
+        self.kelly_sizer = SmartPositionSizer(initial_balance=31.20)
+        self.emergency = EmergencyStop(max_loss=0.10, max_trades_per_min=10)
         self.compounder = CompoundEngine(initial_capital=31.20, compound_rate=0.5)
         self.min_profit_per_trade = 0.01  # $0.50 minimum
         self.target_profit_pct = 0.008  # 0.8% per trade (conservative)
@@ -81,6 +84,10 @@ class SteadyProfitExtractor:
             self.last_reset = datetime.now()
             logger.info(f"📊 Daily reset: {self.daily_trades} trades, ${self.daily_profit:.2f} profit")
         
+        # Emergency stop check (2025 safety)
+        if hasattr(self, "emergency") and self.emergency.emergency_active:
+            logger.error("🚨 EMERGENCY STOP ACTIVE - trading halted")
+            return None
         # Check daily limit
         if self.daily_trades >= self.max_trades_per_day:
             logger.debug(f"⚠️ Daily trade limit reached ({self.max_trades_per_day})")
