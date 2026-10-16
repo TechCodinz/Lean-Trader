@@ -1,4 +1,4 @@
-import os, time, logging, requests, ccxt
+import os, time, logging, requests, ccxt, json
 from critical_features_addon import CompoundEngine
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 logger = logging.getLogger('PAPER')
@@ -8,7 +8,20 @@ def tg(msg):
         if tok and cid: requests.post(f"https://api.telegram.org/bot{tok}/sendMessage", json={"chat_id":cid,"text":msg}, timeout=5)
     except: pass
 compounder = CompoundEngine(initial_capital=100.0, compound_rate=0.5)
+STATE_FILE='/tmp/paper_state.json'
+def load_state():
+    global cash, positions, trades, compounder
+    try:
+        d=json.load(open(STATE_FILE))
+        cash=d['cash']; positions=d['positions']; trades=d['trades']
+        for _ in range(len([t for t in trades if t>0])): pass
+        compounder.current_capital=cash
+        print(f"Loaded: ${cash:.2f}, {len(positions)} positions")
+    except: pass
+def save_state():
+    json.dump({'cash':cash,'positions':positions,'trades':trades}, open(STATE_FILE,'w'))
 cash = 100.0; positions = {}; trades = []
+load_state()
 ex = ccxt.bybit({'enableRateLimit': True}); ex.set_sandbox_mode(True)
 logger.info("💰 Real Paper Trader started with $100"); tg("💰 Paper Trader LIVE - $100")
 while True:
@@ -26,7 +39,7 @@ while True:
             qty = size_usd / price
             positions[sym] = {'qty': qty, 'entry': price}
             logger.info(f"📈 PAPER BUY {sym} @ {price:.4f} ({chg:+.1f}%)")
-            tg(f"📈 BUY {sym} @ ${price:.4f} ({chg:+.1f}%)")
+            tg(f"📈 PREMIUM BUY\n{sym}\nEntry: ${price:.4f}\nMomentum: {chg:+.1f}%\nSize: ${size_usd:.2f}\nCash: ${cash:.2f}")
         for sym, pos in list(positions.items()):
             try:
                 cur = ex.fetch_ticker(sym)['last']
@@ -35,8 +48,8 @@ while True:
                     pnl = (cur - pos['entry']) * pos['qty']
                     cash += pnl; trades.append(pnl); compounder.update_pnl(pnl)
                     logger.info(f"📉 SELL {sym} P&L: ${pnl:+.4f} ({pct:+.2f}%)")
-                    tg(f"📉 SELL {sym} ${pnl:+.2f} ({pct:+.1f}%)")
-                    del positions[sym]
+                    tg(f"📉 PREMIUM SELL\n{sym}\nP&L: ${pnl:+.2f} ({pct:+.1f}%)\nCash: ${cash:.2f}\nWin Rate: {w}/{len(trades)}")
+                    del positions[sym]; save_state()
             except: pass
         w = sum(1 for x in trades if x > 0)
         logger.info(f"💵 ${cash:.2f} | Open:{len(positions)} | Trades:{len(trades)} W:{w}")
