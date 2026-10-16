@@ -228,8 +228,13 @@ class SteadyProfitExtractor:
                             # Execute immediately (auto-execution!)
                             logger.info(f"⚡ AUTO-EXECUTING profit extraction trade...")
                             try:
-                                result = await self.execution.execute(extraction_trade)
+                                result = await asyncio.wait_for(
+                                    self.execution.execute(extraction_trade),
+                                    timeout=30.0
+                                )
                                 logger.info("Executed trade")
+                            except asyncio.TimeoutError:
+                                logger.error("Execution timed out after 30s")
                             except Exception as ex:
                                 logger.error("Execution failed: %s", ex)
                             
