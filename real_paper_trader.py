@@ -1,5 +1,6 @@
 import os, time, logging, requests, ccxt, json
-from critical_features_addon import CompoundEngine
+from critical_features_addon import CompoundEngine, TrailingStopManager, PartialTPManager, EmergencyStop, VolumeProfileAnalyzer
+from EXECUTION_ORCHESTRATOR import SmartPositionSizer
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 logger = logging.getLogger('PAPER')
 def tg(msg):
@@ -8,6 +9,11 @@ def tg(msg):
         if tok and cid: requests.post(f"https://api.telegram.org/bot{tok}/sendMessage", json={"chat_id":cid,"text":msg}, timeout=5)
     except: pass
 compounder = CompoundEngine(initial_capital=100.0, compound_rate=0.5)
+trailer = TrailingStopManager(trail_percent=0.02)
+partial = PartialTPManager()
+emergency = EmergencyStop(max_loss=0.10, max_trades_per_min=10)
+kelly = SmartPositionSizer(initial_balance=100.0)
+vol_analyzer = VolumeProfileAnalyzer(bins=50)
 STATE_FILE='/tmp/paper_state.json'
 def load_state():
     global cash, positions, trades, compounder
