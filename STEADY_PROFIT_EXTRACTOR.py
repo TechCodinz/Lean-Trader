@@ -33,7 +33,7 @@ class SteadyProfitExtractor:
         self.execution = execution_engine
         
         # Profit targets (scales with balance)
-        self.min_profit_per_trade = 0.50  # $0.50 minimum
+        self.min_profit_per_trade = 0.01  # $0.50 minimum
         self.target_profit_pct = 0.008  # 0.8% per trade (conservative)
         self.max_trades_per_day = 30
         
@@ -227,7 +227,11 @@ class SteadyProfitExtractor:
                         if extraction_trade:
                             # Execute immediately (auto-execution!)
                             logger.info(f"⚡ AUTO-EXECUTING profit extraction trade...")
-                            # In production, would call execution engine here
+                            try:
+                                result = await self.execution.execute(extraction_trade)
+                                logger.info("Executed trade")
+                            except Exception as ex:
+                                logger.error("Execution failed: %s", ex)
                             
                     except asyncio.TimeoutError:
                         pass

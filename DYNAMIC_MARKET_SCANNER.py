@@ -137,7 +137,7 @@ class DynamicMarketScanner:
                                     'symbol': symbol,
                                     'exchange': exchange_name,
                                     'volume_24h': volume_24h,
-                                    'price_change_pct': price_change_pct,
+                                    'price_change_pct': price_change_pct, 'price': ticker.get('last', 0),
                                     'discovered_at': datetime.now()
                                 })
                                 

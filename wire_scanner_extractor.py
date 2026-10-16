@@ -89,7 +89,7 @@ def trending_to_signal(trending):
         'symbol': symbol,
         'side': side,
         'confidence': confidence,
-        'price_change_pct': pct,
+        'price_change_pct': pct, 'price': trending.get('price', 0),
         'exchange': trending.get('exchange'),
     }
 
