@@ -440,12 +440,16 @@ class REAL_PROFIT_BOT:
                     if amount <= 0:
                         print(f"\u23ed\ufe0f SKIP BUY {symbol}: amount floored to zero", flush=True)
                         return None
-                    order = self.gate.create_market_buy_order(symbol, amount)
+                    # DISABLED: RPB no longer buys (extractor handles execution)
+                    # order = self.gate.create_market_buy_order(symbol, amount)
+                    order = None  # Disabled
                     print(f"✅ REAL PROFIT BUY: {symbol} @ ${price:.4f} | Amount: {amount:.8f} | Cost: ${target_position_usd:.2f}")
                 else:
                     # Gate.io: Pass cost directly
                     cost_usd = target_position_usd
-                    order = self.gate.create_market_buy_order(symbol, cost_usd)
+                    # DISABLED: RPB no longer buys (extractor handles execution)
+                    # order = self.gate.create_market_buy_order(symbol, cost_usd)
+                    order = None  # Disabled
                     print(f"✅ REAL PROFIT BUY: {symbol} @ ${price:.4f} | Cost: ${cost_usd:.2f}")
             elif signal == "SELL":
                 # Both Gate.io and Bybit: Pass amount in base currency for sells
