@@ -6,6 +6,7 @@ from BALANCE_TIER_COORDINATOR import BalanceTierCoordinator
 from strategy_zoo import get_strategy
 from session_intelligence import SessionPerformanceTracker, MarketSession
 from scalping_coordinator import ScalpingCoordinator
+from auto_adaptive_apex import AutoAdaptiveApex
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 logger = logging.getLogger('ZOO')
@@ -41,6 +42,7 @@ def save_state():
 
 load_state()
 ex = ccxt.bybit({'enableRateLimit': True}); ex.set_sandbox_mode(True)
+apex = AutoAdaptiveApex(ex)
 logger.info("🐯 Zoo Paper Trader started"); tg("🐯 Zoo Trader LIVE - 5 strategies")
 
 def get_signal(sym):
@@ -69,6 +71,8 @@ while True:
             sig = get_signal(sym)
             if not sig: continue
             tier_coord.update_balance(cash)
+            apex_tier, apex_cfg = apex.get_current_tier(cash)
+            # Apex provides tier-based risk: use its target_profit/stop_loss
             tier_size = tier_coord.get_recommended_position_size()
             kelly_size = kelly.calculate_position_size(confidence=0.7, volatility=0.02, stop_loss_pct=0.02)
             size_usd = min(tier_size, max(kelly_size, cash*0.10))
