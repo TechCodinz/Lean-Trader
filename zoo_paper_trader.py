@@ -10,6 +10,10 @@ from auto_adaptive_apex import AutoAdaptiveApex
 from balance_aware_intelligence import BalanceAwareIntelligence
 from central_nervous_system import get_central_nervous_system
 from central_coordination_hub import CentralCoordinationHub
+from central_control_intelligence import CentralControlIntelligence
+from hybrid_intelligence_coordinator import HybridIntelligenceCoordinator
+from exchange_spawn_manager import ExchangeSpawnManager
+from collective_swarm_intelligence import CollectiveSwarmIntelligence
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 logger = logging.getLogger('ZOO')
@@ -53,6 +57,13 @@ cns.register_engine("strategy_zoo", strategies)
 cns.register_engine("risk", emergency)
 hub = CentralCoordinationHub()
 # Hub is single source of truth for pairs/strategies
+# Supreme hierarchy: CCI coordinates all
+data_hub = {}
+hybrid_coord = HybridIntelligenceCoordinator(data_hub)
+swarm = CollectiveSwarmIntelligence(data_hub)
+cci = CentralControlIntelligence(data_hub)
+spawn_mgr = ExchangeSpawnManager(data_hub, cci)
+cci.register_subsystems(hybrid_coord, spawn_mgr, swarm)
 logger.info("🐯 Zoo Paper Trader started"); tg("🐯 Zoo Trader LIVE - 5 strategies")
 
 def get_signal(sym):
