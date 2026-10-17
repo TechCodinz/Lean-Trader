@@ -99,7 +99,9 @@ while True:
             # Apex provides tier-based risk: use its target_profit/stop_loss
             tier_size = tier_coord.get_recommended_position_size()
             kelly_size = kelly.calculate_position_size(confidence=0.7, volatility=0.02, stop_loss_pct=0.02)
-            size_usd = min(tier_size, max(kelly_size, cash*0.10))
+            # Apex aggressive sizing (2025)
+            apex_tier, apex_cfg = apex.get_current_tier(cash)
+            size_usd = min(cash * apex_cfg["risk_pct"], cash * 0.95)
             size_usd = compounder.calculate_position_size(base_size=size_usd)
             qty = size_usd / price
             positions[sym] = {'qty': qty, 'entry': price}
