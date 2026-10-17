@@ -5,6 +5,7 @@ from EXECUTION_ORCHESTRATOR import SmartPositionSizer
 from BALANCE_TIER_COORDINATOR import BalanceTierCoordinator
 from strategy_zoo import get_strategy
 from session_intelligence import SessionPerformanceTracker, MarketSession
+from scalping_coordinator import ScalpingCoordinator
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 logger = logging.getLogger('ZOO')
@@ -23,6 +24,7 @@ emergency = EmergencyStop(max_loss=0.10, max_trades_per_min=10)
 kelly = SmartPositionSizer(initial_balance=100.0)
 tier_coord = BalanceTierCoordinator(initial_balance=100.0)
 session_tracker = SessionPerformanceTracker()
+scalp_coord = ScalpingCoordinator(max_concurrent=5)
 strategies = [get_strategy(n) for n in ['RSIMeanRev','DonchianBreakout','EMAbbSqueeze','MAPullback','EvoCombo']]
 
 cash=100.0; positions={}; trades=[]
@@ -76,10 +78,11 @@ while True:
             trailer.update(sym, price, price, price*0.98)
             partial.add_position(sym, price, qty)
             emergency.add_trade()
+            scalp_coord.add_scalp({"symbol": sym, "entry": price})
             logger.info(f"📈 BUY {sym} [{sig}] @ {price:.4f} ${size_usd:.2f}")
             tg(f"📈 BUY {sym}\nStrategy: {sig}\nEntry: ${price:.4f}\nSize: ${size_usd:.2f}")
             save_state()
-            if len(positions) >= 5: break
+            if not scalp_coord.can_take_scalp() or len(positions) >= 5: break
         for sym, pos in list(positions.items()):
             try:
                 cur = ex.fetch_ticker(sym)['last']
@@ -97,6 +100,7 @@ while True:
                     w=sum(1 for x in trades if x>0)
                     logger.info(f"📉 SELL {sym} ({reason}) ${pnl:+.2f}")
                     tg(f"📉 SELL {sym} ({reason})\nP&L: ${pnl:+.2f} ({pct:+.1f}%)\nCash: ${cash:.2f}\nW:{w}/{len(trades)}")
+                    scalp_coord.close_scalp(sym, pct)
                     del positions[sym]; save_state()
             except: pass
         w=sum(1 for x in trades if x>0)
