@@ -4,6 +4,7 @@ from critical_features_addon import CompoundEngine, TrailingStopManager, Partial
 from EXECUTION_ORCHESTRATOR import SmartPositionSizer
 from BALANCE_TIER_COORDINATOR import BalanceTierCoordinator
 from strategy_zoo import get_strategy
+from session_intelligence import SessionPerformanceTracker, MarketSession
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 logger = logging.getLogger('ZOO')
@@ -21,6 +22,7 @@ partial = PartialTPManager()
 emergency = EmergencyStop(max_loss=0.10, max_trades_per_min=10)
 kelly = SmartPositionSizer(initial_balance=100.0)
 tier_coord = BalanceTierCoordinator(initial_balance=100.0)
+session_tracker = SessionPerformanceTracker()
 strategies = [get_strategy(n) for n in ['RSIMeanRev','DonchianBreakout','EMAbbSqueeze','MAPullback','EvoCombo']]
 
 cash=100.0; positions={}; trades=[]
@@ -90,6 +92,8 @@ while True:
                 if sell:
                     pnl=(cur-pos['entry'])*pos['qty']
                     cash+=pnl; trades.append(pnl); compounder.update_pnl(pnl); trailer.clear(sym)
+                    sess = MarketSession.get_current_session()
+                    session_tracker.record_trade(sym, sess, pnl, pnl>0)
                     w=sum(1 for x in trades if x>0)
                     logger.info(f"📉 SELL {sym} ({reason}) ${pnl:+.2f}")
                     tg(f"📉 SELL {sym} ({reason})\nP&L: ${pnl:+.2f} ({pct:+.1f}%)\nCash: ${cash:.2f}\nW:{w}/{len(trades)}")
