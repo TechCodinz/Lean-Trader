@@ -9,6 +9,7 @@ from scalping_coordinator import ScalpingCoordinator
 from auto_adaptive_apex import AutoAdaptiveApex
 from balance_aware_intelligence import BalanceAwareIntelligence
 from central_nervous_system import get_central_nervous_system
+from central_coordination_hub import CentralCoordinationHub
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 logger = logging.getLogger('ZOO')
@@ -50,6 +51,8 @@ cns = get_central_nervous_system()
 # Register engines with CNS
 cns.register_engine("strategy_zoo", strategies)
 cns.register_engine("risk", emergency)
+hub = CentralCoordinationHub()
+# Hub is single source of truth for pairs/strategies
 logger.info("🐯 Zoo Paper Trader started"); tg("🐯 Zoo Trader LIVE - 5 strategies")
 
 def get_signal(sym):
