@@ -14,6 +14,7 @@ from central_control_intelligence import CentralControlIntelligence
 from hybrid_intelligence_coordinator import HybridIntelligenceCoordinator
 from exchange_spawn_manager import ExchangeSpawnManager
 from collective_swarm_intelligence import CollectiveSwarmIntelligence
+from ultrasonic_rare_strategies import UltrasonicStrategiesManager
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 logger = logging.getLogger('ZOO')
@@ -64,6 +65,8 @@ swarm = CollectiveSwarmIntelligence(data_hub)
 cci = CentralControlIntelligence(data_hub)
 spawn_mgr = ExchangeSpawnManager(data_hub, cci)
 cci.register_subsystems(hybrid_coord, spawn_mgr, swarm)
+ultra = UltrasonicStrategiesManager()
+# 8 quant systems: VPIN, Almgren-Chriss, Pairs, HMM, Bandit, TD-Lambda, Copula, Impact
 logger.info("🐯 Zoo Paper Trader started"); tg("🐯 Zoo Trader LIVE - 5 strategies")
 
 def get_signal(sym):
