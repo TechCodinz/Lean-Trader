@@ -8,6 +8,7 @@ from session_intelligence import SessionPerformanceTracker, MarketSession
 from scalping_coordinator import ScalpingCoordinator
 from auto_adaptive_apex import AutoAdaptiveApex
 from balance_aware_intelligence import BalanceAwareIntelligence
+from central_nervous_system import get_central_nervous_system
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 logger = logging.getLogger('ZOO')
@@ -45,6 +46,10 @@ load_state()
 ex = ccxt.bybit({'enableRateLimit': True}); ex.set_sandbox_mode(True)
 apex = AutoAdaptiveApex(ex)
 bai = BalanceAwareIntelligence()
+cns = get_central_nervous_system()
+# Register engines with CNS
+cns.register_engine("strategy_zoo", strategies)
+cns.register_engine("risk", emergency)
 logger.info("🐯 Zoo Paper Trader started"); tg("🐯 Zoo Trader LIVE - 5 strategies")
 
 def get_signal(sym):
