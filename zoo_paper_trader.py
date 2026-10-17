@@ -57,6 +57,13 @@ cns = get_central_nervous_system()
 cns.register_engine("strategy_zoo", strategies)
 cns.register_engine("risk", emergency)
 hub = CentralCoordinationHub()
+hub.register_exchange("bybit", True)
+# Update with available pairs from exchange
+try:
+    tickers = ex.fetch_tickers()
+    pairs = [s for s in tickers.keys() if "/USDT" in s][:50]
+    hub.update_available_pairs("bybit", pairs)
+except: pass
 # Hub is single source of truth for pairs/strategies
 # Supreme hierarchy: CCI coordinates all
 data_hub = {}
@@ -109,6 +116,7 @@ while True:
             partial.add_position(sym, price, qty)
             emergency.add_trade()
             scalp_coord.add_scalp({"symbol": sym, "entry": price})
+            partial.add_position(sym, price, size_usd)
             logger.info(f"📈 BUY {sym} [{sig}] @ {price:.4f} ${size_usd:.2f}")
             tg(f"📈 BUY {sym}\nStrategy: {sig}\nEntry: ${price:.4f}\nSize: ${size_usd:.2f}")
             save_state()
