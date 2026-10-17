@@ -7,6 +7,7 @@ from strategy_zoo import get_strategy
 from session_intelligence import SessionPerformanceTracker, MarketSession
 from scalping_coordinator import ScalpingCoordinator
 from auto_adaptive_apex import AutoAdaptiveApex
+from balance_aware_intelligence import BalanceAwareIntelligence
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 logger = logging.getLogger('ZOO')
@@ -43,6 +44,7 @@ def save_state():
 load_state()
 ex = ccxt.bybit({'enableRateLimit': True}); ex.set_sandbox_mode(True)
 apex = AutoAdaptiveApex(ex)
+bai = BalanceAwareIntelligence()
 logger.info("🐯 Zoo Paper Trader started"); tg("🐯 Zoo Trader LIVE - 5 strategies")
 
 def get_signal(sym):
