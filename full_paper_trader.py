@@ -1,6 +1,7 @@
 import os, time, logging, requests, ccxt, json, asyncio
 from critical_features_addon import CompoundEngine, TrailingStopManager, PartialTPManager, EmergencyStop, VolumeProfileAnalyzer
 from EXECUTION_ORCHESTRATOR import SmartPositionSizer
+from BALANCE_TIER_COORDINATOR import BalanceTierCoordinator
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 logger = logging.getLogger('PAPER')
@@ -17,6 +18,7 @@ trailer = TrailingStopManager(trail_percent=0.02)
 partial = PartialTPManager()
 emergency = EmergencyStop(max_loss=0.10, max_trades_per_min=10)
 kelly = SmartPositionSizer(initial_balance=100.0)
+tier_coord = BalanceTierCoordinator(initial_balance=100.0)
 
 cash=100.0; positions={}; trades=[]
 
@@ -54,7 +56,11 @@ while True:
         for sym, price, chg in trending[:3]:
             if sym in positions or not price: continue
             # KELLY SIZING + COMPOUNDING
+            tier_coord.update_balance(cash)
+            tier_size = tier_coord.get_recommended_position_size()
             kelly_size = kelly.calculate_position_size(confidence=0.7, volatility=0.02, stop_loss_pct=0.02)
+            # Blend: use tier aggression (50% at small tier) capped by Kelly
+            kelly_size = min(tier_size, max(kelly_size, cash * 0.10))
             size_usd = compounder.calculate_position_size(base_size=max(1.0, kelly_size))
             qty = size_usd / price
             positions[sym] = {'qty': qty, 'entry': price}
