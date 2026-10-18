@@ -20,6 +20,9 @@ from universe import Universe
 from ultra_core import UltraCore
 from risk_engine import RiskEngine
 from ultra_scalping_engine import UltraScalpingEngine
+from ultra_arbitrage_engine import UltraArbitrageEngine
+from ultra_ml_pipeline import UltraMLPipeline
+from ultra_moon_spotter import UltraMoonSystem
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 logger = logging.getLogger('ZOO')
@@ -85,6 +88,12 @@ try:
     _core = UltraCore(_router, _universe)
     _risk = RiskEngine()
     scalp_engine = UltraScalpingEngine(_core, _risk)
+    arb_engine = UltraArbitrageEngine(_core, _risk)
+    ml_pipeline = UltraMLPipeline()
+    logger.info('🧠 ML Pipeline initialized')
+    moon_system = UltraMoonSystem()
+    logger.info('🌙 Moon System initialized')
+    logger.info('🔀 Arbitrage Engine initialized')
     logger.info('⚡ Micro Scalping Engine initialized')
 except Exception as e:
     scalp_engine = None
