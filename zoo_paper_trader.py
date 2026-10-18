@@ -15,6 +15,11 @@ from hybrid_intelligence_coordinator import HybridIntelligenceCoordinator
 from exchange_spawn_manager import ExchangeSpawnManager
 from collective_swarm_intelligence import CollectiveSwarmIntelligence
 from ultrasonic_rare_strategies import UltrasonicStrategiesManager
+from router import ExchangeRouter
+from universe import Universe
+from ultra_core import UltraCore
+from risk_engine import RiskEngine
+from ultra_scalping_engine import UltraScalpingEngine
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 logger = logging.getLogger('ZOO')
@@ -73,6 +78,17 @@ cci = CentralControlIntelligence(data_hub)
 spawn_mgr = ExchangeSpawnManager(data_hub, cci)
 cci.register_subsystems(hybrid_coord, spawn_mgr, swarm)
 ultra = UltrasonicStrategiesManager()
+# Micro scalping stack (BAI recommended)
+try:
+    _router = ExchangeRouter()
+    _universe = Universe(router=_router)
+    _core = UltraCore(_router, _universe)
+    _risk = RiskEngine()
+    scalp_engine = UltraScalpingEngine(_core, _risk)
+    logger.info('⚡ Micro Scalping Engine initialized')
+except Exception as e:
+    scalp_engine = None
+    logger.warning(f'Micro scalping init failed: {e}')
 # 8 quant systems: VPIN, Almgren-Chriss, Pairs, HMM, Bandit, TD-Lambda, Copula, Impact
 logger.info("🐯 Zoo Paper Trader started"); tg("🐯 Zoo Trader LIVE - 5 strategies")
 
