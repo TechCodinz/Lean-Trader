@@ -99,6 +99,72 @@ try:
 except Exception as e:
     scalp_engine = None
     logger.warning(f'Micro scalping init failed: {e}')
+# === AUTO PROFIT TAKER (sell brain, paper-routed) ===
+def _paper_close(symbol, side, size, price, reason):
+    global cash
+    pos = positions.get(symbol)
+    if not pos:
+        return {'ok': False, 'error': 'not in paper book'}
+    pnl = (price - pos['entry']) * pos['qty']
+    cash += pnl
+    trades.append(pnl)
+    compounder.update_pnl(pnl)
+    trailer.clear(symbol)
+    try:
+        sess = MarketSession.get_current_session()
+        session_tracker.record_trade(symbol, sess, pnl, pnl > 0)
+    except Exception:
+        pass
+    try:
+        scalp_coord.close_scalp(symbol, (price - pos['entry']) / pos['entry'] * 100)
+    except Exception:
+        pass
+    del positions[symbol]
+    save_state()
+    w = sum(1 for x in trades if x > 0)
+    logger.info(f"PT SELL {symbol} ({reason}) ${pnl:+.2f}")
+    tg(f"PT SELL {symbol} ({reason})\nP&L: ${pnl:+.2f}\nCash: ${cash:.2f}\nW:{w}/{len(trades)}")
+    return {'ok': True, 'pnl': pnl}
+
+try:
+    from AUTO_PROFIT_TAKER import AutoProfitTaker as _APT
+    profit_taker = _APT(ex, {}, close_handler=_paper_close)
+    logger.info('Auto Profit Taker initialized (paper-routed)')
+except Exception as e:
+    profit_taker = None
+    logger.warning(f'Profit taker init failed: {e}')
+
+# === CROSS-EXCHANGE ARBITRAGE SCAN (public prices, fresh clients per cycle) ===
+async def _xarb_scan():
+    import ccxt.async_support as _cca
+    from CROSS_EXCHANGE_ARBITRAGE import CrossExchangeArbitrage as _XARB
+    _exs = {}
+    for _nm, _cid in [('bybit', 'bybit'), ('gate', 'gateio'), ('gate', 'gate'), ('kucoin', 'kucoin'), ('okx', 'okx')]:
+        if _nm in _exs:
+            continue
+        _f = getattr(_cca, _cid, None)
+        if _f:
+            try:
+                _exs[_nm] = _f({'enableRateLimit': True})
+            except Exception:
+                pass
+    _xa = _XARB(_exs, {})
+    _out = []
+    try:
+        for _xs in ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'XRP/USDT', 'DOGE/USDT', 'AVAX/USDT', 'LINK/USDT', 'NEAR/USDT', 'SUI/USDT', 'ARB/USDT', 'OP/USDT']:
+            _prices = await _xa.fetch_all_prices(_xs)
+            if _prices and len(_prices) >= 2:
+                for _opp in _xa.find_arbitrage_opportunities(_xs, _prices):
+                    if _opp['profit_pct'] >= _xa.min_profit_pct:
+                        _out.append(_opp)
+    finally:
+        for _e in _exs.values():
+            try:
+                await _e.close()
+            except Exception:
+                pass
+    return _out
+
 # 8 quant systems: VPIN, Almgren-Chriss, Pairs, HMM, Bandit, TD-Lambda, Copula, Impact
 logger.info("🐯 Zoo Paper Trader started"); tg("🐯 Zoo Trader LIVE - 5 strategies")
 
@@ -152,6 +218,12 @@ while True:
                         logger.info(f"ARB {osym}")
             except Exception as e:
                 logger.warning(f"arb scan: {e}")
+        try:
+            for opp in asyncio.run(_xarb_scan()):
+                engine_hot[opp['symbol']] = True
+                logger.info(f"XARB {opp['symbol']} buy {opp['buy_exchange']} sell {opp['sell_exchange']} +{opp['profit_pct']:.2f}%")
+        except Exception as e:
+            logger.warning(f"xarb scan: {e}")
         _cand_syms = {x for x, _ in cands}
         _norm = {k.split(':')[0]: k for k in tickers}
         for hs in list(engine_hot):
@@ -194,11 +266,24 @@ while True:
             partial.add_position(sym, price, qty)
             emergency.add_trade()
             scalp_coord.add_scalp({"symbol": sym, "entry": price})
+            if globals().get('profit_taker'):
+                try:
+                    profit_taker.register_position(sym, 'buy', price, qty, 'micro_scalp' if sig == 'ultra_engine' else 'normal')
+                except Exception:
+                    pass
             partial.add_position(sym, price, size_usd)
             logger.info(f"📈 BUY {sym} [{sig}] @ {price:.4f} ${size_usd:.2f}")
             tg(f"📈 BUY {sym}\nStrategy: {sig}\nEntry: ${price:.4f}\nSize: ${size_usd:.2f}")
             save_state()
             if not scalp_coord.can_take_scalp() or len(positions) >= 5: break
+        if globals().get('profit_taker'):
+            try:
+                for _sym, _pos in list(positions.items()):
+                    if _sym not in profit_taker.open_positions:
+                        profit_taker.register_position(_sym, 'buy', _pos['entry'], _pos['qty'], 'normal')
+                asyncio.run(profit_taker.check_and_close_positions())
+            except Exception as e:
+                logger.warning(f"profit taker: {e}")
         for sym, pos in list(positions.items()):
             try:
                 cur = ex.fetch_ticker(sym)['last']
