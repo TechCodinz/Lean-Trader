@@ -155,6 +155,38 @@ class UltraCore:
         if os.getenv("TRADING_MODE", "demo").lower() == "demo":
             setattr(self.router, "live", False)
 
+    async def get_market_data(self, symbol, timeframe='5m'):
+        """Market data for the ultra engines (they expect this UltraCore method).
+
+        Returns a dict with close/prices/bid/ask built from the router's
+        OHLCV + ticker feeds. Empty dict on failure.
+        """
+        import asyncio as _aio
+        try:
+            candles = await _aio.to_thread(self.router.fetch_ohlcv, symbol, timeframe, 100)
+            ticker = await _aio.to_thread(self.router.fetch_ticker, symbol)
+        except Exception as e:
+            if self.logger:
+                self.logger.warning(f"get_market_data {symbol}: {e}")
+            return {}
+        if not candles:
+            return {}
+        closes = [c[4] for c in candles]
+        return {
+            'symbol': symbol,
+            'timeframe': timeframe,
+            'open': candles[-1][1],
+            'high': max(c[2] for c in candles),
+            'low': min(c[3] for c in candles),
+            'close': closes[-1],
+            'volume': candles[-1][5] if len(candles[-1]) > 5 else 0,
+            'prices': closes,
+            'candles': candles,
+            'bid': (ticker or {}).get('bid') or closes[-1],
+            'ask': (ticker or {}).get('ask') or closes[-1],
+            'timestamp': time.time(),
+        }
+
     def scan_markets(self):
         """Scan all supported markets for opportunities."""
         results: Dict[str, Any] = {}

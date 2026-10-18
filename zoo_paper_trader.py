@@ -1,3 +1,4 @@
+import asyncio
 import os, time, logging, requests, ccxt, json
 import pandas as pd
 from critical_features_addon import CompoundEngine, TrailingStopManager, PartialTPManager, EmergencyStop
@@ -122,10 +123,62 @@ while True:
         tickers = ex.fetch_tickers()
         cands = [(s,t['last']) for s,t in tickers.items() if '/USDT' in s and t.get('quoteVolume',0)>1000000 and t['last']]
         cands = cands[:20]
+        # === ULTRA ENGINE SIGNALS (harvested once per cycle) ===
+        engine_hot = {}
+        if globals().get('scalp_engine'):
+            try:
+                for sg in asyncio.run(scalp_engine._scan_scalp_opportunities('5m')):
+                    if sg.confidence >= 0.6:
+                        engine_hot[sg.symbol] = True
+                        logger.info(f"SCALP {sg.symbol} {sg.strategy} {sg.confidence:.2f}")
+            except Exception as e:
+                logger.warning(f"scalp scan: {e}")
+        if globals().get('moon_system'):
+            try:
+                for g in asyncio.run(moon_system.spotter.scan_for_new_gems()):
+                    gs = g.get('symbol') if isinstance(g, dict) else None
+                    if gs:
+                        engine_hot[gs] = True
+                        logger.info(f"MOON GEM {gs}")
+            except Exception as e:
+                logger.warning(f"moon scan: {e}")
+        if globals().get('arb_engine'):
+            try:
+                asyncio.run(arb_engine._scan_arbitrage_opportunities([x for x, _ in cands], 'high'))
+                for opp in list(arb_engine.active_arbitrages.values()):
+                    osym = getattr(opp, 'symbol', None)
+                    if osym:
+                        engine_hot[osym] = True
+                        logger.info(f"ARB {osym}")
+            except Exception as e:
+                logger.warning(f"arb scan: {e}")
+        _cand_syms = {x for x, _ in cands}
+        _norm = {k.split(':')[0]: k for k in tickers}
+        for hs in list(engine_hot):
+            tk = hs if hs in tickers else _norm.get(hs)
+            if tk and tk not in _cand_syms and tickers[tk].get('last'):
+                cands.append((tk, tickers[tk]['last']))
+                engine_hot[tk] = True
+                _cand_syms.add(tk)
         for sym, price in cands:
             if sym in positions: continue
             sig = get_signal(sym)
-            if not sig: continue
+            ml_act = None
+            if globals().get('ml_pipeline') and (sig or sym in engine_hot):
+                try:
+                    _ml = asyncio.run(ml_pipeline.ultra_analysis(sym))
+                    ml_act = _ml.get('action')
+                    logger.info(f"ML {sym}: {ml_act} conf {_ml.get('confidence')}")
+                except Exception as e:
+                    logger.warning(f"ml {sym}: {e}")
+            if sig and ml_act in ('SELL', 'SHORT'):
+                logger.info(f"ML veto {sym}")
+                continue
+            if not sig:
+                if sym in engine_hot and ml_act not in ('SELL', 'SHORT'):
+                    sig = 'ultra_engine'
+                else:
+                    continue
             tier_coord.update_balance(cash)
             apex_tier, apex_cfg = apex.get_current_tier(cash)
             # Apex provides tier-based risk: use its target_profit/stop_loss
