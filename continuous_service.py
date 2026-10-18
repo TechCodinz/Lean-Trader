@@ -165,6 +165,24 @@ async def main():
     logger.info('CONTINUOUS SERVICE: orchestrator live with real execution (relay)')
     tg(f'CONTINUOUS SERVICE LIVE - orchestrator propagating (wallet ${free:.2f})')
 
+    nov = None
+    try:
+        from november_growth_strategy import NovemberGrowthStrategy, NovemberTarget
+        from datetime import datetime, timedelta
+        _t0 = datetime.now()
+        nov = NovemberGrowthStrategy(core, risk, target=NovemberTarget(
+            start_balance=free, target_balance=150.0, stretch_target=300.0,
+            start_date=_t0.strftime('%Y-%m-%d'),
+            target_date=(_t0 + timedelta(days=60)).strftime('%Y-%m-%d'),
+            days_remaining=60))
+        nov.continuous_trading = orch
+        nov.current_balance = free
+        logger.info(f'NOVEMBER GROWTH: governor attached - ${free:.2f} -> $150 in 60d, phase {nov.target.phases[0].phase_name}')
+        tg(f'NOVEMBER GROWTH governor live - ${free:.2f} -> $150 target (60d)')
+    except Exception as e:
+        nov = None
+        logger.warning(f'NOVEMBER GROWTH unavailable: {e}')
+
     tasks = [
         asyncio.create_task(orch._continuous_trading_loop()),
         asyncio.create_task(orch._monitor_all_positions()),
@@ -172,6 +190,14 @@ async def main():
         asyncio.create_task(orch._track_performance()),
         asyncio.create_task(orch._daily_reset()),
     ]
+    if nov is not None:
+        tasks += [
+            asyncio.create_task(nov._manage_growth_phases()),
+            asyncio.create_task(nov._monitor_target_progress()),
+            asyncio.create_task(nov._optimize_strategies()),
+            asyncio.create_task(nov._track_performance()),
+            asyncio.create_task(nov._daily_optimization()),
+        ]
     await asyncio.gather(*tasks)
 
 

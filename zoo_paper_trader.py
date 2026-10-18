@@ -149,6 +149,16 @@ def _partial_close(symbol, price, qty_sell, level):
             del partial.positions[symbol]
     save_state()
     _w = sum(1 for x in trades if x > 0)
+    try:
+        ultra.learn_from_trade({'EMAbbSqueeze': 'momentum', 'RSIMeanRev': 'mean_reversion', 'DonchianBreakout': 'breakout', 'MAPullback': 'momentum', 'EvoCombo': 'momentum', 'ultra_engine': 'scalping'}.get(positions.get(symbol, {}).get('strat'), 'momentum'), pnl > 0, pnl)
+        if positions.get(symbol, {}).get('strat') == 'alpha_router' and globals().get('alpha_router'):
+            try:
+                for _sn, _sv in (alpha_votes.pop(symbol, {}) or {}).items():
+                    alpha_router.update_reliability(symbol, '1h', _sn, (1.0 if pnl > 0 else -1.0) * min(1.0, abs(_sv)))
+            except Exception:
+                pass
+    except Exception:
+        pass
     logger.info(f"PARTIAL {level} {symbol} sold {qty_sell} @ {price} pnl ${pnl:+.2f}")
     tg(f"PARTIAL {level} {symbol} sold {qty_sell} @ ${price:.4f} | P&L ${pnl:+.2f} | Cash {_cash_str()} | W:{_w}/{len(trades)}")
     return True
@@ -171,6 +181,17 @@ def _paper_close(symbol, side, size, price, reason):
     cash += pnl
     trades.append(pnl)
     compounder.update_pnl(pnl)
+    try:
+        ultra.learn_from_trade({'EMAbbSqueeze': 'momentum', 'RSIMeanRev': 'mean_reversion', 'DonchianBreakout': 'breakout', 'MAPullback': 'momentum', 'EvoCombo': 'momentum', 'ultra_engine': 'scalping'}.get(pos.get('strat'), 'momentum'), pnl > 0, pnl)
+        if pos.get('strat') == 'alpha_router' and globals().get('alpha_router'):
+            try:
+                for _sn, _sv in (alpha_votes.pop(symbol, {}) or {}).items():
+                    alpha_router.update_reliability(symbol, '1h', _sn, (1.0 if pnl > 0 else -1.0) * min(1.0, abs(_sv)))
+                logger.info(f"ALPHA ROUTER learn {symbol} pnl {pnl:+.2f}")
+            except Exception:
+                pass
+    except Exception:
+        pass
     trailer.clear(symbol)
     try:
         sess = MarketSession.get_current_session()
@@ -333,6 +354,16 @@ def _cash_str():
 
 logger.info("🐯 Zoo Paper Trader started"); tg("🐯 Zoo Trader LIVE - 5 strategies")
 
+try:
+    from alpha_engines import AlphaRouter
+    alpha_router = AlphaRouter()
+    alpha_votes = {}
+    logger.info('ALPHA ROUTER: ensemble live (9 strategies, reliability learning)')
+except Exception as e:
+    alpha_router = None
+    alpha_votes = {}
+    logger.warning(f'ALPHA ROUTER unavailable: {e}')
+
 def get_signal(sym):
     try:
         ohlcv = ex.fetch_ohlcv(sym, '1h', 100)
@@ -407,9 +438,39 @@ while True:
                 if tk not in _cand_syms and tickers[tk].get('last'):
                     cands.append((tk, tickers[tk]['last']))
                     _cand_syms.add(tk)
+        # Ultrasonic overlay: HMM regime gate + bandit read (research suite)
+        us_bear_block = False
+        try:
+            _oh = ex.fetch_ohlcv('BTC/USDT:USDT', '1h', 60)
+            _cl = [c[4] for c in _oh]
+            _rets = [(_cl[i] / _cl[i - 1] - 1) for i in range(1, len(_cl))]
+            _md = {'current_price': _cl[-1], 'returns': _rets, 'volume_usd': 50000000}
+            _us = asyncio.run(ultra.get_ultrasonic_signals(_md, []))
+            _reg = (_us.get('regime') or {})
+            _bnd = (_us.get('best_strategy') or {})
+            logger.info(f"ULTRASONIC regime={_reg.get('regime')} conf={_reg.get('confidence')} bias={_reg.get('position_bias')} | bandit={_bnd.get('strategy')} wr={_bnd.get('win_rate')} | vpin={(_us.get('vpin') or {}).get('toxicity')}")
+            if _reg.get('regime') == 'bear' and (_reg.get('confidence') or 0) >= 0.6:
+                us_bear_block = True
+                logger.info("ULTRASONIC GATE: bear regime - long entries paused this cycle")
+        except Exception as e:
+            logger.warning(f"ultrasonic consult failed: {e}")
         for sym, price in cands:
+            if us_bear_block:
+                break
             if sym in positions: continue
             sig = get_signal(sym)
+            if not sig and sym not in engine_hot and globals().get('alpha_router'):
+                try:
+                    _oh = ex.fetch_ohlcv(sym, '1h', 100)
+                    if len(_oh) >= 55:
+                        _df = pd.DataFrame(_oh, columns=['ts','open','high','low','close','vol'])
+                        _dec = alpha_router.pick(_df, sym, '1h')
+                        if _dec.side == 'buy':
+                            sig = 'alpha_router'
+                            alpha_votes[sym] = dict(_dec.votes or {})
+                            logger.info(f"ALPHA ROUTER buy {sym} p={_dec.prob:.2f} size_mult={_dec.size_mult:.2f}")
+                except Exception as e:
+                    logger.warning(f"alpha router {sym}: {e}")
             ml_act = None
             if globals().get('ml_pipeline') and (sig or sym in engine_hot):
                 try:
@@ -476,7 +537,7 @@ while True:
                     except Exception as e:
                         logger.warning(f"testnet BUY failed {sym}: {e}")
                         continue
-            positions[sym] = {'qty': qty, 'entry': price, 'real': pos_real}
+            positions[sym] = {'qty': qty, 'entry': price, 'real': pos_real, 'strat': sig}
             trailer.update(sym, price, price, price*0.98)
             partial.add_position(sym, price, qty)
             emergency.add_trade()
