@@ -364,6 +364,22 @@ except Exception as e:
     alpha_votes = {}
     logger.warning(f'ALPHA ROUTER unavailable: {e}')
 
+try:
+    from ultra_god_mode import UltraGodMode
+    god_mode = UltraGodMode()
+    logger.info('GOD MODE: quantum/swarm/fractal/smart-money analysis live (advisory veto)')
+except Exception as e:
+    god_mode = None
+    logger.warning(f'GOD MODE unavailable: {e}')
+
+try:
+    from ultra_quantum_intelligence import QuantumMomentumOscillator
+    qmo = QuantumMomentumOscillator()
+    logger.info('QUANTUM INTELLIGENCE: momentum oscillator overlay live (observation)')
+except Exception as e:
+    qmo = None
+    logger.warning(f'QUANTUM unavailable: {e}')
+
 def get_signal(sym):
     try:
         ohlcv = ex.fetch_ohlcv(sym, '1h', 100)
@@ -482,6 +498,28 @@ while True:
             if sig and ml_act in ('SELL', 'SHORT'):
                 logger.info(f"ML veto {sym}")
                 continue
+            if sig and globals().get('god_mode'):
+                try:
+                    _goh = ex.fetch_ohlcv(sym, '5m', 200)
+                    if len(_goh) >= 50:
+                        _gdf = pd.DataFrame(_goh, columns=['ts','open','high','low','close','vol'])
+                        _g = asyncio.run(god_mode.execute_god_mode_analysis(sym, _gdf))
+                        logger.info(f"GOD {sym}: {_g.get('action')} conf {_g.get('confidence')}")
+                        if _g.get('action') in ('SELL', 'SHORT') and float(_g.get('confidence') or 0) > 0.8:
+                            logger.info(f"GOD veto {sym}")
+                            continue
+                except Exception as e:
+                    logger.warning(f"god {sym}: {e}")
+            if sig and globals().get('qmo'):
+                try:
+                    _qoh = ex.fetch_ohlcv(sym, '1h', 120)
+                    if len(_qoh) >= 100:
+                        import numpy as _np
+                        _q = qmo.calculate(_np.array([c[4] for c in _qoh], dtype=float))
+                        if _q:
+                            logger.info(f"QUANTUM {sym}: momentum={_q.get('quantum_momentum'):.3f} shift={_q.get('shift_direction')} p={_q.get('shift_probability'):.2f} conf={_q.get('confidence'):.2f}")
+                except Exception as e:
+                    logger.warning(f"quantum {sym}: {e}")
             if not sig:
                 if sym in engine_hot and ml_act not in ('SELL', 'SHORT'):
                     sig = 'ultra_engine'

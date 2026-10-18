@@ -1,42 +1,58 @@
 #!/usr/bin/env python3
 """
-LeanTrader Dynamic Market Scanner Service (2025 microservice).
+SCANNER SERVICE - the multi-platform scanner as its own being.
 
-Continuously scans exchanges for trending pairs, high-volume opportunities.
-Publishes signals for the adaptive pair selector.
-
-2025 original: DYNAMIC_MARKET_SCANNER.py (2025-10-16)
+UltraMultiPlatformScanner (ultra_multi_platform_scanner.py) sweeps CEX,
+DEX and DeFi venues for PlatformOpportunities. Its own file's main() uses
+a stale UltraCore(mode='paper', ...) constructor, so this service builds
+the core the live way (router/universe) and hands it to the scanner's own
+integrate helper. Discovery-only for now: it places no orders; its
+opportunities are logged for the other beings (and a later engine_hot
+bridge) to act on.
 """
-
 import asyncio
 import logging
-import sys
+import os
+import urllib.request
+import json as _json
 
-sys.path.insert(0, '/app')
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s - %(name)s - %(message)s')
+logger = logging.getLogger('SCANNER')
 
-from DYNAMIC_MARKET_SCANNER import DynamicMarketScanner
-from REAL_PROFIT_BOT import REAL_PROFIT_BOT
+from router import ExchangeRouter
+from universe import Universe
+from ultra_core import UltraCore
+from risk_engine import RiskEngine
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger('SCANNER_SERVICE')
+
+def tg(msg):
+    tok = os.environ.get('TELEGRAM_BOT_TOKEN')
+    cid = os.environ.get('TELEGRAM_CHAT_ID')
+    if not tok or not cid:
+        return
+    try:
+        data = _json.dumps({'chat_id': cid, 'text': msg}).encode()
+        req = urllib.request.Request(
+            f'https://api.telegram.org/bot{tok}/sendMessage',
+            data=data, headers={'Content-Type': 'application/json'})
+        urllib.request.urlopen(req, timeout=10).read()
+    except Exception:
+        pass
 
 
 async def main():
-    logger.info("🔍 Starting Dynamic Market Scanner Service (2025 microservice)")
-    
-    # Use Bybit testnet (working keys)
-    rpb = REAL_PROFIT_BOT(mode='testnet')
-    exchanges = {'bybit_testnet': rpb.gate}
-    
-    scanner = DynamicMarketScanner(exchanges=exchanges, data_hub=None)
-    logger.info("✅ Scanner initialized with Bybit testnet")
-    
-    # Run continuous scanning
-    await scanner.run_continuous_scanning()
+    router = ExchangeRouter()
+    universe = Universe(router)
+    core = UltraCore(router, universe)
+    risk = RiskEngine()
+
+    from ultra_multi_platform_scanner import integrate_multi_platform_scanner
+    scanner = integrate_multi_platform_scanner(core, risk)
+    logger.info('SCANNER SERVICE: multi-platform scanner live (discovery-only)')
+    tg('SCANNER LIVE - sweeping CEX/DEX/DeFi for opportunities')
+    await scanner.start_multi_platform_scanning()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     asyncio.run(main())

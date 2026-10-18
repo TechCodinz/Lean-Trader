@@ -63,3 +63,18 @@ for pid in os.listdir('/proc'):
 sleep 2
 docker exec leantrader-2025-testnet bash -c "TESTNET_RELAY=http://172.17.0.1:18099 TELEGRAM_BOT_TOKEN='$TOK' TELEGRAM_CHAT_ID='$CID' setsid python3 -u /app/swarm_service.py > /tmp/swarm.log 2>&1 < /dev/null &"
 echo "LeanTrader being started $(date)"
+
+# === Sentinel + Scanner beings (added 2026-10-18) ===
+TOK=$(grep "^TELEGRAM_BOT_TOKEN=" /root/Lean-Trader/.env | cut -d'=' -f2)
+CID=$(grep "^TELEGRAM_CHAT_ID=" /root/Lean-Trader/.env | cut -d'=' -f2)
+docker exec leantrader-2025-testnet python3 -c "
+import os,signal
+for pid in os.listdir('/proc'):
+    if pid.isdigit() and int(pid)!=os.getpid():
+        try:
+            cl=open(f'/proc/{pid}/cmdline','rb').read().decode(errors='ignore')
+            if 'sentinel_service.py' in cl or 'scanner_service.py' in cl: os.kill(int(pid),signal.SIGKILL)
+        except Exception: pass
+" 2>/dev/null || true
+docker exec leantrader-2025-testnet bash -c "TELEGRAM_BOT_TOKEN='$TOK' TELEGRAM_CHAT_ID='$CID' setsid python3 -u /app/sentinel_service.py > /tmp/sentinel.log 2>&1 < /dev/null &"
+docker exec leantrader-2025-testnet bash -c "TELEGRAM_BOT_TOKEN='$TOK' TELEGRAM_CHAT_ID='$CID' setsid python3 -u /app/scanner_service.py > /tmp/scanner.log 2>&1 < /dev/null &"
