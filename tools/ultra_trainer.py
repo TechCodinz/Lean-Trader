@@ -78,11 +78,13 @@ except Exception:
 
 # Advanced ML libraries
 try:
+    import xgboost as xgb
     XGBOOST_AVAILABLE = True
 except ImportError:
     XGBOOST_AVAILABLE = False
 
 try:
+    import lightgbm as lgb
     LIGHTGBM_AVAILABLE = True
 except ImportError:
     LIGHTGBM_AVAILABLE = False
@@ -154,7 +156,7 @@ class UltraFeatureEngine:
             ) / features[f'sma_{period}']
 
         # Volatility features
-        features['volatility_20'] = df['returns_1'].rolling(20).std()
+        features['volatility_20'] = features['returns_1'].rolling(20).std()
         features['volatility_ratio'] = (
             features['volatility_20'] / features['volatility_20'].rolling(50).mean()
         )
@@ -247,7 +249,7 @@ class UltraFeatureEngine:
                 features[f'{col}_roll_max_10'] = source.rolling(10).max()
 
         # Drop NaN values from feature calculation
-        features = features.fillna(method='ffill').fillna(0)
+        features = features.ffill().fillna(0)
 
         return features
 
@@ -927,7 +929,7 @@ class ReinforcementLearningAgent:
             model.add(layers.Dense(64, activation='relu'))
             model.add(layers.Dense(32, activation='relu'))
             model.add(layers.Dense(self.action_size, activation='linear'))
-            model.compile(loss='mse', optimizer=optimizers.Adam(lr=self.learning_rate))
+            model.compile(loss='mse', optimizer=optimizers.Adam(learning_rate=self.learning_rate))
             return model
         return None
 
@@ -1107,14 +1109,14 @@ class UltraTrainer:
         # Save deep model
         if self.deep_model and self.deep_model.model:
             if TENSORFLOW_AVAILABLE:
-                self.deep_model.model.save(str(base_path / "deep_model"))
+                self.deep_model.model.save(str(base_path / "deep_model.keras"))
             elif PYTORCH_AVAILABLE:
                 torch.save(self.deep_model.model.state_dict(), str(base_path / "deep_model.pth"))
 
         # Save RL agent
         if self.rl_agent and self.rl_agent.model:
             if TENSORFLOW_AVAILABLE:
-                self.rl_agent.model.save(str(base_path / "rl_model"))
+                self.rl_agent.model.save(str(base_path / "rl_model.keras"))
 
         # Save metadata
         metadata['model_id'] = model_id
@@ -1128,7 +1130,7 @@ class UltraTrainer:
         latest_path = self.models_dir / "latest"
         if latest_path.exists():
             latest_path.unlink()
-        latest_path.symlink_to(base_path)
+        latest_path.symlink_to(base_path.resolve())
 
         return model_id
 

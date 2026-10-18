@@ -100,6 +100,59 @@ except Exception as e:
     scalp_engine = None
     logger.warning(f'Micro scalping init failed: {e}')
 # === AUTO PROFIT TAKER (sell brain, paper-routed) ===
+def _partial_close(symbol, price, qty_sell, level):
+    global cash
+    pos = positions.get(symbol)
+    if not pos or qty_sell <= 0:
+        return False
+    qty_sell = min(qty_sell, pos['qty'])
+    if TRADING_MODE == 'testnet' and pos.get('real'):
+        _rs = _ccxt_to_raw(symbol)
+        if _rs:
+            try:
+                _q = qty_sell
+                try:
+                    _mkt = ex.market(symbol)
+                    _step = float((_mkt.get('precision') or {}).get('amount') or 0)
+                    if _step:
+                        _ds = str(_step)
+                        _dec = len(_ds.split('.')[1].rstrip('0')) if '.' in _ds else 0
+                        _q = round(int(_q / _step) * _step, _dec)
+                except Exception:
+                    pass
+                if _q <= 0:
+                    return False
+                tn.create_market_sell(_rs, _qty_str(_q))
+                qty_sell = _q
+                logger.info(f"TESTNET PARTIAL SELL {level} {symbol} ({_rs}) qty {_q} @ {price}")
+            except Exception as e:
+                logger.warning(f"testnet partial sell failed {symbol}: {e}")
+                return False
+    pnl = (price - pos['entry']) * qty_sell
+    cash += pnl
+    trades.append(pnl)
+    compounder.update_pnl(pnl)
+    pos['qty'] -= qty_sell
+    if pos['qty'] <= 1e-9:
+        trailer.clear(symbol)
+        try:
+            sess = MarketSession.get_current_session()
+            session_tracker.record_trade(symbol, sess, pnl, pnl > 0)
+        except Exception:
+            pass
+        try:
+            scalp_coord.close_scalp(symbol, (price - pos['entry']) / pos['entry'] * 100)
+        except Exception:
+            pass
+        del positions[symbol]
+        if symbol in getattr(partial, 'positions', {}):
+            del partial.positions[symbol]
+    save_state()
+    _w = sum(1 for x in trades if x > 0)
+    logger.info(f"PARTIAL {level} {symbol} sold {qty_sell} @ {price} pnl ${pnl:+.2f}")
+    tg(f"PARTIAL {level} {symbol} sold {qty_sell} @ ${price:.4f} | P&L ${pnl:+.2f} | Cash {_cash_str()} | W:{_w}/{len(trades)}")
+    return True
+
 def _paper_close(symbol, side, size, price, reason):
     global cash
     pos = positions.get(symbol)
@@ -435,6 +488,25 @@ while True:
             tg(f"📈 BUY {sym}\nStrategy: {sig}\nEntry: ${price:.4f}\nSize: ${size_usd:.2f}")
             save_state()
             if not scalp_coord.can_take_scalp() or len(positions) >= 5: break
+        # --- PartialTP ladder (2025): trim 25% @+1%, 50% @+2%, remainder @+3% ---
+        try:
+            for _psym in list(getattr(partial, 'positions', {})):
+                if _psym not in positions:
+                    del partial.positions[_psym]
+            for _psym, _ppos in list(positions.items()):
+                if _psym not in partial.positions:
+                    partial.add_position(_psym, _ppos['entry'], _ppos['qty'])
+                _ptp = profit_taker.open_positions.get(_psym) if profit_taker else None
+                if _ptp and _ptp.get('strategy_type', _ptp.get('strategy', '')) != 'micro_scalp':
+                    _ptp['profit_target'] = 0.035
+                _ptk = tickers.get(_psym)
+                if not _ptk or not _ptk.get('last'):
+                    continue
+                for _ord in asyncio.run(partial.check_tp_levels(_psym, _ptk['last'])):
+                    _partial_close(_psym, _ptk['last'], _ord['size'], _ord['tp_level'])
+        except Exception as e:
+            logger.warning(f"partial tp: {e}")
+
         if globals().get('profit_taker'):
             try:
                 for _sym, _pos in list(positions.items()):

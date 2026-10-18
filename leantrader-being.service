@@ -1,0 +1,13 @@
+[Unit]
+Description=LeanTrader being (testnet relay + zoo trader)
+After=docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/root/start_being.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

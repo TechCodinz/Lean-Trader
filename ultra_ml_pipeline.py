@@ -150,9 +150,11 @@ class UltraMLPipeline:
                 if df.empty:
                     continue
 
-                # Train model
+                # Train model (trainer loads from a path - hand it the df as CSV)
+                _csv = f"runtime/train_{symbol.replace('/', '')}.csv"
+                df.to_csv(_csv, index=False)
                 results = self.trainer.train_full_system(
-                    data_path=None, symbol=symbol, task='classification'  # Will use df directly
+                    data_path=_csv, symbol=symbol, task='classification'
                 )
 
                 print(f"✅ Trained model for {symbol}: {results.get('ensemble', {})}")
