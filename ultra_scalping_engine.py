@@ -1,3 +1,4 @@
+import numpy as np
 """
 Ultra Scalping Engine - Micro-Profit Accumulation System
 Designed for rapid $48 → $3000-5000 growth by November
