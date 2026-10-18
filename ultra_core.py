@@ -162,6 +162,8 @@ class UltraCore:
         OHLCV + ticker feeds. Empty dict on failure.
         """
         import asyncio as _aio
+        _tf_map = {'M1': '1m', 'M5': '5m', 'M15': '15m', 'M30': '30m', 'H1': '1h', 'H4': '4h', 'D1': '1d'}
+        timeframe = _tf_map.get(timeframe, timeframe)
         try:
             candles = await _aio.to_thread(self.router.fetch_ohlcv, symbol, timeframe, 100)
             ticker = await _aio.to_thread(self.router.fetch_ticker, symbol)

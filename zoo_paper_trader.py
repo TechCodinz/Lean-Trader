@@ -445,6 +445,9 @@ while True:
             pos_real = False
             if TRADING_MODE == 'testnet':
                 _rs = _ccxt_to_raw(sym)
+                if _rs and sum(1 for _p in positions.values() if _p.get('real')) >= 3:
+                    logger.info(f"real cap (3) reached - {sym} paper-only, margin reserved for continuous layer")
+                    _rs = None
                 if _rs:
                     try:
                         try:

@@ -1,0 +1,178 @@
+#!/usr/bin/env python3
+"""
+LeanTrader Continuous Propagation Service.
+
+Runs the 2025 UltraContinuousTradingOrchestrator as its own process, in
+parallel with the zoo trader: 1-second-cadence multi-timeframe opportunity
+scanning (scalping / momentum / mean-reversion / breakout / arbitrage
+detectors) with REAL testnet execution through the host signing relay.
+
+While one system waits, the ready one propagates - this is that layer.
+Execution discipline mirrors the zoo: lot-step quantized quantities,
+per-position notional cap, account-level conflict guard (never opens a
+symbol the exchange already holds a position on).
+"""
+import asyncio
+import logging
+import os
+import sys
+import time
+import urllib.request
+import json as _json
+
+sys.path.insert(0, '/app')
+os.chdir('/app')
+
+import ccxt
+
+from testnet_client import make_client, ccxt_to_raw, qty_str, quantize
+from router import ExchangeRouter
+from universe import Universe
+from ultra_core import UltraCore
+from risk_engine import RiskEngine
+from ultra_continuous_trading import UltraContinuousTradingOrchestrator
+
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s - %(message)s')
+logger = logging.getLogger('CONT')
+
+SLICE_CAP = 25.0       # max notional per orchestrator position (USD)
+MAX_CONCURRENT = 4     # orchestrator positions at once (zoo trades in parallel)
+
+
+def tg(msg):
+    tok = os.environ.get('TELEGRAM_BOT_TOKEN', '')
+    cid = os.environ.get('TELEGRAM_CHAT_ID', '')
+    if not tok or not cid:
+        return
+    try:
+        data = _json.dumps({'chat_id': cid, 'text': msg}).encode()
+        rq = urllib.request.Request(f'https://api.telegram.org/bot{tok}/sendMessage',
+                                    data=data, headers={'Content-Type': 'application/json'})
+        urllib.request.urlopen(rq, timeout=10).read()
+    except Exception:
+        pass
+
+
+class RelayExecutor:
+    """Turns orchestrator sessions into real testnet positions via the relay."""
+
+    def __init__(self, tn, pub_ex):
+        self.tn = tn
+        self.ex = pub_ex
+        self.open_raw = set()
+        self.cooldown_until = 0.0
+
+    def _market_step_min(self, perp):
+        mkt = self.ex.market(perp)
+        step = float((mkt.get('precision') or {}).get('amount') or 0)
+        minq = float(((mkt.get('limits') or {}).get('amount') or {}).get('min') or 0)
+        return step, minq
+
+    async def open_position(self, session, opportunity):
+        if time.time() < self.cooldown_until:
+            return False
+        sym = opportunity['symbol']                 # 'SOL/USDT' style
+        perp = sym + ':USDT'
+        raw = ccxt_to_raw(perp)
+        if not raw or raw in self.open_raw:
+            return False
+        if len(self.open_raw) >= MAX_CONCURRENT:
+            return False
+        price = float(opportunity.get('entry_price') or 0)
+        if price <= 0:
+            return False
+        # Account-level conflict guard: never stack on an existing position
+        try:
+            poss = await asyncio.to_thread(self.tn.positions)
+            if any(p.get('symbol') == raw and float(p.get('size') or 0) > 0 for p in poss):
+                return False
+        except Exception:
+            pass
+        try:
+            free = await asyncio.to_thread(self.tn.wallet_free_usdt)
+            step, minq = await asyncio.to_thread(self._market_step_min, perp)
+        except Exception as e:
+            logger.warning(f'cont open prep {sym}: {e}')
+            return False
+        notional = min(free * 2, SLICE_CAP)
+        qty = notional / price
+        qty = quantize(qty, step)
+        if minq and qty < minq:
+            if minq * price <= notional:
+                qty = minq
+            else:
+                return False        # instrument minimum exceeds the slice cap
+        if qty <= 0:
+            return False
+        try:
+            try:
+                await asyncio.to_thread(self.tn.set_leverage, raw, 10)
+            except Exception:
+                pass
+            await asyncio.to_thread(self.tn.create_market_buy, raw, qty_str(qty))
+        except Exception as e:
+            if '110007' in str(e):
+                self.cooldown_until = time.time() + 60
+                logger.info('cont: margin busy (zoo positions using the wallet) - backing off 60s')
+            else:
+                logger.warning(f'cont BUY failed {sym}: {e}')
+            return False
+        session.entry_price = price
+        session.qty = qty
+        self.open_raw.add(raw)
+        logger.info(f'CONT TESTNET BUY {sym} ({raw}) qty {qty} @ {price} [{opportunity.get("strategy")}/{opportunity.get("timeframe")}]')
+        tg(f'CONT BUY {sym} qty {qty} @ ${price:.4f} [{opportunity.get("strategy")}]')
+        return True
+
+    async def close_position(self, session):
+        perp = session.symbol + ':USDT'
+        raw = ccxt_to_raw(perp)
+        qty = session.qty
+        try:
+            step, _minq = await asyncio.to_thread(self._market_step_min, perp)
+            qty = quantize(qty, step) or qty
+        except Exception:
+            pass
+        await asyncio.to_thread(self.tn.create_market_sell_reduce, raw, qty_str(qty))
+        self.open_raw.discard(raw)
+        try:
+            t = await asyncio.to_thread(self.ex.fetch_ticker, perp)
+            exit_price = float(t.get('last') or session.entry_price)
+        except Exception:
+            exit_price = session.entry_price
+        logger.info(f'CONT TESTNET SELL {session.symbol} ({raw}) qty {qty} @ {exit_price}')
+        tg(f'CONT SELL {session.symbol} qty {qty} @ ${exit_price:.4f}')
+        return exit_price
+
+
+async def main():
+    tn = make_client()
+    free = tn.wallet_free_usdt()
+    logger.info(f'CONTINUOUS SERVICE: testnet wallet = {free:.2f} USDT')
+
+    router = ExchangeRouter()
+    universe = Universe(router)
+    core = UltraCore(router, universe)
+    risk = RiskEngine()
+    orch = UltraContinuousTradingOrchestrator(core, risk)
+    orch.daily_balance = free
+    orch.total_balance = free
+    pub = ccxt.bybit()
+    pub.load_markets()
+    orch.executor = RelayExecutor(tn, pub)
+    logger.info('CONTINUOUS SERVICE: orchestrator live with real execution (relay)')
+    tg(f'CONTINUOUS SERVICE LIVE - orchestrator propagating (wallet ${free:.2f})')
+
+    tasks = [
+        asyncio.create_task(orch._continuous_trading_loop()),
+        asyncio.create_task(orch._monitor_all_positions()),
+        asyncio.create_task(orch._manage_compound_growth()),
+        asyncio.create_task(orch._track_performance()),
+        asyncio.create_task(orch._daily_reset()),
+    ]
+    await asyncio.gather(*tasks)
+
+
+if __name__ == '__main__':
+    asyncio.run(main())

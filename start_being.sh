@@ -32,4 +32,19 @@ for pid in os.listdir('/proc'):
 "
 sleep 3
 docker exec leantrader-2025-testnet bash -c "TRADING_MODE=testnet TESTNET_RELAY=http://172.17.0.1:18099 TELEGRAM_BOT_TOKEN='$TOK' TELEGRAM_CHAT_ID='$CID' setsid python3 -u /app/zoo_paper_trader.py > /tmp/zoo_paper.log 2>&1 < /dev/null &"
+
+# 5) Continuous propagation service (orchestrator with real execution, own process)
+docker exec leantrader-2025-testnet python3 -c "
+import os, signal
+me=str(os.getpid())
+for pid in os.listdir('/proc'):
+    if not pid.isdigit() or pid==me: continue
+    try:
+        cmd=open(f'/proc/'+pid+'/cmdline').read().replace(chr(0),' ')
+        if '/app/continuous_service.py' in cmd:
+            os.kill(int(pid), signal.SIGKILL)
+    except: pass
+"
+sleep 2
+docker exec leantrader-2025-testnet bash -c "TESTNET_RELAY=http://172.17.0.1:18099 TELEGRAM_BOT_TOKEN='$TOK' TELEGRAM_CHAT_ID='$CID' setsid python3 -u /app/continuous_service.py > /tmp/continuous.log 2>&1 < /dev/null &"
 echo "LeanTrader being started $(date)"

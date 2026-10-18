@@ -16,10 +16,13 @@ from typing import Dict, List, Optional, Any
 import asyncio
 import time
 import logging
+import numpy as np
 
 # Core imports
 from ultra_core import UltraCore
 from risk_engine import RiskEngine
+from ultra_scalping_engine import UltraScalpingEngine
+from ultra_arbitrage_engine import UltraArbitrageEngine
 
 @dataclass
 class TradingSession:
@@ -37,6 +40,8 @@ class TradingSession:
     trades_count: int
     win_rate: float
     status: str
+    entry_price: float = 0.0
+    qty: float = 0.0
 
 @dataclass
 class ContinuousTradingConfig:
@@ -153,6 +158,7 @@ class UltraContinuousTradingOrchestrator:
         self.daily_growth_rate = 0.0
         self.target_balance = 3000.0  # November target
 
+        self.executor = None  # injected by hosting service: real execution
         self.logger = logging.getLogger(__name__)
 
     async def start_continuous_trading(self) -> None:
@@ -261,7 +267,7 @@ class UltraContinuousTradingOrchestrator:
             return ['BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'ADA/USDT', 'SOL/USDT']
         else:
             # All symbols
-            return ['BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'ADA/USDT', 'SOL/USDT', 'MATIC/USDT']
+            return ['BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'ADA/USDT', 'SOL/USDT', 'POL/USDT']
 
     async def _analyze_symbol_opportunities(
         self, symbol: str, timeframe: str, market_data: Dict[str, Any], weight: float
@@ -577,6 +583,18 @@ class UltraContinuousTradingOrchestrator:
             # Store active session
             self.active_sessions[session_id] = session
 
+            # Real execution hook: an injected executor turns the session
+            # into a real position and fills entry_price/qty on it.
+            if getattr(self, 'executor', None) is not None:
+                try:
+                    _ok = await self.executor.open_position(session, opportunity)
+                except Exception as _e:
+                    self.logger.error(f"executor open failed: {_e}")
+                    _ok = False
+                if not _ok:
+                    del self.active_sessions[session_id]
+                    return
+
             self.logger.info(
                 f"🎯 Opened Position: {opportunity['symbol']} "
                 f"{opportunity['timeframe']} {opportunity['strategy']} "
@@ -605,20 +623,24 @@ class UltraContinuousTradingOrchestrator:
                 await asyncio.sleep(5)
 
     async def _should_close_position(self, session: TradingSession) -> bool:
-        """Check if position should be closed"""
+        """Check if position should be closed (real P&L when an executor is attached)"""
         try:
-            # Check timeout
             if time.time() - session.start_time > self.config.position_timeout:
                 return True
-
-            # Check profit target
-            # This would check actual price against profit target
-            # For now, simulate based on time
-            if time.time() - session.start_time > 60:  # 1 minute timeout
+            if getattr(self, 'executor', None) is not None and session.entry_price > 0:
+                try:
+                    md = await self.ultra_core.get_market_data(session.symbol)
+                    cur = (md or {}).get('close') or 0
+                    if cur:
+                        pct = (cur - session.entry_price) / session.entry_price
+                        if pct >= self.config.profit_taking_threshold or pct <= -0.015:
+                            return True
+                except Exception:
+                    pass
+                return False
+            if time.time() - session.start_time > 60:
                 return True
-
             return False
-
         except Exception as e:
             self.logger.error(f"Error checking if should close position: {e}")
             return True
@@ -626,10 +648,14 @@ class UltraContinuousTradingOrchestrator:
     async def _close_position(self, session_id: str, session: TradingSession) -> None:
         """Close trading position"""
         try:
-            # Calculate profit (simulate)
-            import random
-
-            profit = random.uniform(-0.01, 0.05)  # -$0.01 to $0.05 profit
+            # Real exit: the executor places the closing order and returns
+            # the exit price; P&L is computed from actual entry/exit.
+            if getattr(self, 'executor', None) is not None and session.entry_price > 0 and session.qty > 0:
+                _exit = await self.executor.close_position(session)
+                profit = (_exit - session.entry_price) * session.qty
+            else:
+                import random
+                profit = random.uniform(-0.01, 0.05)
 
             # Update session
             session.end_time = time.time()
