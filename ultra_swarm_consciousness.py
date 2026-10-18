@@ -333,6 +333,7 @@ class SwarmConsciousness:
         # Testnet trading
         self.testnet_mode = True
         self.active_trades = {}
+        self.executor = None  # injected by hosting service: real execution
         self.trade_history = deque(maxlen=10000)
 
         # Initialize swarm
@@ -599,6 +600,22 @@ class SwarmConsciousness:
     async def _execute_testnet_trade(self, signal: SwarmSignal):
         """Execute a single testnet trade"""
         try:
+            # Real execution hook: an injected executor turns high-confidence
+            # swarm signals into real testnet orders (buy opens, sell closes).
+            if getattr(self, 'executor', None) is not None:
+                if signal.signal_type == 'buy':
+                    _t = await self.executor.open_swarm(signal)
+                    if _t:
+                        self.active_trades[_t['id']] = _t
+                        self.trade_history.append(_t)
+                        self.logger.info(
+                            f"SWARM REAL BUY {_t['symbol']} qty {_t['qty']} @ {_t['price']} "
+                            f"(conf {signal.confidence:.2f}, {signal.agent_id})"
+                        )
+                    return
+                if signal.signal_type == 'sell':
+                    await self.executor.close_swarm(signal.symbol)
+                    return
             # Simulate testnet trade execution
             trade_id = hashlib.md5(f"{signal.agent_id}_{signal.timestamp}".encode()).hexdigest()[:8]
 

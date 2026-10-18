@@ -47,4 +47,19 @@ for pid in os.listdir('/proc'):
 "
 sleep 2
 docker exec leantrader-2025-testnet bash -c "TESTNET_RELAY=http://172.17.0.1:18099 TELEGRAM_BOT_TOKEN='$TOK' TELEGRAM_CHAT_ID='$CID' setsid python3 -u /app/continuous_service.py > /tmp/continuous.log 2>&1 < /dev/null &"
+
+# 6) Swarm consciousness service (100 agents, real execution, own process)
+docker exec leantrader-2025-testnet python3 -c "
+import os, signal
+me=str(os.getpid())
+for pid in os.listdir('/proc'):
+    if not pid.isdigit() or pid==me: continue
+    try:
+        cmd=open(f'/proc/'+pid+'/cmdline').read().replace(chr(0),' ')
+        if '/app/swarm_service.py' in cmd:
+            os.kill(int(pid), signal.SIGKILL)
+    except: pass
+"
+sleep 2
+docker exec leantrader-2025-testnet bash -c "TESTNET_RELAY=http://172.17.0.1:18099 TELEGRAM_BOT_TOKEN='$TOK' TELEGRAM_CHAT_ID='$CID' setsid python3 -u /app/swarm_service.py > /tmp/swarm.log 2>&1 < /dev/null &"
 echo "LeanTrader being started $(date)"
