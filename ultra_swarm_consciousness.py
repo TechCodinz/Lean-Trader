@@ -11,6 +11,8 @@ This system implements a distributed swarm consciousness that:
 - Spawns new trading strategies based on collective learning
 """
 
+from collections import defaultdict
+import numpy as np
 import asyncio
 import time
 import queue
@@ -314,6 +316,7 @@ class SwarmConsciousness:
         # Agent management
         self.agents: List[SwarmAgent] = []
         self.signal_queue = queue.Queue()
+        self.trading_queue = queue.Queue()
         self.collective_awareness = CollectiveAwareness(
             timestamp=time.time(),
             market_state='normal',
@@ -388,6 +391,7 @@ class SwarmConsciousness:
                         for signal in signals:
                             if isinstance(signal, SwarmSignal):
                                 self.signal_queue.put(signal)
+                                self.trading_queue.put(signal)
 
                 await asyncio.sleep(0.1)  # 100ms cycle
 
@@ -584,16 +588,39 @@ class SwarmConsciousness:
 
         # Get recent high-confidence signals
         recent_signals = []
-        while not self.signal_queue.empty():
+        while not self.trading_queue.empty():
             try:
-                signal = self.signal_queue.get_nowait()
+                signal = self.trading_queue.get_nowait()
                 if signal.confidence > 0.8:
                     recent_signals.append(signal)
             except queue.Empty:
                 break
 
+        if recent_signals:
+            self.logger.info(f'TRADECHK: {len(recent_signals)} qualifying signals, first={recent_signals[0].symbol} {recent_signals[0].signal_type} {recent_signals[0].confidence:.2f} executor={getattr(self, "executor", None) is not None}')
+        if recent_signals:
+            self.logger.info(f'TRADECHK: {len(recent_signals)} qualifying signals, first={recent_signals[0].symbol} {recent_signals[0].signal_type} {recent_signals[0].confidence:.2f} executor={getattr(self, "executor", None) is not None}')
+        if recent_signals:
+            self.logger.info(f'TRADECHK: {len(recent_signals)} qualifying signals, first={recent_signals[0].symbol} {recent_signals[0].signal_type} {recent_signals[0].confidence:.2f} executor={getattr(self, "executor", None) is not None}')
+        from collections import defaultdict as _dd
+        _groups = _dd(list)
+        for _s in recent_signals:
+            if _s.signal_type in ['buy', 'sell']:
+                _groups[(_s.symbol, _s.signal_type)].append(_s)
+        decisions = []
+        for (_sym, _side), _gs in _groups.items():
+            if len(_gs) >= 20:
+                _rep = max(_gs, key=lambda x: x.confidence)
+                decisions.append(_rep)
+                self.logger.info(f'CONSENSUS TRADE: {_sym} {_side} n={len(_gs)} best_conf={_rep.confidence:.2f}')
+        _by_sym = {}
+        for _d in decisions:
+            _cur = _by_sym.get(_d.symbol)
+            if _cur is None or len(_groups[(_d.symbol, _d.signal_type)]) > len(_groups[(_cur.symbol, _cur.signal_type)]):
+                _by_sym[_d.symbol] = _d
+        decisions = sorted(_by_sym.values(), key=lambda x: (x.signal_type != 'buy', -x.confidence))
         # Execute trades based on signals
-        for signal in recent_signals:
+        for signal in decisions[:10]:
             if signal.signal_type in ['buy', 'sell']:
                 await self._execute_testnet_trade(signal)
 

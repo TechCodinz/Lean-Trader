@@ -85,7 +85,8 @@ class RelayExecutor:
         # Account-level conflict guard: never stack on an existing position
         try:
             poss = await asyncio.to_thread(self.tn.positions)
-            if any(p.get('symbol') == raw and float(p.get('size') or 0) > 0 for p in poss):
+            if any(p.get('symbol') == raw and float(p.get('size') or 0) > 0
+                   and float(p.get('positionValue') or 0) >= 1.0 for p in poss):
                 return False
         except Exception:
             pass

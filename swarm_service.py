@@ -79,20 +79,25 @@ class SwarmExecutor:
         if not raw or raw in self.positions:
             return None
         if len(self.positions) >= MAX_CONCURRENT:
+            if time.time() - getattr(self, '_cap_log_ts', 0) > 60:
+                self._cap_log_ts = time.time()
+                logger.info(f'swarm: at capacity ({MAX_CONCURRENT}) - holding {list(self.positions)}')
             return None
-        price = float(signal.price or 0)
-        if price <= 0:
-            try:
-                t = await asyncio.to_thread(self.ex.fetch_ticker, perp)
-                price = float(t.get('last') or 0)
-            except Exception:
-                return None
+        try:
+            t = await asyncio.to_thread(self.ex.fetch_ticker, perp)
+            price = float(t.get('last') or 0)
+        except Exception:
+            return None
         if price <= 0:
             return None
         # Account-level conflict guard: never stack on an existing position
         try:
             poss = await asyncio.to_thread(self.tn.positions)
-            if any(p.get('symbol') == raw and float(p.get('size') or 0) > 0 for p in poss):
+            if any(p.get('symbol') == raw and float(p.get('size') or 0) > 0
+                   and float(p.get('positionValue') or 0) >= 1.0 for p in poss):
+                if time.time() - getattr(self, '_held_log_ts', 0) > 60:
+                    self._held_log_ts = time.time()
+                    logger.info(f'swarm: {sym} already held by another being - skipping')
                 return None
         except Exception:
             pass
@@ -108,6 +113,9 @@ class SwarmExecutor:
             if minq * price <= notional:
                 qty = minq
             else:
+                if time.time() - getattr(self, '_minq_log_ts', 0) > 60:
+                    self._minq_log_ts = time.time()
+                    logger.info(f'swarm: {sym} min order ${minq * price:.2f} exceeds slice ${notional:.2f} - skipping')
                 return None
         if qty <= 0:
             return None
@@ -125,6 +133,7 @@ class SwarmExecutor:
                 logger.warning(f'swarm BUY failed {sym}: {e}')
             return None
         self.positions[raw] = {'qty': qty, 'entry': price, 'ts': time.time(), 'symbol': sym}
+        logger.info(f'SWARM REAL BUY {sym} qty {qty} @ {price:.4f} conf {signal.confidence:.2f}')
         tg(f'SWARM BUY {sym} qty {qty} @ ${price:.4f} (conf {signal.confidence:.2f})')
         return {'id': hashlib.md5(f"{signal.agent_id}_{signal.timestamp}".encode()).hexdigest()[:8],
                 'symbol': sym, 'side': 'buy', 'price': price, 'qty': qty,
