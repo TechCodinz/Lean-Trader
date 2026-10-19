@@ -113,3 +113,13 @@ for pid in os.listdir('/proc'):
         except Exception: pass
 " 2>/dev/null || true
 docker exec leantrader-2025-testnet bash -c "TESTNET_RELAY=http://172.17.0.1:18099 TELEGRAM_BOT_TOKEN='$TOK' TELEGRAM_CHAT_ID='$CID' setsid python3 -u /app/governor_service.py > /tmp/governor.log 2>&1 < /dev/null &"
+
+# === Bus bridge (learning loop: ledger outcomes -> OnlineLearner + SentientBrain) ===
+if ! dexec pgrep -f bus_bridge_service.py >/dev/null 2>&1; then
+  echo "[being] starting bus bridge..."
+  docker exec -d \
+    -e TESTNET_RELAY="$RELAY_URL" \
+    -e TELEGRAM_BOT_TOKEN="$TOK" \
+    -e TELEGRAM_CHAT_ID="$CID" \
+    "$C" bash -c 'cd /app && nohup python3 -u bus_bridge_service.py >>/tmp/bus_bridge.log 2>&1 &'
+fi

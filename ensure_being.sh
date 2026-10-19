@@ -37,6 +37,7 @@ start_missing zoo_paper_trader.py zoo_paper.log "TRADING_MODE=testnet $RELAY $TG
 start_missing continuous_service.py continuous.log "$RELAY $TG"
 start_missing swarm_service.py swarm.log "$RELAY $TG"
 start_missing governor_service.py governor.log "$RELAY $TG"
+start_missing bus_bridge_service.py bus_bridge.log "$RELAY $TG"
 start_missing sentinel_service.py sentinel.log "$TG"
 start_missing multiplatform_scanner_service.py scanner.log "$TG"
 start_missing nervous_system.py nervous.log ""
