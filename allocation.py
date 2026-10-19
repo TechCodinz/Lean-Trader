@@ -17,6 +17,7 @@ DEFAULTS = {
     'zoo': {'mode': 'real', 'real_cap': 3},
     'continuous': {'mode': 'real', 'slice_usd': 25.0, 'max_concurrent': 4},
     'swarm': {'mode': 'real', 'slice_usd': 15.0, 'max_concurrent': 2},
+    'master': {'mode': 'real', 'slice_usd': 12.0, 'max_concurrent': 2},
 }
 _cache = {'ts': 0.0, 'data': None}
 

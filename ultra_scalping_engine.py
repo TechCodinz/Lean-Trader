@@ -364,6 +364,12 @@ class UltraScalpingEngine:
                 f"(confidence: {signal.confidence:.2f})"
             )
 
+            # Real testnet execution on the relay (guarded, capped)
+            try:
+                self._real_open(signal)
+            except Exception as e:
+                self.logger.warning(f"real open {signal.symbol}: {e}")
+
         except Exception as e:
             self.logger.error(f"Error executing scalp trade: {e}")
 
@@ -415,6 +421,11 @@ class UltraScalpingEngine:
     ) -> None:
         """Close scalping position and record result"""
         try:
+            # Real testnet close first (if this position is real)
+            try:
+                self._real_close(signal, exit_price)
+            except Exception as e:
+                self.logger.error(f"real close hook: {e}")
             # Calculate profit
             if signal.target_price > signal.entry_price:  # Long position
                 profit = exit_price - signal.entry_price
@@ -458,14 +469,124 @@ class UltraScalpingEngine:
             self.logger.error(f"Error closing scalp position: {e}")
 
     async def _get_current_price(self, symbol: str) -> float:
-        """Get current price for symbol"""
+        """Get current price for symbol (live public ticker)."""
         try:
-            # This would integrate with your market data provider
-            # For now, return a placeholder
-            return 0.0
+            pub = getattr(self, '_pub', None)
+            if pub is None:
+                import ccxt as _ccxt
+                pub = _ccxt.bybit({'enableRateLimit': True})
+                self._pub = pub
+            t = pub.fetch_ticker(symbol)
+            return float(t.get('last') or 0.0)
         except Exception as e:
             self.logger.error(f"Error getting current price: {e}")
             return 0.0
+
+    # === REAL EXECUTION (relay graft, 2026-10-19) ===================
+    # The 2025 engine's execution tail was simulated (store + log).
+    # These two methods give it a real testnet execution core on the
+    # signing relay - the same pattern as the swarm/continuous
+    # executors: live-ticker sizing, conflict guard, margin backoff,
+    # allocation-governed slice/cap, ledger-recorded closes.
+    def _real_open(self, signal) -> None:
+        import time as _t
+        if signal.target_price <= signal.entry_price:
+            return  # long-only v1: short signals stay simulated
+        if getattr(self, '_real_backoff_until', 0) > _t.time():
+            return
+        try:
+            import allocation as _alloc
+            a = _alloc.get('master')
+        except Exception:
+            a = {'mode': 'real', 'slice_usd': 12.0, 'max_concurrent': 2}
+        if a.get('mode') != 'real':
+            return
+        open_real = sum(1 for sg in self.active_positions.values()
+                        if getattr(sg, 'real_qty', None))
+        if open_real >= int(a.get('max_concurrent', 2)):
+            return
+        base = signal.symbol.split('/')[0]
+        raw = base + 'USDT'
+        try:
+            from testnet_client import make_client, qty_str, quantize
+            tn = getattr(self, '_tn', None)
+            if tn is None:
+                tn = make_client()
+                self._tn = tn
+            for pos in tn.positions():
+                if pos.get('symbol') == raw and float(pos.get('positionValue') or 0) >= 1.0:
+                    return  # conflict guard: exchange already holds it
+            price = self._pub.fetch_ticker(signal.symbol)['last'] \
+                if getattr(self, '_pub', None) else None
+            if not price:
+                import ccxt as _ccxt
+                self._pub = _ccxt.bybit({'enableRateLimit': True})
+                price = float(self._pub.fetch_ticker(signal.symbol)['last'])
+            slice_usd = float(a.get('slice_usd', 12.0))
+            qty = slice_usd / float(price)
+            try:
+                mkt = self._pub.market(signal.symbol + ':USDT')
+                step = float(mkt['precision']['amount'])
+                qty = quantize(qty, step)
+            except Exception:
+                qty = round(qty, 3)
+            # A quantized qty of 0 (slice below the lot minimum, e.g.
+            # BTC at a $12 slice) or a sub-$10 notional is a clean
+            # skip - never fall back to the unquantized amount.
+            if not qty or qty <= 0 or qty * float(price) < 10.0:
+                return
+            try:
+                tn.set_leverage(raw, 10)
+            except Exception:
+                pass
+            res = tn.create_market_buy(raw, qty_str(qty))
+            if isinstance(res, dict) and res.get('orderId'):
+                signal.real_qty = qty
+                signal.real_entry = float(price)
+                self.logger.info(
+                    f"REAL scalp buy {raw} qty {qty} @ {price} "
+                    f"(strat {signal.strategy} conf {signal.confidence:.2f})")
+            else:
+                self.logger.warning(f"real open rejected {raw}: {res}")
+                if isinstance(res, dict) and '110007' in str(res):
+                    self._real_backoff_until = _t.time() + 60
+        except Exception as e:
+            if '110007' in str(e):
+                self._real_backoff_until = _t.time() + 60
+            self.logger.warning(f"real open {signal.symbol}: {e}")
+
+    def _real_close(self, signal, exit_price: float) -> None:
+        qty = getattr(signal, 'real_qty', None)
+        if not qty:
+            return
+        base = signal.symbol.split('/')[0]
+        raw = base + 'USDT'
+        try:
+            from testnet_client import make_client, qty_str
+            tn = getattr(self, '_tn', None)
+            if tn is None:
+                tn = make_client()
+                self._tn = tn
+            res = None
+            for _ in range(3):
+                res = tn.create_market_sell_reduce(raw, qty_str(qty))
+                if isinstance(res, dict) and res.get('orderId'):
+                    break
+            if isinstance(res, dict) and res.get('orderId'):
+                pnl = (float(exit_price) - float(signal.real_entry)) * float(qty)
+                self.logger.info(f"REAL scalp close {raw} qty {qty} pnl ${pnl:+.4f}")
+                try:
+                    import being_ledger
+                    being_ledger.record_close(
+                        'master', signal.symbol, pnl, real=True,
+                        meta={'strat': signal.strategy, 'engine': 'scalp',
+                              'tf': signal.timeframe})
+                except Exception:
+                    pass
+            else:
+                self.logger.error(f"REAL CLOSE FAILED {raw}: {res} - position may be orphaned, check the exchange")
+        except Exception as e:
+            self.logger.error(f"real close {signal.symbol}: {e}")
 
     async def _manage_risk(self) -> None:
         """Manage scalping risk"""

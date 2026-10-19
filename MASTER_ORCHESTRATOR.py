@@ -52,7 +52,6 @@ except ImportError as e:
 
 # AI/ML Systems
 try:
-    from EVOLUTION_ENGINE import EvolutionEngine
     from working_450_models_bot import AI450ModelsBot
     from ultra_swarm_consciousness import UltraSwarmConsciousness
     from divine_intelligence_core import DivineIntelligence
@@ -60,6 +59,12 @@ try:
     from online_learner import OnlineLearner
 except ImportError as e:
     print(f"⚠️  AI/ML systems import error: {e}")
+
+try:
+    from EVOLUTION_ENGINE import EvolutionEngine
+except ImportError as e:
+    EvolutionEngine = None
+    print(f"⚠️  Evolution import deferred (needs langchain + LLM key): {e}")
 
 # Advanced Intelligence
 try:
@@ -79,18 +84,24 @@ except ImportError as e:
 
 # Business & Monetization
 try:
-    from ultra_business_system import UltraBusinessSystem
     from november_growth_strategy import NovemberGrowthStrategy
 except ImportError as e:
     print(f"⚠️  Business systems import error: {e}")
+
+try:
+    from ultra_business_system import UltraBusinessSystem
+except ImportError as e:
+    UltraBusinessSystem = None
+    print(f"⚠️  Business system import deferred (monetization stays off): {e}")
 
 # Utilities
 try:
     from router import ExchangeRouter
     from paper_broker import PaperBroker
-    from notifier import Notifier
+    from notifier import TelegramNotifier as Notifier
     from alpha_engines import AlphaRouter
-    from strategy_zoo import StrategyZoo
+    from strategy_zoo import (DonchianBreakout, EMAbbSqueeze, EvoCombo,
+                          MAPullback, NakedFXPriceAction)
 except ImportError as e:
     print(f"⚠️  Utility systems import error: {e}")
 
@@ -170,14 +181,20 @@ class MasterOrchestrator:
         
         try:
             # Core reasoning and planning
-            self.core = UltraCore()
+            # UltraCore requires (router, universe) - build both first.
+            _router = ExchangeRouter()
+            from EXPANDED_MARKET_UNIVERSE import FULL_MARKET_UNIVERSE
+            from universe import Universe
+            _universe = Universe(_router, 'bybit', list(FULL_MARKET_UNIVERSE))
+            self.core = UltraCore(_router, _universe)
+            self.router = _router
             logger.info("✅ UltraCore initialized")
         except Exception as e:
             logger.warning(f"⚠️  UltraCore initialization failed: {e}")
         
         try:
             # Risk management
-            self.risk_engine = RiskEngine(max_risk_per_trade=0.02)
+            self.risk_engine = RiskEngine()
             logger.info("✅ RiskEngine initialized")
         except Exception as e:
             logger.warning(f"⚠️  RiskEngine initialization failed: {e}")
@@ -205,7 +222,7 @@ class MasterOrchestrator:
         
         try:
             # Situational awareness
-            self.awareness = SituationalAwareness()
+            self.awareness = SituationalAwareness(__import__('awareness').AwarenessConfig())
             logger.info("✅ SituationalAwareness initialized")
         except Exception as e:
             logger.warning(f"⚠️  SituationalAwareness initialization failed: {e}")
@@ -219,7 +236,7 @@ class MasterOrchestrator:
         
         try:
             # Global market awareness
-            self.global_awareness = GlobalAwareness()
+            self.global_awareness = GlobalAwareness(__import__('gloaware').AwarenessConfig())
             logger.info("✅ GlobalAwareness initialized")
         except Exception as e:
             logger.warning(f"⚠️  GlobalAwareness initialization failed: {e}")
@@ -233,9 +250,8 @@ class MasterOrchestrator:
         try:
             # Arbitrage engine
             self.arbitrage_engine = UltraArbitrageEngine(
-                core=self.core,
-                risk_engine=self.risk_engine,
-                pattern_memory=self.pattern_memory
+                ultra_core=self.core,
+                risk_engine=self.risk_engine
             )
             logger.info("✅ UltraArbitrageEngine initialized")
         except Exception as e:
@@ -244,9 +260,8 @@ class MasterOrchestrator:
         try:
             # Scalping engine
             self.scalping_engine = UltraScalpingEngine(
-                core=self.core,
-                risk_engine=self.risk_engine,
-                brain=self.brain
+                ultra_core=self.core,
+                risk_engine=self.risk_engine
             )
             logger.info("✅ UltraScalpingEngine initialized")
         except Exception as e:
@@ -254,10 +269,7 @@ class MasterOrchestrator:
         
         try:
             # Moon spotter (DEX/new tokens)
-            self.moon_spotter = UltraMoonSpotter(
-                core=self.core,
-                risk_engine=self.risk_engine
-            )
+            self.moon_spotter = UltraMoonSpotter()
             logger.info("✅ UltraMoonSpotter initialized")
         except Exception as e:
             logger.warning(f"⚠️  UltraMoonSpotter initialization failed: {e}")
@@ -265,7 +277,7 @@ class MasterOrchestrator:
         try:
             # Real profit bot (Gate.io)
             if self.mode in ["live", "testnet"]:
-                self.real_profit_bot = RealProfitBot()
+                self.real_profit_bot = RealProfitBot(mode=self.mode)
                 logger.info("✅ RealProfitBot initialized")
         except Exception as e:
             logger.warning(f"⚠️  RealProfitBot initialization failed: {e}")
@@ -286,7 +298,7 @@ class MasterOrchestrator:
         
         try:
             # Evolution engine (12K+ models)
-            self.evolution_engine = EvolutionEngine()
+            self.evolution_engine = EvolutionEngine() if EvolutionEngine is not None else None
             logger.info("✅ EvolutionEngine initialized (targeting 12,000+ models)")
         except Exception as e:
             logger.warning(f"⚠️  EvolutionEngine initialization failed: {e}")
@@ -300,7 +312,7 @@ class MasterOrchestrator:
         
         try:
             # Swarm consciousness (100+ agents)
-            self.swarm_consciousness = UltraSwarmConsciousness()
+            self.swarm_consciousness = UltraSwarmConsciousness(ultra_core=self.core, risk_engine=self.risk_engine)
             logger.info("✅ UltraSwarmConsciousness initialized (100+ agents)")
         except Exception as e:
             logger.warning(f"⚠️  SwarmConsciousness initialization failed: {e}")
@@ -341,14 +353,14 @@ class MasterOrchestrator:
         
         try:
             # Fluid mechanics
-            self.fluid_mechanics = UltraFluidMechanics()
+            self.fluid_mechanics = UltraFluidMechanics(ultra_core=self.core, risk_engine=self.risk_engine)
             logger.info("✅ UltraFluidMechanics initialized (market flow analysis)")
         except Exception as e:
             logger.warning(f"⚠️  FluidMechanics initialization failed: {e}")
         
         try:
             # Backtest engine
-            self.backtest_engine = UltraBacktestEngine()
+            self.backtest_engine = UltraBacktestEngine(ultra_core=self.core, risk_engine=self.risk_engine)
             logger.info("✅ UltraBacktestEngine initialized")
         except Exception as e:
             logger.warning(f"⚠️  BacktestEngine initialization failed: {e}")
@@ -375,7 +387,7 @@ class MasterOrchestrator:
         
         try:
             # Nobel AI models
-            self.nobel_ai = NobelAIModels()
+            self.nobel_ai = NobelAIModels({})
             logger.info("✅ NobelAIModels initialized")
         except Exception as e:
             logger.warning(f"⚠️  NobelAI initialization failed: {e}")
@@ -388,14 +400,14 @@ class MasterOrchestrator:
         
         try:
             # Ultra business system (Stripe, subscriptions)
-            self.business_system = UltraBusinessSystem()
+            self.business_system = UltraBusinessSystem() if UltraBusinessSystem is not None else None
             logger.info("✅ UltraBusinessSystem initialized (Stripe, subscriptions $99-$1,999)")
         except Exception as e:
             logger.warning(f"⚠️  BusinessSystem initialization failed: {e}")
         
         try:
             # Growth strategy ($48 → $3K-$5K)
-            self.growth_strategy = NovemberGrowthStrategy()
+            self.growth_strategy = NovemberGrowthStrategy(ultra_core=self.core, risk_engine=self.risk_engine)
             logger.info("✅ NovemberGrowthStrategy initialized ($48 → $3K-$5K plan)")
         except Exception as e:
             logger.warning(f"⚠️  GrowthStrategy initialization failed: {e}")
@@ -437,7 +449,7 @@ class MasterOrchestrator:
         
         try:
             # Strategy zoo
-            self.strategy_zoo = StrategyZoo()
+            self.strategy_zoo = [DonchianBreakout(), EMAbbSqueeze(), EvoCombo(), MAPullback(), NakedFXPriceAction()]
             logger.info("✅ StrategyZoo initialized")
         except Exception as e:
             logger.warning(f"⚠️  StrategyZoo initialization failed: {e}")

@@ -43,7 +43,7 @@ logging.basicConfig(level=logging.INFO,
 logger = logging.getLogger('GOVERNOR')
 
 ALLOC_PATH = '/app/runtime/allocation.json'
-BEINGS = ['zoo', 'continuous', 'swarm']
+BEINGS = ['zoo', 'continuous', 'swarm', 'master']
 CYCLE = 300
 
 
@@ -94,9 +94,10 @@ def compute(tn):
         n = st['closes']
         scores[b] = (st['expectancy'] * min(1.0, n / 20.0)) if n else None
 
-    mult = {'zoo': 1.0, 'continuous': 1.0, 'swarm': 1.0}
+    mult = {'zoo': 1.0, 'continuous': 1.0, 'swarm': 1.0, 'master': 1.0}
     if regime == 'ranging':
         mult['swarm'] = 1.15
+        mult['master'] = 1.1
     elif regime == 'bear':
         mult['zoo'] = 0.8
         mult['swarm'] = 1.1
@@ -107,7 +108,7 @@ def compute(tn):
     adj = {b: max(scores[b] or 0.0, 0.0) * mult[b] for b in BEINGS}
     total = sum(adj.values())
     if total <= 0:
-        weights = {b: 1.0 / 3 for b in BEINGS}
+        weights = {b: 1.0 / len(BEINGS) for b in BEINGS}
     else:
         weights = {b: 0.05 + 0.85 * adj[b] / total for b in BEINGS}
 
@@ -137,6 +138,11 @@ def compute(tn):
             'mode': modes['swarm'],
             'slice_usd': round(max(11.0, min(40.0, 8 + weights['swarm'] * 30)), 2),
             'max_concurrent': max(1, min(4, round(1 + weights['swarm'] * 3))),
+        },
+        'master': {
+            'mode': modes['master'],
+            'slice_usd': round(max(10.0, min(30.0, 8 + weights['master'] * 22)), 2),
+            'max_concurrent': max(1, min(3, round(1 + weights['master'] * 2))),
         },
     }
     return {

@@ -123,3 +123,20 @@ if ! dexec pgrep -f bus_bridge_service.py >/dev/null 2>&1; then
     -e TELEGRAM_CHAT_ID="$CID" \
     "$C" bash -c 'cd /app && nohup python3 -u bus_bridge_service.py >>/tmp/bus_bridge.log 2>&1 &'
 fi
+
+# === Master Apex (MasterOrchestrator + scalping engine, added 2026-10-19) ===
+if ! dexec pgrep -f master_apex_service.py >/dev/null 2>&1; then
+  echo "[being] starting master apex..."
+  docker exec -d \
+    -e TESTNET_RELAY="$RELAY_URL" \
+    -e TELEGRAM_BOT_TOKEN="$TOK" \
+    -e TELEGRAM_CHAT_ID="$CID" \
+    "$C" bash -c 'cd /app && nohup python3 -u master_apex_service.py >>/tmp/master.log 2>&1 &'
+fi
+
+# === Discovery pipeline (market_router selection, added 2026-10-19) ===
+if ! dexec pgrep -f discovery_service.py >/dev/null 2>&1; then
+  echo "[being] starting discovery..."
+  docker exec -d \
+    "$C" bash -c 'cd /app && nohup python3 -u discovery_service.py >>/tmp/discovery.log 2>&1 &'
+fi
