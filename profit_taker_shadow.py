@@ -19,6 +19,7 @@ Compare against the internal managers' actual realized exits on the
 same positions in being_ledger to learn whose exits extract more.
 """
 import asyncio
+import json
 import logging
 import os
 
@@ -57,8 +58,31 @@ class ShadowExchange(RelayExchange):
 async def main():
     ex = ShadowExchange()
     apt = AutoProfitTaker(ex, None)
+    # A shadow exit is final for that position instance: sync_from_
+    # exchange keeps re-adopting the still-open REAL position, and
+    # without this memory the shadow 'exits' it every ~10 cycles
+    # (99 rows, mostly repeats, by 2026-10-19). Seed from the ledger.
+    shadow_done = set()
+    try:
+        with open('/app/runtime/being_ledger.jsonl') as _f:
+            for _line in _f:
+                _r = json.loads(_line)
+                if _r.get('being') == 'profit_taker_shadow':
+                    shadow_done.add((_r.get('symbol'),
+                                     round(float((_r.get('meta') or {}).get('entry') or 0), 6)))
+    except Exception:
+        pass
+
+    def _prune():
+        for _k in list(apt.open_positions.keys()):
+            _pos = apt.open_positions[_k]
+            _key = (_k, round(float(_pos.get('entry_price') or 0), 6))
+            if _key in shadow_done:
+                apt.open_positions.pop(_k, None)
+
     n = await apt.sync_from_exchange()
-    logger.info(f'shadow sync: adopted {n} position(s)')
+    _prune()
+    logger.info(f'shadow sync: adopted {n} position(s), {len(shadow_done)} already shadow-exited')
     tracked = dict(apt.open_positions)
     cycle = 0
     while True:
@@ -67,6 +91,7 @@ async def main():
             if cycle >= 10:
                 cycle = 0
                 await apt.sync_from_exchange()
+                _prune()
                 for k, v in apt.open_positions.items():
                     tracked.setdefault(k, v)
             before = {k: dict(v) for k, v in apt.open_positions.items()}
@@ -83,6 +108,7 @@ async def main():
                     pnl = (xp - entry) * size
                 else:
                     pnl = (entry - xp) * size
+                shadow_done.add((sym, round(entry, 6)))
                 being_ledger.record_close(
                     'profit_taker_shadow', sym, pnl, real=False,
                     meta={'shadow': True, 'entry': entry, 'exit': xp})
