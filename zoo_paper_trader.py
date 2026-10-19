@@ -105,6 +105,15 @@ try:
 except Exception:
     _ledger = None
 
+def _alloc_zoo_cap():
+    """Real-position cap from the governor (3 = historical default)."""
+    try:
+        import allocation
+        a = allocation.get('zoo')
+        return int(a.get('real_cap', 3)) if a.get('mode', 'real') == 'real' else 0
+    except Exception:
+        return 3
+
 def _partial_close(symbol, price, qty_sell, level):
     global cash
     pos = positions.get(symbol)
@@ -557,8 +566,8 @@ while True:
             pos_real = False
             if TRADING_MODE == 'testnet':
                 _rs = _ccxt_to_raw(sym)
-                if _rs and sum(1 for _p in positions.values() if _p.get('real')) >= 3:
-                    logger.info(f"real cap (3) reached - {sym} paper-only, margin reserved for continuous layer")
+                if _rs and sum(1 for _p in positions.values() if _p.get('real')) >= _alloc_zoo_cap():
+                    logger.info(f"real cap ({_alloc_zoo_cap()}) reached - {sym} paper-only, margin reserved for other beings")
                     _rs = None
                 if _rs:
                     try:

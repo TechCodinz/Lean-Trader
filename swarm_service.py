@@ -40,6 +40,15 @@ logger = logging.getLogger('SWARM')
 SLICE_CAP = 15.0       # max notional per swarm position (USD)
 MAX_CONCURRENT = 2     # swarm positions at once (zoo + orchestrator trade too)
 
+def _alloc(being, key, default):
+    """Live allocation from the governor (defaults on any problem)."""
+    try:
+        import allocation
+        return allocation.get(being).get(key, default)
+    except Exception:
+        return default
+
+
 
 def tg(msg):
     tok = os.environ.get('TELEGRAM_BOT_TOKEN', '')
@@ -78,7 +87,9 @@ class SwarmExecutor:
         raw = ccxt_to_raw(perp)
         if not raw or raw in self.positions:
             return None
-        if len(self.positions) >= MAX_CONCURRENT:
+        if _alloc('swarm', 'mode', 'real') != 'real':
+            return None
+        if len(self.positions) >= _alloc('swarm', 'max_concurrent', MAX_CONCURRENT):
             if time.time() - getattr(self, '_cap_log_ts', 0) > 60:
                 self._cap_log_ts = time.time()
                 logger.info(f'swarm: at capacity ({MAX_CONCURRENT}) - holding {list(self.positions)}')
@@ -107,7 +118,7 @@ class SwarmExecutor:
         except Exception as e:
             logger.warning(f'swarm open prep {sym}: {e}')
             return None
-        notional = min(free * 2, SLICE_CAP)
+        notional = min(free * 2, _alloc('swarm', 'slice_usd', SLICE_CAP))
         qty = quantize(notional / price, step)
         if minq and qty < minq:
             if minq * price <= notional:

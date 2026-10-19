@@ -39,6 +39,15 @@ logger = logging.getLogger('CONT')
 SLICE_CAP = 25.0       # max notional per orchestrator position (USD)
 MAX_CONCURRENT = 4     # orchestrator positions at once (zoo trades in parallel)
 
+def _alloc(being, key, default):
+    """Live allocation from the governor (defaults on any problem)."""
+    try:
+        import allocation
+        return allocation.get(being).get(key, default)
+    except Exception:
+        return default
+
+
 
 def tg(msg):
     tok = os.environ.get('TELEGRAM_BOT_TOKEN', '')
@@ -77,7 +86,9 @@ class RelayExecutor:
         raw = ccxt_to_raw(perp)
         if not raw or raw in self.open_raw:
             return False
-        if len(self.open_raw) >= MAX_CONCURRENT:
+        if _alloc('continuous', 'mode', 'real') != 'real':
+            return False
+        if len(self.open_raw) >= _alloc('continuous', 'max_concurrent', MAX_CONCURRENT):
             return False
         price = float(opportunity.get('entry_price') or 0)
         if price <= 0:
@@ -96,7 +107,7 @@ class RelayExecutor:
         except Exception as e:
             logger.warning(f'cont open prep {sym}: {e}')
             return False
-        notional = min(free * 2, SLICE_CAP)
+        notional = min(free * 2, _alloc('continuous', 'slice_usd', SLICE_CAP))
         qty = notional / price
         qty = quantize(qty, step)
         if minq and qty < minq:

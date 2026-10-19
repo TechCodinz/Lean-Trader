@@ -90,3 +90,17 @@ for pid in os.listdir('/proc'):
         except Exception: pass
 " 2>/dev/null || true
 docker exec leantrader-2025-testnet bash -c "setsid python3 -u /app/nervous_system.py > /tmp/nervous.log 2>&1 < /dev/null &"
+
+# === Allocation governor (added 2026-10-19) ===
+TOK=$(grep "^TELEGRAM_BOT_TOKEN=" /root/Lean-Trader/.env | cut -d'=' -f2)
+CID=$(grep "^TELEGRAM_CHAT_ID=" /root/Lean-Trader/.env | cut -d'=' -f2)
+docker exec leantrader-2025-testnet python3 -c "
+import os,signal
+for pid in os.listdir('/proc'):
+    if pid.isdigit() and int(pid)!=os.getpid():
+        try:
+            cl=open(f'/proc/{pid}/cmdline','rb').read().decode(errors='ignore')
+            if 'governor_service.py' in cl: os.kill(int(pid),signal.SIGKILL)
+        except Exception: pass
+" 2>/dev/null || true
+docker exec leantrader-2025-testnet bash -c "TESTNET_RELAY=http://172.17.0.1:18099 TELEGRAM_BOT_TOKEN='$TOK' TELEGRAM_CHAT_ID='$CID' setsid python3 -u /app/governor_service.py > /tmp/governor.log 2>&1 < /dev/null &"
