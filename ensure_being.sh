@@ -46,3 +46,10 @@ start_missing execution_orchestrator_service.py orchestrator.log "$RELAY $TG"
 start_missing sentinel_service.py sentinel.log "$TG"
 start_missing multiplatform_scanner_service.py scanner.log "$TG"
 start_missing nervous_system.py nervous.log ""
+
+# MAINNET (real money) - inert until Peters' mainnet keys exist AND
+# the in-container kill-switch flag is set at activation time.
+if [ -f /root/secrets/bybit_mainnet_api_key ] && docker exec $C test -f /app/runtime/mainnet_enabled 2>/dev/null; then
+  /root/start_mainnet_relay.sh > /dev/null 2>&1 || true
+  start_missing mainnet_orchestrator_service.py orchestrator_main.log "MAINNET_RELAY=http://172.17.0.1:18098 $TG"
+fi

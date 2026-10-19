@@ -1,0 +1,339 @@
+#!/usr/bin/env python3
+"""
+MAINNET ORCHESTRATOR SERVICE - the 2025 execution engine on REAL
+MONEY (Peters' $10 first live test, his explicit call 2026-10-19).
+
+Same ExecutionOrchestrator, same AlphaRouter feed, same Kelly
+sizing and -1%/+2% exits as the testnet service - but the arm is
+the Bybit MAINNET relay (host-signed; keys never enter the
+container) and the ledger being is 'orchestrator_main'.
+
+$10-account rails (the arm enforces all of them):
+- kill-switch: /app/runtime/mainnet_enabled must exist
+- ONE open mainnet position at a time
+- $7.50 hard order cap
+- $2 daily-loss entry halt (state in mainnet_day.json)
+- no sentient-bus feeder (testnet orchestrator owns those)
+"""
+import asyncio
+import json
+import logging
+import os
+import time
+import urllib.parse
+import urllib.request
+
+os.environ.setdefault('MAINNET_RELAY', 'http://172.17.0.1:18098')
+
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s - MAINNET-ORCH - %(message)s')
+logger = logging.getLogger('MAINNET_ORCH')
+
+BASE_PAIRS = ['BTC/USDT', 'ETH/USDT', 'XRP/USDT', 'SOL/USDT', 'ADA/USDT']
+
+
+def tg(msg):
+    tok = os.environ.get('TELEGRAM_BOT_TOKEN')
+    cid = os.environ.get('TELEGRAM_CHAT_ID')
+    if not tok or not cid:
+        return
+    try:
+        data = urllib.parse.urlencode({'chat_id': cid, 'text': msg}).encode()
+        urllib.request.urlopen(
+            urllib.request.Request(
+                f'https://api.telegram.org/bot{tok}/sendMessage', data=data),
+            timeout=10)
+    except Exception:
+        pass
+
+
+class RelayExecutionArm:
+    """The orchestrator's execution arm on the signing relay -
+    RealProfitBot's interface, Bybit MAINNET underneath (real money)."""
+
+    def __init__(self, hub):
+        self.hub = hub
+        self._tn = None
+        self._backoff_until = 0.0
+
+    def _client(self):
+        if self._tn is None:
+            from mainnet_client import make_client
+            self._tn = make_client()
+        return self._tn
+
+    def _enabled(self):
+        return os.path.exists('/app/runtime/mainnet_enabled')
+
+    def _day_halted(self, tn):
+        """$10 rail: a $2 down day halts new entries until tomorrow."""
+        try:
+            import datetime as _dt
+            today = _dt.date.today().isoformat()
+            path = '/app/runtime/mainnet_day.json'
+            st = {}
+            if os.path.exists(path):
+                st = json.load(open(path))
+            eq = tn.wallet_equity_usdt() or 0.0
+            if st.get('date') != today:
+                st = {'date': today, 'start_equity': eq,
+                      'halted': False, 'tg': False}
+                json.dump(st, open(path, 'w'))
+            if (eq and st.get('start_equity')
+                    and eq <= st['start_equity'] - 2.0
+                    and not st.get('halted')):
+                st['halted'] = True
+                json.dump(st, open(path, 'w'))
+            if st.get('halted') and not st.get('tg'):
+                st['tg'] = True
+                json.dump(st, open(path, 'w'))
+                tg(f'MAINNET daily-loss halt: equity ${eq:.2f} vs day '
+                   f'start ${st["start_equity"]:.2f} - entries halted '
+                   f'until tomorrow.')
+                logger.warning('MAINNET daily-loss halt active')
+            return bool(st.get('halted'))
+        except Exception:
+            return False
+
+    def execute_trade(self, symbol, signal, price, amount=None):
+        if signal != 'BUY':
+            return None  # long-only
+        if not self._enabled():
+            logger.info('mainnet kill-switch OFF - not executing')
+            return None
+        if time.time() < self._backoff_until:
+            return None
+        raw = symbol.split('/')[0] + 'USDT'
+        try:
+            from mainnet_client import qty_str, quantize
+            tn = self._client()
+            if self._day_halted(tn):
+                return None
+            for pos in tn.positions():
+                if float(pos.get('positionValue') or 0) >= 1.0:
+                    logger.info('arm: a mainnet position is already open - one at a time on $10')
+                    return None  # single-position rail
+            qty = float(amount) if amount else 12.0 / float(price)
+            step = None
+            try:
+                mkt = self.hub.ex.market(symbol + ':USDT')
+            except Exception:
+                mkt = None
+            if mkt is None:
+                logger.info(f'arm: {raw} not live on mainnet - skip')
+                return None
+            try:
+                step = float(mkt['precision']['amount'])
+                qty = quantize(qty, step) or 0
+            except Exception:
+                qty = round(qty, 3)
+            # Bybit's perp minimum order value is $5 - quantization
+            # rounds DOWN, so top up by steps to reach it (the
+            # sizer's intent), never silently die below it.
+            if qty and step:
+                tries = 0
+                while qty * float(price) < 5.0 and tries < 3:
+                    qty = round(qty + step, 10)
+                    tries += 1
+            if qty * float(price) > 7.50 and step:
+                qty = quantize(7.50 / float(price), step) or qty
+            if not qty or qty * float(price) < 5.0:
+                logger.info(f'arm: {raw} qty {qty} @ {price} below $5 min - skip')
+                return None
+            try:
+                tn.set_leverage(raw, 10)
+            except Exception:
+                pass
+            res = tn.create_market_buy(raw, qty_str(qty))
+            if isinstance(res, dict) and res.get('orderId'):
+                logger.info(f'⚡ REAL BUY {raw} qty {qty} @ {price}')
+                tg(f'🟢 MAINNET BUY {raw} qty {qty} @ {price}')
+                return {'symbol': symbol, 'side': 'buy', 'amount': qty,
+                        'price': price, 'orderId': res['orderId'],
+                        'simulated': False}
+            if isinstance(res, dict) and '110007' in str(res):
+                self._backoff_until = time.time() + 60
+            logger.warning(f'arm buy rejected {raw}: {res}')
+            return None
+        except Exception as e:
+            if '110007' in str(e):
+                self._backoff_until = time.time() + 60
+            logger.warning(f'arm buy {symbol}: {e}')
+            return None
+
+    def close_position(self, symbol, size, side):
+        if side != 'buy':
+            return True  # nothing real was opened for shorts
+        raw = symbol.split('/')[0] + 'USDT'
+        try:
+            from mainnet_client import qty_str, quantize
+            tn = self._client()
+            qty = float(size)
+            try:
+                mkt = self.hub.ex.market(symbol + ':USDT')
+                if mkt:
+                    qty = quantize(qty, float(mkt['precision']['amount'])) or qty
+            except Exception:
+                pass
+            for _ in range(3):
+                res = tn.create_market_sell_reduce(raw, qty_str(qty))
+                if isinstance(res, dict) and res.get('orderId'):
+                    logger.info(f'⚡ REAL CLOSE {raw} qty {qty}')
+                    return True
+            logger.error(f'arm close failed {raw}: {res}')
+            return False
+        except Exception as e:
+            logger.error(f'arm close {symbol}: {e}')
+            return False
+
+
+class PriceAdapter:
+    """orchestrator.router: async fetch_ticker over the hub client."""
+
+    def __init__(self, hub):
+        self.hub = hub
+
+    async def fetch_ticker(self, symbol):
+        try:
+            t = self.hub.ex.fetch_ticker(symbol + ':USDT')
+            return {'last': float(t['last'])}
+        except Exception:
+            return {}
+
+
+class BusHub:
+    """The orchestrator's data hub: alert queue in, trade records
+    out to the capacity ledger + Telegram."""
+
+    def __init__(self, arm):
+        self.alert_queue = asyncio.Queue()
+        self.arm = arm
+
+    async def publish_trade(self, record):
+        try:
+            if record.get('status') == 'closed':
+                import being_ledger
+                being_ledger.record_close(
+                    'orchestrator_main', record.get('symbol', '?'),
+                    float(record.get('pnl') or 0.0), real=True,
+                    meta={'reason': record.get('reason'),
+                          'strat': 'alpha_router'})
+                tg(f"⚡ Orchestrator close {record.get('symbol')} "
+                   f"${float(record.get('pnl') or 0.0):+.2f} "
+                   f"({record.get('reason')})")
+            else:
+                logger.info(f"trade opened: {record.get('symbol')} "
+                            f"@ {record.get('entry_price')}")
+        except Exception as e:
+            logger.warning(f'publish_trade: {e}')
+
+
+async def alpha_loop(orchestrator, hub, bus_hub, arm):
+    """Feed the orchestrator the way the design intends: the alpha
+    engines return SCORES; AlphaRouter fuses them (with the
+    reliability weights the zoo's closes keep teaching it - fresh
+    instance each cycle reads the shared memo). Router buy verdicts
+    enter the alert queue, so the orchestrator's own gates (risk
+    manager, Kelly sizing) decide execution. 1h frames match the
+    zoo's reliability keys."""
+    import pandas as pd
+    from alpha_engines import AlphaRouter
+    logger.info('alpha loop: AlphaRouter ensemble on 1h candles -> alert queue')
+    while True:
+        try:
+            if account_equity(arm._client()) < 5.50:
+                await asyncio.sleep(60)
+                continue  # unfunded - idle until Peters' $10 lands
+            router = AlphaRouter()
+            pairs = list(BASE_PAIRS)
+            try:
+                with open('/tmp/discovered_pairs.json') as f:
+                    for p in (json.load(f).get('pairs') or [])[:6]:
+                        s = p.replace(':USDT', '')
+                        if s not in pairs:
+                            pairs.append(s)
+            except Exception:
+                pass
+            since = int((time.time() - 130 * 3600) * 1000)
+            for pair in pairs:
+                try:
+                    rows = hub.ex.fetch_ohlcv(pair + ':USDT', '1h', since, 120)
+                    if not rows or len(rows) < 60:
+                        continue
+                    df = pd.DataFrame(rows, columns=['ts', 'open', 'high',
+                                                     'low', 'close', 'vol'])
+                    dec = router.pick(df, pair, '1h')
+                    if dec is not None and dec.side == 'buy':
+                        logger.info(f'📡 alpha_router: {pair} BUY p={dec.prob:.2f}')
+                        await bus_hub.alert_queue.put({
+                            'signal': {'symbol': pair,
+                                       'data': {'symbol': pair,
+                                                'price': float(df['close'].iloc[-1])}},
+                            'action': 'buy',
+                            'confidence': float(dec.prob),
+                        })
+                except Exception:
+                    continue
+        except Exception as e:
+            logger.warning(f'alpha loop: {e}')
+        await asyncio.sleep(60)
+
+
+def account_equity(tn):
+    """Whole-account equity: the sizer's designed reference ('will
+    auto-update from exchange balance') - read straight from the
+    wallet payload's totalEquity."""
+    try:
+        return tn.wallet_equity_usdt() or 0.0
+    except Exception:
+        return 0.0
+
+
+async def stats_loop(orchestrator, arm):
+    while True:
+        await asyncio.sleep(300)
+        try:
+            # Truth anchor: re-seed the sizer from account equity
+            eq = account_equity(arm._client())
+            if eq:
+                orchestrator.position_sizer.update_balance(eq)
+            logger.info(f'stats: {orchestrator.get_stats()}')
+        except Exception as e:
+            logger.warning(f'stats: {e}')
+
+
+async def main():
+    from data_hub import MarketDataHub
+    from EXECUTION_ORCHESTRATOR import ExecutionOrchestrator
+    from mainnet_client import make_client
+
+    hub = MarketDataHub()
+    arm = RelayExecutionArm(hub)
+    bus_hub = BusHub(arm)
+    orchestrator = ExecutionOrchestrator(
+        data_hub=bus_hub, trading_engines={'real_profit': arm},
+        risk_engine=None, ledger=[], mode='live')
+    orchestrator.router = PriceAdapter(hub)
+    # The 0.80 default was calibrated for brain decisions; the alpha
+    # ensemble's calibrated probabilities live lower (its own buy
+    # line is 0.58). Kelly sizing + the risk manager carry the risk
+    # work - the gate just filters noise.
+    orchestrator.min_confidence = 0.60
+
+    equity = account_equity(make_client())
+    if equity:
+        orchestrator.position_sizer.update_balance(equity)
+    logger.info(f'MAINNET Orchestrator LIVE - sizer balance ${equity:.2f} '
+                f'(account equity), Kelly sizing, -1%/+2% exits, relay arm armed')
+    tg(f'🟢 MAINNET Orchestrator LIVE: Kelly sizing on ${equity:.2f} '
+       f'equity, ONE position max, $7.50 cap, $2 daily-loss halt.')
+
+    await asyncio.gather(
+        orchestrator.run_execution_loop(),
+        alpha_loop(orchestrator, hub, bus_hub, arm),
+        stats_loop(orchestrator, arm),
+    )
+
+
+if __name__ == '__main__':
+    asyncio.run(main())
