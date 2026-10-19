@@ -30,8 +30,23 @@ class MarketDataHub:
     def __init__(self):
         import ccxt
         self.ex = ccxt.bybit({'enableRateLimit': True})
+        self._ex_sandbox = None
         self._closes_cache = {}
         self._cache_ts = {}
+
+    def market_spec(self, symbol):
+        """Testnet (sandbox) market spec for a spot-style symbol, or
+        None if the perp is not live on testnet (mainnet specs list
+        contracts testnet does not carry - orders die 110074)."""
+        try:
+            if self._ex_sandbox is None:
+                import ccxt
+                self._ex_sandbox = ccxt.bybit({'enableRateLimit': True})
+                self._ex_sandbox.set_sandbox_mode(True)
+                self._ex_sandbox.load_markets()
+            return self._ex_sandbox.market(symbol + ':USDT')
+        except Exception:
+            return None
 
     def closes(self, symbol, n=120):
         now = time.time()

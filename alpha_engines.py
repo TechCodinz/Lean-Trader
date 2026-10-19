@@ -154,8 +154,8 @@ class NakedPriceAction(BaseStrategy):
         rng = (h - low).iloc[-1]
         body = abs(c - o).iloc[-1]
         # determine lower wick size
-        _ = (h - c).iloc[-1] if c >= o.iloc[-1] else (h - o).iloc[-1]
-        lower_wick = (o - low).iloc[-1] if c >= o.iloc[-1] else (c - low).iloc[-1]
+        _ = (h - c).iloc[-1] if c.iloc[-1] >= o.iloc[-1] else (h - o).iloc[-1]
+        lower_wick = (o - low).iloc[-1] if c.iloc[-1] >= o.iloc[-1] else (c - low).iloc[-1]
         score = 0.0
         why = []
         if (

@@ -438,8 +438,15 @@ ENGINE_HOT = {}
 
 while True:
     try:
-        if emergency.emergency_active or emergency.check_conditions(cash, 100.0):
-            logger.error("🚨 EMERGENCY"); tg("🚨 EMERGENCY STOP"); time.sleep(300); continue
+        _entries_blocked = emergency.check_conditions(cash, 100.0)
+        if _entries_blocked:
+            logger.error("🚨 EMERGENCY - entries halted, exits still managed")
+            tg("🚨 EMERGENCY STOP - entries halted, exits still managed")
+        elif emergency.emergency_active:
+            # The latch used to hold forever (Peters: the stuck flag
+            # killed the 2025 run). Conditions cleared -> unlatch.
+            emergency.reset()
+            logger.info("✅ Emergency conditions cleared - entries resumed")
         tickers = ex.fetch_tickers()
         cands = [(s,t['last']) for s,t in tickers.items() if '/USDT' in s and t.get('quoteVolume',0)>1000000 and t['last']]
         try:
@@ -607,6 +614,8 @@ while True:
                     size_usd = min(size_usd, _tf * 2)
                 except Exception:
                     pass
+            if _entries_blocked:
+                continue
             qty = size_usd / price
             pos_real = False
             if TRADING_MODE == 'testnet':

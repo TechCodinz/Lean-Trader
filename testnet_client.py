@@ -57,10 +57,27 @@ class TestnetClient:
         return j['result']
 
     def wallet_free_usdt(self):
+        # TRUE spendable balance. The old read returned walletBalance
+        # ($24.15) while totalAvailableBalance was $0.67 - the whole
+        # fleet (and the governor's $15 gate) sized and gated on
+        # money that was already margin for open positions, and new
+        # orders died 110007. (2026-10-19 excavation.)
         res = self._req('GET', '/v5/account/wallet-balance', {'accountType': 'UNIFIED'})
-        coins = res['list'][0].get('coin', [])
+        acct = res['list'][0]
+        avail = acct.get('totalAvailableBalance')
+        if avail not in (None, ''):
+            return float(avail)
+        coins = acct.get('coin', [])
         u = next((c for c in coins if c.get('coin') == 'USDT'), {})
         return float(u.get('availableToWithdraw') or u.get('walletBalance') or 0)
+
+    def wallet_equity_usdt(self):
+        res = self._req('GET', '/v5/account/wallet-balance', {'accountType': 'UNIFIED'})
+        acct = res['list'][0]
+        eq = acct.get('totalEquity')
+        if eq not in (None, ''):
+            return float(eq)
+        return self.wallet_free_usdt()
 
     def positions(self):
         res = self._req('GET', '/v5/position/list', {'category': 'linear', 'settleCoin': 'USDT'})

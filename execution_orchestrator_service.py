@@ -89,14 +89,29 @@ class RelayExecutionArm:
             tn = self._client()
             for pos in tn.positions():
                 if pos.get('symbol') == raw and float(pos.get('positionValue') or 0) >= 1.0:
+                    logger.info(f'arm: {raw} held by another being - skip')
                     return None  # conflict guard
             qty = float(amount) if amount else 12.0 / float(price)
+            step = None
+            mkt = self.hub.market_spec(symbol)
+            if mkt is None:
+                logger.info(f'arm: {raw} not live on testnet - skip')
+                return None
             try:
-                mkt = self.hub.ex.market(symbol + ':USDT')
-                qty = quantize(qty, float(mkt['precision']['amount'])) or 0
+                step = float(mkt['precision']['amount'])
+                qty = quantize(qty, step) or 0
             except Exception:
                 qty = round(qty, 3)
+            # Bybit's perp minimum order value is $5 - quantization
+            # rounds DOWN, so top up by steps to reach it (the
+            # sizer's intent), never silently die below it.
+            if qty and step:
+                tries = 0
+                while qty * float(price) < 5.0 and tries < 3:
+                    qty = round(qty + step, 10)
+                    tries += 1
             if not qty or qty * float(price) < 5.0:
+                logger.info(f'arm: {raw} qty {qty} @ {price} below $5 min - skip')
                 return None
             try:
                 tn.set_leverage(raw, 10)
@@ -128,8 +143,9 @@ class RelayExecutionArm:
             tn = self._client()
             qty = float(size)
             try:
-                mkt = self.hub.ex.market(symbol + ':USDT')
-                qty = quantize(qty, float(mkt['precision']['amount'])) or qty
+                mkt = self.hub.market_spec(symbol)
+                if mkt:
+                    qty = quantize(qty, float(mkt['precision']['amount'])) or qty
             except Exception:
                 pass
             for _ in range(3):
@@ -173,7 +189,8 @@ class BusHub:
                 being_ledger.record_close(
                     'orchestrator', record.get('symbol', '?'),
                     float(record.get('pnl') or 0.0), real=True,
-                    meta={'reason': record.get('reason')})
+                    meta={'reason': record.get('reason'),
+                          'strat': 'alpha_router'})
                 tg(f"⚡ Orchestrator close {record.get('symbol')} "
                    f"${float(record.get('pnl') or 0.0):+.2f} "
                    f"({record.get('reason')})")
@@ -217,27 +234,20 @@ async def decision_feeder(hub):
         await asyncio.sleep(15)
 
 
-async def alpha_loop(orchestrator, hub):
-    """The run_real_2025 pattern on live candles: the 8 alpha
-    engines compute on 15m frames; >=85% buys execute."""
+async def alpha_loop(orchestrator, hub, bus_hub):
+    """Feed the orchestrator the way the design intends: the alpha
+    engines return SCORES; AlphaRouter fuses them (with the
+    reliability weights the zoo's closes keep teaching it - fresh
+    instance each cycle reads the shared memo). Router buy verdicts
+    enter the alert queue, so the orchestrator's own gates (risk
+    manager, Kelly sizing) decide execution. 1h frames match the
+    zoo's reliability keys."""
     import pandas as pd
-    from alpha_engines import (OscillatorConfluence, NakedPriceAction,
-                               TrendSqueeze, DonchianBreakout,
-                               KeltnerBreakout, VWAPBounce, VolumeSpike,
-                               VolRegime)
-    strategies = {
-        'osc_confluence': OscillatorConfluence(),
-        'price_action': NakedPriceAction(),
-        'trend_squeeze': TrendSqueeze(),
-        'donchian': DonchianBreakout(),
-        'keltner': KeltnerBreakout(),
-        'vwap': VWAPBounce(),
-        'vol_spike': VolumeSpike(),
-        'vol_regime': VolRegime(),
-    }
-    logger.info(f'alpha loop: {len(strategies)} engines on 15m candles')
+    from alpha_engines import AlphaRouter
+    logger.info('alpha loop: AlphaRouter ensemble on 1h candles -> alert queue')
     while True:
         try:
+            router = AlphaRouter()
             pairs = list(BASE_PAIRS)
             try:
                 with open('/tmp/discovered_pairs.json') as f:
@@ -247,27 +257,24 @@ async def alpha_loop(orchestrator, hub):
                             pairs.append(s)
             except Exception:
                 pass
-            since = int((time.time() - 30 * 3600) * 1000)
+            since = int((time.time() - 130 * 3600) * 1000)
             for pair in pairs:
                 try:
-                    rows = hub.ex.fetch_ohlcv(pair + ':USDT', '15m', since, 100)
+                    rows = hub.ex.fetch_ohlcv(pair + ':USDT', '1h', since, 120)
                     if not rows or len(rows) < 60:
                         continue
                     df = pd.DataFrame(rows, columns=['ts', 'open', 'high',
                                                      'low', 'close', 'vol'])
-                    for name, strat in strategies.items():
-                        try:
-                            result = strat.compute(df)
-                        except Exception:
-                            continue
-                        if (isinstance(result, dict)
-                                and result.get('signal') == 'BUY'
-                                and float(result.get('confidence', 0)) >= 0.85):
-                            logger.info(f'📡 {name}: {pair} BUY '
-                                        f'@ {float(result["confidence"]):.0%}')
-                            await orchestrator.execute_trade(
-                                pair, 'buy', float(result['confidence']),
-                                result)
+                    dec = router.pick(df, pair, '1h')
+                    if dec is not None and dec.side == 'buy':
+                        logger.info(f'📡 alpha_router: {pair} BUY p={dec.prob:.2f}')
+                        await bus_hub.alert_queue.put({
+                            'signal': {'symbol': pair,
+                                       'data': {'symbol': pair,
+                                                'price': float(df['close'].iloc[-1])}},
+                            'action': 'buy',
+                            'confidence': float(dec.prob),
+                        })
                 except Exception:
                     continue
         except Exception as e:
@@ -275,14 +282,24 @@ async def alpha_loop(orchestrator, hub):
         await asyncio.sleep(60)
 
 
+def account_equity(tn):
+    """Whole-account equity: the sizer's designed reference ('will
+    auto-update from exchange balance') - read straight from the
+    wallet payload's totalEquity."""
+    try:
+        return tn.wallet_equity_usdt() or 0.0
+    except Exception:
+        return 0.0
+
+
 async def stats_loop(orchestrator, arm):
     while True:
         await asyncio.sleep(300)
         try:
-            # Truth anchor: re-seed the sizer from the real wallet
-            free = arm._client().wallet_free_usdt()
-            if free:
-                orchestrator.position_sizer.update_balance(free)
+            # Truth anchor: re-seed the sizer from account equity
+            eq = account_equity(arm._client())
+            if eq:
+                orchestrator.position_sizer.update_balance(eq)
             logger.info(f'stats: {orchestrator.get_stats()}')
         except Exception as e:
             logger.warning(f'stats: {e}')
@@ -300,19 +317,24 @@ async def main():
         data_hub=bus_hub, trading_engines={'real_profit': arm},
         risk_engine=None, ledger=[], mode='testnet')
     orchestrator.router = PriceAdapter(hub)
+    # The 0.80 default was calibrated for brain decisions; the alpha
+    # ensemble's calibrated probabilities live lower (its own buy
+    # line is 0.58). Kelly sizing + the risk manager carry the risk
+    # work - the gate just filters noise.
+    orchestrator.min_confidence = 0.60
 
-    free = make_client().wallet_free_usdt()
-    if free:
-        orchestrator.position_sizer.update_balance(free)
-    logger.info(f'Execution Orchestrator LIVE - sizer balance ${free}, '
-                f'Kelly sizing, -1%/+2% exits, relay arm armed')
+    equity = account_equity(make_client())
+    if equity:
+        orchestrator.position_sizer.update_balance(equity)
+    logger.info(f'Execution Orchestrator LIVE - sizer balance ${equity:.2f} '
+                f'(account equity), Kelly sizing, -1%/+2% exits, relay arm armed')
     tg(f'⚡ Execution Orchestrator LIVE (the 2025 engine): Kelly sizing '
-       f'on ${free:.2f}, alpha engines + sentient decisions executing.')
+       f'on ${equity:.2f} equity, alpha engines + sentient decisions executing.')
 
     await asyncio.gather(
         orchestrator.run_execution_loop(),
         decision_feeder(bus_hub),
-        alpha_loop(orchestrator, hub),
+        alpha_loop(orchestrator, hub, bus_hub),
         stats_loop(orchestrator, arm),
     )
 
