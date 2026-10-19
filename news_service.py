@@ -138,7 +138,7 @@ def build_clean() -> int:
     """Recompute scores/sentiment and write CLEAN_PATH."""
     _ensure_files()
     try:
-        raw = pd.read_csv(RAW_PATH)
+        raw = pd.read_csv(RAW_PATH, engine='python', on_bad_lines='skip')
     except Exception:
         return 0
     if raw.empty:
@@ -160,7 +160,7 @@ def filtered_news_for(
     if not CLEAN_PATH.exists():
         return []
     try:
-        df = pd.read_csv(CLEAN_PATH)
+        df = pd.read_csv(CLEAN_PATH, engine='python', on_bad_lines='skip')
     except Exception:
         return []
 

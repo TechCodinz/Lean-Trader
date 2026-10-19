@@ -30,6 +30,18 @@ class StrategyValidator:
         self.strategy_scores = {}  # {strategy_name: win_rate}
         self.min_trades_before_live = 10  # Test 10 times before going live
         self.min_win_rate = 0.60  # 60% win rate required
+
+        # Hydrate learned scores: the bus bridge keeps
+        # /app/runtime/strategy_capacity.json fresh from real closes.
+        # Every brain instance must adjudicate from the SAME memory -
+        # before this, each process's validator started empty and
+        # processes disagreed about which strategies were approved.
+        try:
+            import json as _json
+            with open('/app/runtime/strategy_capacity.json') as _f:
+                self.strategy_scores = _json.load(_f).get('scores') or {}
+        except Exception:
+            pass
         
         logger.info("✅ Strategy Validator initialized")
         logger.info(f"   Min trades for validation: {self.min_trades_before_live}")
