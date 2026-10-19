@@ -113,7 +113,8 @@ async def main():
                     'APPROVE_LIVE' if approved else 'VALIDATE_TESTNET',
                     int(float(sig.get('confidence', 0))),
                     f"strategy '{strategy}': "
-                    f"{'validator-approved' if approved else 'not yet approved - validation only'}")
+                    f"{'validator-approved' if approved else 'not yet approved - validation only'}",
+                    metadata={'side': norm['side'], 'strategy': strategy})
                 processed.add(fp)
                 logger.info(f"adjudicated {norm['symbol']} {norm['side']} "
                             f"({strategy}) -> "

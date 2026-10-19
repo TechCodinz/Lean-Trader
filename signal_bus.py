@@ -59,7 +59,7 @@ def publish_signal(source, symbol, signal, confidence, metadata=None):
     logger.info(f"📡 Signal: {source} → {symbol} {signal} ({confidence}%)")
 
 
-def publish_decision(brain, symbol, signal, confidence, reasoning):
+def publish_decision(brain, symbol, signal, confidence, reasoning, metadata=None):
     """Publish a processed decision from a brain."""
     data = {
         'timestamp': datetime.utcnow().isoformat(),
@@ -68,6 +68,7 @@ def publish_decision(brain, symbol, signal, confidence, reasoning):
         'signal': signal,
         'confidence': confidence,
         'reasoning': reasoning,
+        'metadata': metadata or {},
         'status': 'processed'
     }
     fname = f"{int(time.time()*1000)}_{brain}_{symbol.replace('/', '_')}.json"

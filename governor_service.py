@@ -43,7 +43,7 @@ logging.basicConfig(level=logging.INFO,
 logger = logging.getLogger('GOVERNOR')
 
 ALLOC_PATH = '/app/runtime/allocation.json'
-BEINGS = ['zoo', 'continuous', 'swarm', 'master']
+BEINGS = ['zoo', 'continuous', 'swarm', 'master', 'orchestrator']
 CYCLE = 300
 
 
@@ -94,7 +94,7 @@ def compute(tn):
         n = st['closes']
         scores[b] = (st['expectancy'] * min(1.0, n / 20.0)) if n else None
 
-    mult = {'zoo': 1.0, 'continuous': 1.0, 'swarm': 1.0, 'master': 1.0}
+    mult = {'zoo': 1.0, 'continuous': 1.0, 'swarm': 1.0, 'master': 1.0, 'orchestrator': 1.0}
     if regime == 'ranging':
         mult['swarm'] = 1.15
         mult['master'] = 1.1
@@ -143,6 +143,9 @@ def compute(tn):
             'mode': modes['master'],
             'slice_usd': round(max(10.0, min(30.0, 8 + weights['master'] * 22)), 2),
             'max_concurrent': max(1, min(3, round(1 + weights['master'] * 2))),
+        },
+        'orchestrator': {
+            'mode': modes['orchestrator'],
         },
     }
     return {

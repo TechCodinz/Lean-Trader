@@ -364,7 +364,8 @@ class ExecutionOrchestrator:
                     execution_result = self.engines['real_profit'].execute_trade(
                         symbol=symbol,
                         signal=side.upper(),
-                        price=price
+                        price=price,
+                        amount=amount
                     )
                 except Exception as e:
                     logger.debug(f"Real profit execution: {e}")
@@ -548,8 +549,19 @@ class ExecutionOrchestrator:
     
     async def close_position(self, symbol: str, exit_price: float, reason: str):
         """Close position and record result"""
-        
+
         try:
+            # Real close first (relay arm, 2026-10-19): if the arm
+            # cannot close it on the exchange, do NOT book it closed -
+            # position monitoring retries next cycle.
+            _arm = (self.engines or {}).get('real_profit')
+            _pos = self.risk_manager.open_positions.get(symbol)
+            if (_arm is not None and _pos is not None
+                    and hasattr(_arm, 'close_position')):
+                if not _arm.close_position(symbol, _pos.get('size', 0),
+                                           _pos.get('side', 'buy')):
+                    logger.error(f'Real close failed for {symbol} - will retry')
+                    return
             # Calculate P&L with risk manager
             pnl = self.risk_manager.close_position(symbol, exit_price)
             
