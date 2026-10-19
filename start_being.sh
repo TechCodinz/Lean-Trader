@@ -73,8 +73,20 @@ for pid in os.listdir('/proc'):
     if pid.isdigit() and int(pid)!=os.getpid():
         try:
             cl=open(f'/proc/{pid}/cmdline','rb').read().decode(errors='ignore')
-            if 'sentinel_service.py' in cl or 'scanner_service.py' in cl: os.kill(int(pid),signal.SIGKILL)
+            if 'sentinel_service.py' in cl or 'multiplatform_scanner_service.py' in cl: os.kill(int(pid),signal.SIGKILL)
         except Exception: pass
 " 2>/dev/null || true
 docker exec leantrader-2025-testnet bash -c "TELEGRAM_BOT_TOKEN='$TOK' TELEGRAM_CHAT_ID='$CID' setsid python3 -u /app/sentinel_service.py > /tmp/sentinel.log 2>&1 < /dev/null &"
-docker exec leantrader-2025-testnet bash -c "TELEGRAM_BOT_TOKEN='$TOK' TELEGRAM_CHAT_ID='$CID' setsid python3 -u /app/scanner_service.py > /tmp/scanner.log 2>&1 < /dev/null &"
+docker exec leantrader-2025-testnet bash -c "TELEGRAM_BOT_TOKEN='$TOK' TELEGRAM_CHAT_ID='$CID' setsid python3 -u /app/multiplatform_scanner_service.py > /tmp/scanner.log 2>&1 < /dev/null &"
+
+# === Nervous system + fleet (added 2026-10-19) ===
+docker exec leantrader-2025-testnet python3 -c "
+import os,signal
+for pid in os.listdir('/proc'):
+    if pid.isdigit() and int(pid)!=os.getpid():
+        try:
+            cl=open(f'/proc/{pid}/cmdline','rb').read().decode(errors='ignore')
+            if 'nervous_system.py' in cl: os.kill(int(pid),signal.SIGKILL)
+        except Exception: pass
+" 2>/dev/null || true
+docker exec leantrader-2025-testnet bash -c "setsid python3 -u /app/nervous_system.py > /tmp/nervous.log 2>&1 < /dev/null &"

@@ -23,8 +23,10 @@ logger = logging.getLogger('NERVOUS_SYSTEM')
 
 # The 14 intelligent systems
 SERVICES = [
-    ("profit_taker", "/app/profit_taker_service.py", "/tmp/apt_service.log"),
-    ("evolution", "/app/evolution_service.py", "/tmp/evo_service.log"),
+    # PARKED 2026-10-19: separate exit-manager trial later (Peters 2026-10-19)
+    #("profit_taker", "/app/profit_taker_service.py", "/tmp/apt_service.log"),
+    # PARKED 2026-10-19: needs langchain + LLM API decision - Phase D
+    #("evolution", "/app/evolution_service.py", "/tmp/evo_service.log"),
     ("scanner", "/app/scanner_service.py", "/tmp/scanner_service.log"),
     ("scalper", "/app/scalp_service.py", "/tmp/scalp_service.log"),
     ("ultra_ai", "/app/ultra_ai_service.py", "/tmp/ultra_ai_service.log"),
@@ -41,12 +43,20 @@ SERVICES = [
 
 
 def is_running(name):
-    """Check if a service is running."""
-    result = subprocess.run(
-        ["bash", "-c", f"ps aux | grep -q '[{name[0]}]{name[1:]}'"],
-        capture_output=True
-    )
-    return result.returncode == 0
+    """Check if a service is running (container has no ps - scan /proc)."""
+    import os
+    script = {n: sc for n, sc, _ in SERVICES}[name]
+    needle = script.encode()
+    for pid in os.listdir('/proc'):
+        if not pid.isdigit() or int(pid) == os.getpid():
+            continue
+        try:
+            with open(f'/proc/{pid}/cmdline', 'rb') as f:
+                if needle in f.read():
+                    return True
+        except Exception:
+            pass
+    return False
 
 
 def start_service(name, script, logfile):

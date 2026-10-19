@@ -174,6 +174,40 @@ class AutoProfitTaker:
         
         return closed_positions
     
+    async def sync_from_exchange(self):
+        """Adopt live exchange positions not yet tracked.
+
+        Restored 2026-10-19: present in the Oct 12-14 build, lost in
+        the zoo adaptation. Positions register as micro_scalp with
+        their real exchange entry price. Returns count adopted.
+        """
+        adopted = 0
+        try:
+            positions = await asyncio.to_thread(self.exchange.fetch_positions)
+        except Exception as e:
+            logger.warning(f"sync_from_exchange: fetch_positions failed: {e}")
+            return 0
+        for p in positions or []:
+            try:
+                contracts = float(p.get('contracts') or 0)
+                if contracts == 0:
+                    continue
+                symbol = p.get('symbol')
+                if not symbol or symbol in self.open_positions:
+                    continue
+                entry = float(p.get('entryPrice') or 0)
+                if entry <= 0:
+                    continue
+                side = 'buy' if contracts > 0 else 'sell'
+                self.register_position(symbol, side, entry, abs(contracts),
+                                       strategy='micro_scalp')
+                adopted += 1
+            except Exception as e:
+                logger.warning(f"sync_from_exchange: adopt skip: {e}")
+        if adopted:
+            logger.info(f"sync_from_exchange: adopted {adopted} position(s)")
+        return adopted
+
     def get_stats(self) -> Dict:
         """Get profit taking statistics"""
         return {

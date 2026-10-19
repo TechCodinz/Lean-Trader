@@ -682,6 +682,14 @@ class UltraContinuousTradingOrchestrator:
             self.completed_sessions.append(session)
             del self.active_sessions[session_id]
 
+            # Capacity ledger: real closes only (executor-attached)
+            if getattr(self, 'executor', None) is not None and session.entry_price > 0 and session.qty > 0:
+                try:
+                    import being_ledger as _ledger
+                    _ledger.record_close('continuous', session.symbol, profit, real=True)
+                except Exception:
+                    pass
+
             # Log result
             status = "✅ WIN" if profit > 0 else "❌ LOSS"
             self.logger.info(

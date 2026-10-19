@@ -100,6 +100,11 @@ except Exception as e:
     scalp_engine = None
     logger.warning(f'Micro scalping init failed: {e}')
 # === AUTO PROFIT TAKER (sell brain, paper-routed) ===
+try:
+    import being_ledger as _ledger
+except Exception:
+    _ledger = None
+
 def _partial_close(symbol, price, qty_sell, level):
     global cash
     pos = positions.get(symbol)
@@ -151,6 +156,10 @@ def _partial_close(symbol, price, qty_sell, level):
     _w = sum(1 for x in trades if x > 0)
     try:
         ultra.learn_from_trade({'EMAbbSqueeze': 'momentum', 'RSIMeanRev': 'mean_reversion', 'DonchianBreakout': 'breakout', 'MAPullback': 'momentum', 'EvoCombo': 'momentum', 'ultra_engine': 'scalping'}.get(positions.get(symbol, {}).get('strat'), 'momentum'), pnl > 0, pnl)
+        try:
+            if _ledger: _ledger.record_close('zoo', symbol, pnl, real=bool(positions.get(symbol, {}).get('real')))
+        except Exception:
+            pass
         if positions.get(symbol, {}).get('strat') == 'alpha_router' and globals().get('alpha_router'):
             try:
                 for _sn, _sv in (alpha_votes.pop(symbol, {}) or {}).items():
@@ -183,6 +192,10 @@ def _paper_close(symbol, side, size, price, reason):
     compounder.update_pnl(pnl)
     try:
         ultra.learn_from_trade({'EMAbbSqueeze': 'momentum', 'RSIMeanRev': 'mean_reversion', 'DonchianBreakout': 'breakout', 'MAPullback': 'momentum', 'EvoCombo': 'momentum', 'ultra_engine': 'scalping'}.get(pos.get('strat'), 'momentum'), pnl > 0, pnl)
+        try:
+            if _ledger: _ledger.record_close('zoo', symbol, pnl, real=bool(pos.get('real')))
+        except Exception:
+            pass
         if pos.get('strat') == 'alpha_router' and globals().get('alpha_router'):
             try:
                 for _sn, _sv in (alpha_votes.pop(symbol, {}) or {}).items():

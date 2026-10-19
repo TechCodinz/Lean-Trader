@@ -28,13 +28,59 @@ logging.basicConfig(
 logger = logging.getLogger('PROFIT_TAKER_SERVICE')
 
 
+class RelayExchange:
+    """ccxt-shaped adapter over the host signing relay."""
+
+    def __init__(self):
+        import ccxt
+        os.environ.setdefault('TESTNET_RELAY', 'http://172.17.0.1:18099')
+        from testnet_client import make_client, ccxt_to_raw
+        self.tn = make_client()
+        self._to_raw = ccxt_to_raw
+        self.pub = ccxt.bybit({'enableRateLimit': True})
+        self.pub.load_markets()
+
+    @staticmethod
+    def _ccxt_sym(raw):
+        base = raw[:-4] if raw.endswith('USDT') else raw
+        return f"{base}/USDT:USDT"
+
+    def fetch_ticker(self, symbol):
+        return self.pub.fetch_ticker(symbol)
+
+    def fetch_positions(self):
+        out = []
+        for p in self.tn.positions():
+            qty = float(p.get('size') or 0)
+            if qty == 0:
+                continue
+            if (p.get('side') or '').lower() == 'sell':
+                qty = -qty
+            out.append({
+                'symbol': self._ccxt_sym(p['symbol']),
+                'contracts': qty,
+                'entryPrice': float(p.get('avgPrice') or 0),
+            })
+        return out
+
+    def create_market_sell_order(self, symbol, size):
+        raw = self._to_raw(symbol)
+        return self.tn.create_market_sell_reduce(raw, float(size))
+
+    def create_market_buy_order(self, symbol, cost):
+        # AutoProfitTaker passes quote cost for short closes.
+        raw = self._to_raw(symbol)
+        price = float(self.pub.fetch_ticker(symbol)['last'])
+        qty = float(cost) / price if price else 0
+        return self.tn.create_market_buy(raw, qty)
+
+
 async def main():
     logger.info("🚀 Starting AutoProfitTaker Service (2025 microservice)")
     
-    # Use RPB's Bybit testnet client
-    rpb = REAL_PROFIT_BOT(mode='testnet')
-    apt = AutoProfitTaker(rpb.gate, None)
-    logger.info("✅ AutoProfitTaker initialized with Bybit testnet")
+    # Relay-backed exchange (ccxt testnet is WAF-blocked in-container)
+    apt = AutoProfitTaker(RelayExchange(), None)
+    logger.info("✅ AutoProfitTaker initialized via signing relay")
     
     # Initial sync
     n = await apt.sync_from_exchange()

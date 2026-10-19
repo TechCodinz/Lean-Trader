@@ -164,6 +164,11 @@ class SwarmExecutor:
             xp = pos['entry']
         pnl = (xp - pos['entry']) * pos['qty']
         logger.info(f'SWARM REAL SELL {pos["symbol"]} qty {qty} @ {xp} pnl ${pnl:+.4f} ({reason})')
+        try:
+            import being_ledger as _ledger
+            _ledger.record_close('swarm', pos['symbol'], pnl, real=True)
+        except Exception:
+            pass
         tg(f'SWARM SELL {pos["symbol"]} @ ${xp:.4f} pnl ${pnl:+.2f} ({reason})')
         return True
 
