@@ -1,3 +1,12 @@
+# === ML model restore (added 2026-10-19) ===
+if [ -d /root/leantrader-backup/models ]; then
+  COUNT=$(docker exec leantrader-2025-testnet bash -c "ls /app/runtime/models 2>/dev/null | wc -l" 2>/dev/null || echo 0)
+  if [ "$COUNT" = "0" ]; then
+    docker exec leantrader-2025-testnet mkdir -p /app/runtime/models
+    docker cp /root/leantrader-backup/models/. leantrader-2025-testnet:/app/runtime/models/ 2>/dev/null || true
+    echo "ML models restored from host backup"
+  fi
+fi
 #!/bin/bash
 # LeanTrader being: boot-time startup (relay + container + zoo trader in testnet mode)
 # Installed at /root/start_being.sh, run by leantrader-being.service (or manually).

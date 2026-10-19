@@ -166,7 +166,7 @@ def _partial_close(symbol, price, qty_sell, level):
     try:
         ultra.learn_from_trade({'EMAbbSqueeze': 'momentum', 'RSIMeanRev': 'mean_reversion', 'DonchianBreakout': 'breakout', 'MAPullback': 'momentum', 'EvoCombo': 'momentum', 'ultra_engine': 'scalping'}.get(positions.get(symbol, {}).get('strat'), 'momentum'), pnl > 0, pnl)
         try:
-            if _ledger: _ledger.record_close('zoo', symbol, pnl, real=bool(positions.get(symbol, {}).get('real')))
+            if _ledger: _ledger.record_close('zoo', symbol, pnl, real=bool(positions.get(symbol, {}).get('real')), meta={'strat': positions.get(symbol, {}).get('strat'), 'kind': 'partial'})
         except Exception:
             pass
         if positions.get(symbol, {}).get('strat') == 'alpha_router' and globals().get('alpha_router'):
@@ -202,7 +202,7 @@ def _paper_close(symbol, side, size, price, reason):
     try:
         ultra.learn_from_trade({'EMAbbSqueeze': 'momentum', 'RSIMeanRev': 'mean_reversion', 'DonchianBreakout': 'breakout', 'MAPullback': 'momentum', 'EvoCombo': 'momentum', 'ultra_engine': 'scalping'}.get(pos.get('strat'), 'momentum'), pnl > 0, pnl)
         try:
-            if _ledger: _ledger.record_close('zoo', symbol, pnl, real=bool(pos.get('real')))
+            if _ledger: _ledger.record_close('zoo', symbol, pnl, real=bool(pos.get('real')), meta={'strat': pos.get('strat'), 'kind': 'full'})
         except Exception:
             pass
         if pos.get('strat') == 'alpha_router' and globals().get('alpha_router'):

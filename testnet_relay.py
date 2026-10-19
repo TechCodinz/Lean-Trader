@@ -12,7 +12,7 @@ KEY = open('/root/secrets/bybit_testnet_api_key').read().strip()
 SEC = open('/root/secrets/bybit_testnet_api_secret').read().strip()
 BASE = 'https://api-testnet.bybit.com'
 ALLOWED = {'/v5/account/wallet-balance', '/v5/order/create',
-           '/v5/position/set-leverage', '/v5/position/list', '/v5/order/realtime'}
+           '/v5/position/set-leverage', '/v5/position/list', '/v5/order/realtime', '/v5/order/cancel'}
 
 def forward(method, path, params):
     ts = str(int(time.time() * 1000)); recv = '5000'

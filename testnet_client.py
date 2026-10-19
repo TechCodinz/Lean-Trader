@@ -81,6 +81,24 @@ class TestnetClient:
                          {'category': 'linear', 'symbol': symbol, 'side': 'Sell',
                           'orderType': 'Market', 'qty': str(qty), 'reduceOnly': True})
 
+    def create_limit_postonly(self, symbol, side, qty, price):
+        return self._req('POST', '/v5/order/create',
+                         {'category': 'linear', 'symbol': symbol, 'side': side,
+                          'orderType': 'Limit', 'qty': qty_str(qty),
+                          'price': str(price), 'timeInForce': 'PostOnly'})
+
+    def cancel_order(self, symbol, order_id):
+        return self._req('POST', '/v5/order/cancel',
+                         {'category': 'linear', 'symbol': symbol,
+                          'orderId': order_id})
+
+    def order_status(self, symbol, order_id):
+        res = self._req('GET', '/v5/order/realtime',
+                        {'category': 'linear', 'symbol': symbol,
+                         'orderId': order_id})
+        lst = res.get('list', []) if isinstance(res, dict) else []
+        return lst[0] if lst else {}
+
 
 def ccxt_to_raw(sym):
     # 'BTC/USDT:USDT' -> 'BTCUSDT'; dated/odd symbols -> None (paper-only)
