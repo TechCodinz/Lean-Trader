@@ -433,6 +433,18 @@ while True:
             logger.error("🚨 EMERGENCY"); tg("🚨 EMERGENCY STOP"); time.sleep(300); continue
         tickers = ex.fetch_tickers()
         cands = [(s,t['last']) for s,t in tickers.items() if '/USDT' in s and t.get('quoteVolume',0)>1000000 and t['last']]
+        try:
+            import json as _json
+            _disc = _json.load(open('/tmp/discovered_pairs.json'))
+            if time.time() - float(_disc.get('timestamp', 0)) < 7200:
+                _lead = [(ds, tickers[ds]['last']) for ds in _disc.get('pairs', [])
+                         if ds in tickers and tickers[ds].get('last')]
+                if _lead:
+                    _lead_syms = {x for x, _ in _lead}
+                    cands = _lead + [c for c in cands if c[0] not in _lead_syms]
+                    logger.info(f"DISCOVERY feed: {len(_lead)} trend-selected pairs lead candidates")
+        except Exception:
+            pass
         cands = cands[:20]
         # === ULTRA ENGINE SIGNALS (background thread refreshes ENGINE_HOT) ===
         engine_hot = {}
