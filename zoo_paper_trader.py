@@ -402,19 +402,30 @@ except Exception as e:
     qmo = None
     logger.warning(f'QUANTUM unavailable: {e}')
 
+_sig_memo = {}
+
 def get_signal(sym):
+    _bucket = int(time.time() // 300)
+    _hit = _sig_memo.get(sym)
+    if _hit and _hit[0] == _bucket:
+        return _hit[1]
+    _res = None
     try:
         ohlcv = ex.fetch_ohlcv(sym, '1h', 100)
-        if len(ohlcv) < 50: return None
-        df = pd.DataFrame(ohlcv, columns=['ts','open','high','low','close','vol'])
-        for strat in strategies:
-            try:
-                out = strat.apply(df)
-                if out['long_signal'].iloc[-1]:
-                    return strat.name
-            except: pass
+        if len(ohlcv) >= 50:
+            df = pd.DataFrame(ohlcv, columns=['ts','open','high','low','close','vol'])
+            for strat in strategies:
+                try:
+                    out = strat.apply(df)
+                    if out['long_signal'].iloc[-1]:
+                        _res = strat.name
+                        break
+                except: pass
     except: pass
-    return None
+    _sig_memo[sym] = (_bucket, _res)
+    return _res
+
+ENGINE_HOT = {}
 
 while True:
     try:
@@ -423,25 +434,43 @@ while True:
         tickers = ex.fetch_tickers()
         cands = [(s,t['last']) for s,t in tickers.items() if '/USDT' in s and t.get('quoteVolume',0)>1000000 and t['last']]
         cands = cands[:20]
-        # === ULTRA ENGINE SIGNALS (harvested once per cycle) ===
+        # === ULTRA ENGINE SIGNALS (background thread refreshes ENGINE_HOT) ===
         engine_hot = {}
-        if globals().get('scalp_engine'):
-            try:
-                for sg in asyncio.run(scalp_engine._scan_scalp_opportunities('5m')):
-                    if sg.confidence >= 0.6:
-                        engine_hot[sg.symbol] = True
-                        logger.info(f"SCALP {sg.symbol} {sg.strategy} {sg.confidence:.2f}")
-            except Exception as e:
-                logger.warning(f"scalp scan: {e}")
-        if globals().get('moon_system'):
-            try:
-                for g in asyncio.run(moon_system.spotter.scan_for_new_gems()):
-                    gs = g.get('symbol') if isinstance(g, dict) else None
-                    if gs:
-                        engine_hot[gs] = True
-                        logger.info(f"MOON GEM {gs}")
-            except Exception as e:
-                logger.warning(f"moon scan: {e}")
+        if not globals().get('_engine_bg_started'):
+            import threading as _th2
+            def _engine_bg():
+                while True:
+                    try:
+                        if globals().get('scalp_engine'):
+                            try:
+                                for sg in asyncio.run(scalp_engine._scan_scalp_opportunities('5m')):
+                                    if sg.confidence >= 0.6:
+                                        ENGINE_HOT[sg.symbol] = time.time()
+                                        logger.info(f"SCALP {sg.symbol} {sg.strategy} {sg.confidence:.2f}")
+                            except Exception as e:
+                                logger.warning(f"scalp scan: {e}")
+                        if globals().get('moon_system'):
+                            try:
+                                for g in asyncio.run(moon_system.spotter.scan_for_new_gems()):
+                                    gs = g.get('symbol') if isinstance(g, dict) else None
+                                    if gs:
+                                        ENGINE_HOT[gs] = time.time()
+                                        logger.info(f"MOON GEM {gs}")
+                            except Exception as e:
+                                logger.warning(f"moon scan: {e}")
+                        try:
+                            for opp in asyncio.run(_xarb_scan()):
+                                ENGINE_HOT[opp['symbol']] = time.time()
+                                logger.info(f"XARB {opp['symbol']} buy {opp['buy_exchange']} sell {opp['sell_exchange']} +{opp['profit_pct']:.2f}%")
+                        except Exception as e:
+                            logger.warning(f"xarb scan: {e}")
+                    except Exception as e:
+                        logger.warning(f"engine bg: {e}")
+                    time.sleep(90)
+            _th2.Thread(target=_engine_bg, daemon=True).start()
+            globals()['_engine_bg_started'] = True
+            logger.info('ENGINE background scanner started (scalp/moon/xarb)')
+        engine_hot = {s2: True for s2, ts2 in list(ENGINE_HOT.items()) if time.time() - ts2 < 300}
         if globals().get('arb_engine'):
             try:
                 if not globals().get('_arb_bg_started'):
@@ -461,12 +490,7 @@ while True:
                         logger.info(f"ARB {osym}")
             except Exception as e:
                 logger.warning(f"arb scan: {e}")
-        try:
-            for opp in asyncio.run(_xarb_scan()):
-                engine_hot[opp['symbol']] = True
-                logger.info(f"XARB {opp['symbol']} buy {opp['buy_exchange']} sell {opp['sell_exchange']} +{opp['profit_pct']:.2f}%")
-        except Exception as e:
-            logger.warning(f"xarb scan: {e}")
+        # xarb results arrive via the engine background thread (ENGINE_HOT)
         _cand_syms = {x for x, _ in cands}
         _norm = {k.split(':')[0]: k for k in tickers}
         for hs in list(engine_hot):
@@ -670,6 +694,6 @@ while True:
             except: pass
         w=sum(1 for x in trades if x>0)
         logger.info(f"💵 {_cash_str()} | Open:{len(positions)} | Trades:{len(trades)} W:{w}")
-        time.sleep(120)
+        time.sleep(45)
     except Exception as e:
         logger.error(f"E: {e}"); time.sleep(30)
