@@ -61,8 +61,16 @@ class StatisticalArbitrage:
         
         for asset1, asset2, expected_corr in self.pairs:
             try:
-                # Get recent prices (would fetch from data hub)
-                ratio = np.random.uniform(0.95, 1.05)  # ETH/BTC ratio
+                # Real ratio from the data hub (was np.random until
+                # the hub was built - the z-scores were meaningless)
+                ratio = None
+                if self.data_hub is not None:
+                    try:
+                        ratio = self.data_hub.get_ratio(asset1, asset2)
+                    except Exception:
+                        ratio = None
+                if ratio is None:
+                    continue
                 
                 # Calculate z-score (how far from mean)
                 ratios = list(self.ratio_history[(asset1, asset2, expected_corr)])

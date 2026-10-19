@@ -42,6 +42,33 @@ def _env_float(k: str, d: float) -> float:
     except Exception:
         return d
 
+
+def _since_shim(exchange):
+    """Bound every fetch_ohlcv with `since` when the caller omits it.
+
+    Found 2026-10-19: an unbounded fetch_ohlcv on this API returns the
+    OLDEST candle page (BTC from 2020, SOL from 2021, ETH from 2023) -
+    every candle consumer in the system was silently analyzing
+    ancient history while trading on live tickers. Injecting
+    since = now - (limit+10) timeframes returns the current window.
+    """
+    import time as _time
+    _orig = exchange.fetch_ohlcv
+    _TF = {'1m': 60000, '3m': 180000, '5m': 300000, '15m': 900000,
+           '30m': 1800000, '1h': 3600000, '2h': 7200000, '4h': 14400000,
+           '6h': 21600000, '12h': 43200000, '1d': 86400000, '1w': 604800000}
+
+    def _fetch(symbol, timeframe='1h', since=None, limit=None, params=None):
+        if since is None:
+            n = limit if isinstance(limit, int) and limit > 0 else 100
+            step = _TF.get(timeframe, 3600000)
+            since = int(_time.time() * 1000) - int((n + 10) * step)
+        return _orig(symbol, timeframe, since, limit, params or {})
+
+    exchange.fetch_ohlcv = _fetch
+    return exchange
+
+
 class ExchangeRouter:
     """
     Thin, safe wrapper around one ccxt exchange.
@@ -171,6 +198,12 @@ class ExchangeRouter:
         # If load_markets fails repeatedly we mark the exchange as malformed and avoid calling it.
         self._exchange_malformed: bool = False
         self._load_markets_safe()
+        # Candle-data integrity (2026-10-19): bound all OHLCV reads
+        try:
+            if hasattr(self.ex, 'set_sandbox_mode'):
+                _since_shim(self.ex)
+        except Exception:
+            pass
 
         # Awareness / telemetry (opt-in via env)
         try:

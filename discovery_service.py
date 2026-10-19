@@ -41,7 +41,12 @@ class _Ex:
 
     def safe_fetch_ohlcv(self, sym, timeframe='1h', limit=400):
         try:
-            return self._ex.fetch_ohlcv(sym, timeframe=timeframe, limit=limit)
+            # since-bounded: an unbounded fetch returns the OLDEST
+            # candle page on this API (discovery scored 2021 data
+            # until 2026-10-19). 1h candles assumed (router's use).
+            import time as _t
+            since = int((_t.time() - (limit + 5) * 3600) * 1000)
+            return self._ex.fetch_ohlcv(sym, timeframe, since, limit)
         except Exception:
             return None
 

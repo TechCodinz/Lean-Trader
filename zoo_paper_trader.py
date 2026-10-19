@@ -59,6 +59,15 @@ def save_state():
 
 load_state()
 ex = ccxt.bybit({'enableRateLimit': True}); ex.set_sandbox_mode(True)
+# Candle-data integrity (2026-10-19): unbounded fetch_ohlcv returns the
+# OLDEST candle page on this API - the zoo's strategies, ML, ultrasonic
+# and router reads were analyzing 2023-era candles. Bound every fetch.
+try:
+    from router import _since_shim as _since_shim_zoo
+    _since_shim_zoo(ex)
+    print('[zoo] since shim applied to shared exchange client')
+except Exception as _e:
+    print(f'[zoo] since shim FAILED: {_e}')
 apex = AutoAdaptiveApex(ex)
 bai = BalanceAwareIntelligence()
 cns = get_central_nervous_system()
