@@ -94,7 +94,10 @@ class SmartRiskManager:
     """Smart risk management and validation"""
     
     def __init__(self):
-        self.max_open_positions = 7  # 5->7 (2026-10-20 dials): at min order size the old cap idled capital
+        self.max_open_positions = 10  # Princewill 2026-10-20:
+        # compounding speed is closes x expectancy - the book was
+        # using 3-4 of 7 slots; 10 gives the flow room while the
+        # per-trade Kelly sizing and the -1% stop carry the risk  # 5->7 (2026-10-20 dials): at min order size the old cap idled capital
         self.max_daily_loss = 0.05  # 5% max daily loss
         self.max_correlated_positions = 8  # Max positions in correlated assets (optimized for small balance)
         
