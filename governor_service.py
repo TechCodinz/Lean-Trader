@@ -82,6 +82,159 @@ def current_regime():
         return 'unknown'
 
 
+
+GUARD_PATH = '/app/runtime/guard_state.json'
+LEDGER_PATH = '/app/runtime/being_ledger.jsonl'
+
+try:
+    from risk.guards import (GuardState, RiskLimits, should_halt_trading,
+                             RISK_MAX_LOSS_PER_SYMBOL, RISK_MAX_DAILY_LOSS,
+                             RISK_MAX_ACCOUNT_DD, RISK_LIMITS_PCT)
+    _GUARDS_OK = True
+except Exception:
+    _GUARDS_OK = False
+
+try:
+    from allocators.portfolio import choose_assets as _choose_assets
+    _ALLOC_OK = True
+except Exception:
+    _ALLOC_OK = False
+
+
+def _guard_evaluate(tn):
+    """Princewill's 2025 risk gates (risk/guards.py, restored
+    2026-10-20) fed from the being ledger + live equity. Returns
+    (halted, reasons, info). Guard state rebuilt from today's real
+    closes each cycle (restart-proof); peak equity persists."""
+    info = {'daily_pnl': 0.0, 'peak_equity': 0.0}
+    if not _GUARDS_OK:
+        return False, [], info
+    try:
+        import datetime as _dt
+        st = GuardState()
+        now = _dt.datetime.now(_dt.timezone.utc)
+        midnight = now.replace(hour=0, minute=0, second=0,
+                               microsecond=0).timestamp()
+        try:
+            with open(LEDGER_PATH) as f:
+                for line in f:
+                    try:
+                        r = json.loads(line)
+                    except Exception:
+                        continue
+                    if not r.get('real') or float(r.get('ts', 0)) < midnight:
+                        continue
+                    st.record_fill(r.get('symbol', ''), float(r.get('pnl', 0)))
+        except Exception:
+            pass
+        peak = 0.0
+        try:
+            with open(GUARD_PATH) as f:
+                peak = float(json.load(f).get('peak_equity', 0.0))
+        except Exception:
+            peak = 0.0
+        st.peak_equity = peak
+        eq = 0.0
+        try:
+            eq = float(tn.wallet_equity_usdt())
+        except Exception:
+            eq = 0.0
+        if eq > 0:
+            st.update_equity(eq)
+        limits = RiskLimits(RISK_MAX_LOSS_PER_SYMBOL, RISK_MAX_DAILY_LOSS,
+                            RISK_MAX_ACCOUNT_DD, pct=RISK_LIMITS_PCT)
+        halt, reasons = should_halt_trading(st, limits)
+        info = {'daily_pnl': round(st.daily_pnl, 4),
+                'peak_equity': round(st.peak_equity, 2),
+                'equity': round(eq, 2),
+                'per_symbol': {k: round(v, 4) for k, v in
+                               st.per_symbol_pnl_today.items()},
+                'limits': {'per_symbol': RISK_MAX_LOSS_PER_SYMBOL,
+                           'daily': RISK_MAX_DAILY_LOSS,
+                           'drawdown': RISK_MAX_ACCOUNT_DD}}
+        try:
+            with open(GUARD_PATH, 'w') as f:
+                json.dump({'peak_equity': st.peak_equity,
+                           'daily_pnl': st.daily_pnl,
+                           'ts': time.time()}, f)
+        except Exception:
+            pass
+        return halt, reasons, info
+    except Exception as e:
+        logger.warning(f'guard evaluate: {e}')
+        return False, [], info
+
+
+def _allocator_select(stats, free):
+    """Princewill's 2025 allocator (allocators/portfolio.py
+    choose_assets): beings are assets; mu = 72h expectancy, Sigma =
+    covariance of hourly realized P&L; budget = real slots by
+    wallet tier. Returns (selected_set, mu_dict) or (None, mu) to
+    fall back to the legacy mode logic."""
+    mu = {}
+    for b in BEINGS:
+        st = stats.get(b) or {}
+        # Evidence discipline (Princewill's own demotion standard):
+        # under 30 closes there is no track record to select on -
+        # the being is an explorer with a small positive mu, never
+        # benched by an anecdote (one pre-restoration close of
+        # -$2.44 sat in 'continuous' history all day).
+        mu[b] = float(st.get('expectancy', 0.0)) if (st.get('closes') or 0) >= 30 else 0.001
+    if not _ALLOC_OK:
+        return None, mu
+    try:
+        import datetime as _dt
+        import numpy as _np
+        now = _dt.datetime.now(_dt.timezone.utc)
+        start = (now - _dt.timedelta(hours=72)).timestamp()
+        buckets = {b: _np.zeros(72) for b in BEINGS}
+        try:
+            with open(LEDGER_PATH) as f:
+                for line in f:
+                    try:
+                        r = json.loads(line)
+                    except Exception:
+                        continue
+                    if not r.get('real'):
+                        continue
+                    b = r.get('being')
+                    ts = float(r.get('ts', 0))
+                    if b in buckets and ts >= start:
+                        idx = min(71, int((ts - start) // 3600))
+                        buckets[b][idx] += float(r.get('pnl', 0))
+        except Exception:
+            pass
+        X = _np.array([buckets[b] for b in BEINGS])
+        if _np.any(X):
+            Sigma = _np.cov(X)
+            if Sigma.shape != (len(BEINGS), len(BEINGS)):
+                Sigma = _np.diag(_np.var(X, axis=1) + 1e-6)
+        else:
+            Sigma = _np.eye(len(BEINGS))
+        # beings with no variance signal get the fleet median so the
+        # exploration epsilon cannot dominate the Sharpe-like score
+        d = _np.diag(Sigma).copy()
+        pos = d[d > 1e-9]
+        med = float(_np.median(pos)) if pos.size else 1e-4
+        for i in range(len(BEINGS)):
+            if d[i] <= 1e-9:
+                Sigma[i, i] = med
+        if free <= 0:
+            budget = len(BEINGS)
+        elif free < 8:
+            budget = 1
+        elif free < 25:
+            budget = 4
+        else:
+            budget = len(BEINGS)
+        sel = _choose_assets([mu[b] for b in BEINGS], Sigma, budget)
+        selected = {BEINGS[i] for i, v in enumerate(sel) if int(v) == 1}
+        return selected, mu
+    except Exception as e:
+        logger.warning(f'allocator select: {e}')
+        return None, mu
+
+
 def compute(tn):
     import being_ledger
     stats = being_ledger.capacity_summary(72)
@@ -112,6 +265,9 @@ def compute(tn):
     else:
         weights = {b: 0.05 + 0.85 * adj[b] / total for b in BEINGS}
 
+    halted, guard_reasons, guard_info = _guard_evaluate(tn)
+    selected, _mu = _allocator_select(stats, free)
+
     modes = {}
     for b in BEINGS:
         s = scores[b]
@@ -131,12 +287,22 @@ def compute(tn):
         pst = stats.get(b) or {}
         rehabilitated = (pst.get('paper_closes', 0) >= 20
                           and pst.get('paper_expectancy', 0.0) > 0)
-        modes[b] = 'paper' if (demoted and not rehabilitated) else 'real'
-    if 0 < free < 8:
+        real = not (demoted and not rehabilitated)
+        if selected is not None:
+            real = real and (b in selected)
+        modes[b] = 'real' if real else 'paper'
+    if 0 < free < 8 and selected is None:
         top = max(weights, key=weights.get)
         for b in BEINGS:
             if b != top:
                 modes[b] = 'paper'
+    if halted:
+        # The 2025 gates override everything: entries halt fleet-
+        # wide; exits keep running inside each being (paper mode
+        # blocks opens only). Reasons ride in allocation.json.
+        for b in BEINGS:
+            modes[b] = 'paper'
+        logger.warning(f'GUARD HALT: {guard_reasons}')
 
     beings = {
         'zoo': {
@@ -171,6 +337,10 @@ def compute(tn):
                    for b in BEINGS},
         'weights': {b: round(weights[b], 3) for b in BEINGS},
         'stats': {b: stats.get(b) for b in BEINGS},
+        'guard': {'halted': halted, 'reasons': guard_reasons, **guard_info},
+        'allocator': {'selected': sorted(selected) if selected is not None
+                      else None,
+                      'mu': {b: round(_mu[b], 5) for b in BEINGS}},
         'beings': beings,
     }
 
