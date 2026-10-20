@@ -117,6 +117,58 @@ class RelayExecutionArm:
                 tn.set_leverage(raw, 10)
             except Exception:
                 pass
+            # Maker-first entry (2026-10-20): taker fees are the
+            # structural drag at these notionals. Post-only limit at
+            # the signal price with a 15s fuse; a filled maker order
+            # is the position. Unfilled -> cancel -> ONE market
+            # fallback (never starve a strong signal). A partial
+            # fill >= $5 stands as the position; a dust partial is
+            # left for the exchange sync and topped up by market.
+            try:
+                lr = tn.create_limit_postonly(raw, 'Buy', qty, price)
+                oid = lr.get('orderId') if isinstance(lr, dict) else None
+                if oid:
+                    deadline = time.time() + 15
+                    filled_qty = 0.0
+                    avg = float(price)
+                    status = ''
+                    while time.time() < deadline:
+                        st = tn.order_status(raw, oid) or {}
+                        status = st.get('orderStatus') or ''
+                        try:
+                            filled_qty = float(st.get('cumExecQty') or 0)
+                            if st.get('avgPrice'):
+                                avg = float(st['avgPrice'])
+                        except Exception:
+                            pass
+                        if status in ('Filled', 'Cancelled', 'Rejected', 'Expired'):
+                            break
+                        time.sleep(1.5)
+                    if status != 'Filled':
+                        try:
+                            tn.cancel_order(raw, oid)
+                        except Exception:
+                            pass
+                        st = tn.order_status(raw, oid) or {}
+                        try:
+                            filled_qty = float(st.get('cumExecQty') or filled_qty)
+                            if st.get('avgPrice'):
+                                avg = float(st['avgPrice'])
+                        except Exception:
+                            pass
+                    if filled_qty > 0 and filled_qty * avg >= 5.0:
+                        logger.info(f'⚡ MAKER BUY {raw} qty {filled_qty} @ {avg} (post-only)')
+                        tg(f'⚡ Orchestrator MAKER BUY {raw} qty {filled_qty} @ {avg}')
+                        return {'symbol': symbol, 'side': 'buy',
+                                'amount': filled_qty, 'price': avg,
+                                'orderId': oid, 'simulated': False}
+                    if filled_qty > 0:
+                        qty = round(qty - filled_qty, 10)
+                        logger.info(f'arm: maker dust partial {filled_qty} on {raw}; market top-up {qty}')
+                    else:
+                        logger.info(f'arm: maker unfilled on {raw} - market fallback')
+            except Exception as e:
+                logger.info(f'arm: maker path failed on {raw} ({e}) - market fallback')
             res = tn.create_market_buy(raw, qty_str(qty))
             if isinstance(res, dict) and res.get('orderId'):
                 logger.info(f'⚡ REAL BUY {raw} qty {qty} @ {price}')

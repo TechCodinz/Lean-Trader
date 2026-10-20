@@ -180,6 +180,46 @@ async def main():
     pub = ccxt.bybit()
     pub.load_markets()
     orch.executor = RelayExecutor(tn, pub)
+
+    # SESSION REHYDRATION (2026-10-20): restore the grower's own
+    # open positions across restarts, verified against the exchange
+    # (stored sessions the exchange no longer holds are dead - the
+    # zoo's record carries whatever closed them).
+    try:
+        import json as _j2
+        import os as _o2
+        _sp = '/app/runtime/continuous_sessions.json'
+        if _o2.path.exists(_sp):
+            _stored = _j2.load(open(_sp))
+            _truth = {}
+            for _pos in tn.positions():
+                _truth[_pos['symbol']] = _pos
+            _restored = 0
+            for _sid, _d in _stored.items():
+                _raw = _d['symbol'].split('/')[0] + 'USDT'
+                _pos = _truth.get(_raw)
+                if not _pos or float(_pos.get('positionValue') or 0) < 1.0:
+                    continue
+                from ultra_continuous_trading import TradingSession as _TS
+                _ssn = _TS(
+                    session_id=_sid,
+                    start_time=float(_d.get('start_time') or 0),
+                    end_time=0,
+                    strategy=_d.get('strategy', 'restored'),
+                    timeframe=_d.get('timeframe', ''),
+                    symbol=_d['symbol'],
+                    initial_balance=float(_d.get('initial_balance') or 0),
+                    final_balance=0, profit=0, trades_count=0,
+                    win_rate=0, status='active',
+                    entry_price=float(_pos.get('avgPrice') or _d.get('entry_price') or 0),
+                    qty=abs(float(_pos.get('size') or 0)))
+                orch.active_sessions[_sid] = _ssn
+                _restored += 1
+            if _restored:
+                logger.info(f'CONT REHYDRATE: {_restored} session(s) restored '
+                            f'and exchange-verified')
+    except Exception as _e:
+        logger.warning(f'CONT rehydrate: {_e}')
     logger.info('CONTINUOUS SERVICE: orchestrator live with real execution (relay)')
     tg(f'CONTINUOUS SERVICE LIVE - orchestrator propagating (wallet ${free:.2f})')
 

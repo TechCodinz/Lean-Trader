@@ -598,6 +598,36 @@ class UltraContinuousTradingOrchestrator:
             self.logger.error(f"Error checking if can open position: {e}")
             return False
 
+    def _persist_sessions(self):
+        """Persist REAL active sessions (session persistence,
+        2026-10-20): a service restart used to orphan the grower's
+        open positions - exchange-safe but exit-blind (the monitor
+        only watches current-run sessions). Sessions now survive
+        restarts: written on every open/close, rehydrated and
+        exchange-verified by the service at boot."""
+        try:
+            import json as _j
+            import os as _o
+            data = {}
+            for sid, ssn in self.active_sessions.items():
+                if getattr(ssn, 'entry_price', 0) and ssn.entry_price > 0:
+                    data[sid] = {
+                        'session_id': ssn.session_id,
+                        'start_time': ssn.start_time,
+                        'strategy': ssn.strategy,
+                        'timeframe': ssn.timeframe,
+                        'symbol': ssn.symbol,
+                        'initial_balance': ssn.initial_balance,
+                        'entry_price': ssn.entry_price,
+                        'qty': ssn.qty}
+            path = '/app/runtime/continuous_sessions.json'
+            tmp = path + '.tmp'
+            with open(tmp, 'w') as f:
+                _j.dump(data, f)
+            _o.replace(tmp, path)
+        except Exception:
+            pass
+
     async def _execute_opportunity(self, opportunity: Dict[str, Any]) -> None:
         """Execute trading opportunity"""
         try:
@@ -634,6 +664,7 @@ class UltraContinuousTradingOrchestrator:
                     del self.active_sessions[session_id]
                     return
 
+            self._persist_sessions()
             self.logger.info(
                 f"🎯 Opened Position: {opportunity['symbol']} "
                 f"{opportunity['timeframe']} {opportunity['strategy']} "
@@ -720,6 +751,7 @@ class UltraContinuousTradingOrchestrator:
             # Move to completed sessions
             self.completed_sessions.append(session)
             del self.active_sessions[session_id]
+            self._persist_sessions()
 
             # Capacity ledger: real closes only (executor-attached)
             if getattr(self, 'executor', None) is not None and session.entry_price > 0 and session.qty > 0:
