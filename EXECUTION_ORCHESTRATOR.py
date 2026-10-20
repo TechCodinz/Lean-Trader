@@ -94,10 +94,17 @@ class SmartRiskManager:
     """Smart risk management and validation"""
     
     def __init__(self):
-        self.max_open_positions = 10  # Princewill 2026-10-20:
-        # compounding speed is closes x expectancy - the book was
-        # using 3-4 of 7 slots; 10 gives the flow room while the
-        # per-trade Kelly sizing and the -1% stop carry the risk  # 5->7 (2026-10-20 dials): at min order size the old cap idled capital
+        self.max_open_positions = 15  # HARD CEILING only. The
+        # effective cap is INTELLIGENT (Princewill 2026-10-20:
+        # 'make it intelligent, not manual raising') - computed
+        # per decision by _dynamic_cap() from two witnesses: this
+        # engine's measured expectancy and the equity that funds
+        # the slots. It widens as the being proves itself and the
+        # balance grows; it narrows (floor 3, never zero - the
+        # being keeps learning) when the record says so.
+        self.balance_fn = None  # wired to the sizer below
+        self._cap_cache = (0.0, 8)
+        self._cap_logged = None
         self.max_daily_loss = 0.05  # 5% max daily loss
         self.max_correlated_positions = 8  # Max positions in correlated assets (optimized for small balance)
         
@@ -106,6 +113,62 @@ class SmartRiskManager:
         self.daily_trades = 0
         self.last_reset = datetime.now().date()
         
+    def _dynamic_cap(self) -> int:
+        """Effective position cap from evidence + affordability.
+        Evidence (this engine's last 40 real closes in the being
+        ledger): expectancy >= +0.05 -> 12 slots; >= +0.02 -> 10;
+        >= 0 -> 8; >= -0.02 -> 5; below -> 3. Fewer than 10 closes
+        of evidence -> 8 (room to learn). Affordability: one slot
+        per $4 of sizer balance, clamped [5, 15] - a slot the
+        wallet cannot fund is not a slot. Effective cap is the
+        LOWER of the two witnesses, floored at 3, under the hard
+        ceiling."""
+        ev_cap = 8
+        aff_cap = 15
+        exp = None
+        n = 0
+        try:
+            import json as _j
+            rows = []
+            with open('/app/runtime/being_ledger.jsonl') as f:
+                for line in f:
+                    try:
+                        r = _j.loads(line)
+                    except Exception:
+                        continue
+                    if r.get('being') == 'orchestrator' and r.get('real'):
+                        rows.append(float(r.get('pnl') or 0))
+            rows = rows[-40:]
+            n = len(rows)
+            if n >= 10:
+                exp = sum(rows) / n
+                if exp >= 0.05:
+                    ev_cap = 12
+                elif exp >= 0.02:
+                    ev_cap = 10
+                elif exp >= 0.0:
+                    ev_cap = 8
+                elif exp >= -0.02:
+                    ev_cap = 5
+                else:
+                    ev_cap = 3
+        except Exception:
+            pass
+        bal = None
+        try:
+            if self.balance_fn:
+                bal = float(self.balance_fn())
+                aff_cap = max(5, min(15, int(bal / 4.0)))
+        except Exception:
+            pass
+        cap = max(3, min(self.max_open_positions, ev_cap, aff_cap))
+        self._cap_cache = (0.0, cap)
+        if cap != self._cap_logged:
+            self._cap_logged = cap
+            logger.info(f'INTELLIGENT CAP: {cap} slots '
+                        f'(evidence n={n} exp={exp}, balance={bal})')
+        return cap
+
     def can_open_position(self, symbol: str, signal_type: str) -> tuple[bool, str]:
         """Check if we can open a new position"""
         
@@ -113,9 +176,10 @@ class SmartRiskManager:
         if self.daily_pnl < -self.max_daily_loss:
             return False, f"Daily loss limit reached: {self.daily_pnl:.2%}"
         
-        # Check max positions
-        if len(self.open_positions) >= self.max_open_positions:
-            return False, f"Max positions reached: {len(self.open_positions)}/{self.max_open_positions}"
+        # Check max positions (intelligent cap)
+        _cap = self._dynamic_cap()
+        if len(self.open_positions) >= _cap:
+            return False, f"Max positions reached: {len(self.open_positions)}/{_cap}"
         
         # Check if already in this position
         if symbol in self.open_positions:
@@ -215,6 +279,7 @@ class ExecutionOrchestrator:
         # Start conservative - will auto-update from exchange balance
         self.position_sizer = SmartPositionSizer(initial_balance=50.0)
         self.risk_manager = SmartRiskManager()
+        self.risk_manager.balance_fn = lambda: self.position_sizer.balance
         
         # 🧠 Adaptive pair selector - grows with balance!
         try:

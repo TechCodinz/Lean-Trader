@@ -201,15 +201,49 @@ class RelayExecutionArm:
                     qty = quantize(qty, float(mkt['precision']['amount'])) or qty
             except Exception:
                 pass
+            # An accepted order is NOT a fill (2026-10-20): on an
+            # illiquid testnet pair the market close returns an
+            # orderId and executes nothing - the core booked the
+            # 'close', dropped the position, the sync re-adopted
+            # it, and the phantom loss repeated every cycle. A
+            # close counts only when the exchange position
+            # actually shrinks; attempts are throttled per symbol
+            # so an unfillable pair retries calmly, not per cycle.
+            _now = time.time()
+            _last = getattr(self, '_close_attempts', {}).get(raw, 0)
+            if _now - _last < 120:
+                return False
+            if not hasattr(self, '_close_attempts'):
+                self._close_attempts = {}
+            self._close_attempts[raw] = _now
+
+            def _pos_size():
+                for pp in tn.positions():
+                    if (pp.get('symbol') or '') == raw:
+                        return abs(float(pp.get('size') or 0))
+                return 0.0
+
+            before = _pos_size()
+            res = None
             for _ in range(3):
                 if side == 'buy':
                     res = tn.create_market_sell_reduce(raw, qty_str(qty))
                 else:
                     res = tn.create_market_buy_reduce(raw, qty_str(qty))
                 if isinstance(res, dict) and res.get('orderId'):
-                    logger.info(f'⚡ REAL CLOSE {raw} qty {qty}')
+                    break
+            if not (isinstance(res, dict) and res.get('orderId')):
+                logger.error(f'arm close failed {raw}: {res}')
+                return False
+            for _ in range(3):
+                time.sleep(2)
+                if _pos_size() < before * 0.99:
+                    logger.info(f'⚡ REAL CLOSE {raw} qty {qty} '
+                                f'(fill verified)')
                     return True
-            logger.error(f'arm close failed {raw}: {res}')
+            logger.warning(f'arm close {raw}: order accepted but '
+                           f'position unchanged (unfilled - likely '
+                           f'no testnet liquidity); not booking')
             return False
         except Exception as e:
             logger.error(f'arm close {symbol}: {e}')
@@ -217,12 +251,39 @@ class RelayExecutionArm:
 
 
 class PriceAdapter:
-    """orchestrator.router: async fetch_ticker over the hub client."""
+    """orchestrator.router: async fetch_ticker over the hub client.
 
-    def __init__(self, hub):
+    PRICE TRUTH (2026-10-20): positions live on TESTNET but the hub
+    serves MAINNET tickers - for most pairs the marks agree, but
+    illiquid testnet pairs drift hard (KAS testnet mark 0.0351 vs
+    mainnet 0.0375: +6.8%). Monitoring a testnet position against a
+    mainnet price fired phantom stops. So: when the symbol has an
+    open exchange position, its own markPrice (the exchange's
+    testnet truth) wins; the hub price serves entry sizing only."""
+
+    def __init__(self, hub, arm=None):
         self.hub = hub
+        self.arm = arm
+        self._marks = {}
+        self._marks_ts = 0.0
 
     async def fetch_ticker(self, symbol):
+        raw = symbol.split('/')[0] + 'USDT'
+        try:
+            if self.arm is not None:
+                import time as _t
+                if _t.time() - self._marks_ts > 10:
+                    tn = self.arm._client()
+                    self._marks = {
+                        (pp.get('symbol') or ''):
+                        float(pp.get('markPrice') or 0)
+                        for pp in tn.positions()}
+                    self._marks_ts = _t.time()
+                mp = self._marks.get(raw)
+                if mp:
+                    return {'last': mp}
+        except Exception:
+            pass
         try:
             t = self.hub.ex.fetch_ticker(symbol + ':USDT')
             return {'last': float(t['last'])}
@@ -592,7 +653,7 @@ async def main():
     orchestrator = ExecutionOrchestrator(
         data_hub=bus_hub, trading_engines={'real_profit': arm},
         risk_engine=None, ledger=[], mode='testnet')
-    orchestrator.router = PriceAdapter(hub)
+    orchestrator.router = PriceAdapter(hub, arm)
     # The 0.80 default was calibrated for brain decisions; the alpha
     # ensemble's calibrated probabilities live lower (its own buy
     # line is 0.58). Kelly sizing + the risk manager carry the risk
