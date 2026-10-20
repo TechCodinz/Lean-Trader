@@ -221,8 +221,10 @@ def _allocator_select(stats, free):
                 Sigma[i, i] = med
         if free <= 0:
             budget = len(BEINGS)
+        elif free < 2:
+            budget = 2
         elif free < 8:
-            budget = 1
+            budget = 3
         elif free < 25:
             budget = 4
         else:

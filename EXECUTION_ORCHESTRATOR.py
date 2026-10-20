@@ -66,7 +66,8 @@ class SmartPositionSizer:
         # AGGRESSIVE MODE: SMART auto-adjustment for any balance size
         if self.aggressive_mode and confidence >= 0.85:
             # Scale boost based on balance (small balance = small boost, large balance = large boost)
-            balance_scale = min(self.balance / 1000.0, 1.0)  # Max 1.0x at $1000+ balance
+            # Curve recalibrated to the Foundation phase (2026-10-20, Princewill's dials): full boost at the $150 phase target, not $1000 - at $35 the old curve gave a 1.01x boost, i.e. the aggression was switched off for the exact balance range the system is climbing through.
+            balance_scale = min(self.balance / 150.0, 1.0)  # Max 1.0x at $150+ balance
             confidence_boost = 1.0 + ((confidence - 0.85) * 2.0 * balance_scale)  # Scaled by balance
             position_size *= confidence_boost
             logger.info(f"🚀 Smart aggressive sizing: {confidence:.1%} conf × ${self.balance:.0f} balance → {confidence_boost:.2f}x boost")
@@ -77,8 +78,8 @@ class SmartPositionSizer:
         position_size = max(position_size, self.min_position_usd)
         
         # Balance-aware: As balance grows, increase position sizes proportionally
-        if self.balance > 1000:
-            growth_multiplier = (self.balance / 1000) ** 0.5  # Square root scaling
+        if self.balance > 150:
+            growth_multiplier = (self.balance / 150) ** 0.5  # Square root scaling
             position_size *= growth_multiplier
             logger.debug(f"💰 Balance-aware sizing: ${self.balance:.0f} → {growth_multiplier:.2f}x multiplier")
         
@@ -93,7 +94,7 @@ class SmartRiskManager:
     """Smart risk management and validation"""
     
     def __init__(self):
-        self.max_open_positions = 5
+        self.max_open_positions = 7  # 5->7 (2026-10-20 dials): at min order size the old cap idled capital
         self.max_daily_loss = 0.05  # 5% max daily loss
         self.max_correlated_positions = 8  # Max positions in correlated assets (optimized for small balance)
         
