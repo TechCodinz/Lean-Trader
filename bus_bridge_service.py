@@ -117,6 +117,61 @@ def main():
                 except Exception as e:
                     logger.warning(f'learner feed {sym}: {e}')
                 if r.get('real'):
+                    # PAIR STUDY (Princewill's design, 2026-10-20):
+                    # EVERY pair is under continuous study, so a
+                    # trade goes in on studied ground. Every real
+                    # close updates the pair's measured record (wins
+                    # AND losses: trades, win rate, expectancy); a
+                    # loss additionally writes its full context to
+                    # the loss log - the system reads WHY the pair
+                    # lost, the swarm deploys on its pattern, and
+                    # nothing is ever gated.
+                    try:
+                        import time as _t
+                        base = sym.replace(':USDT', '')
+                        sp = '/app/runtime/pair_study.json'
+                        try:
+                            with open(sp) as f:
+                                study = json.load(f)
+                        except Exception:
+                            study = {}
+                        e = study.setdefault(base, {
+                            'losses': 0, 'total_lost': 0.0, 'trades': 0,
+                            'wins': 0, 'total_pnl': 0.0,
+                            'beings': {}, 'strategies': {},
+                            'first_seen_ts': _t.time()})
+                        e['trades'] = e.get('trades', 0) + 1
+                        e['total_pnl'] = round(e.get('total_pnl', 0.0) + pnl, 4)
+                        if pnl > 0:
+                            e['wins'] = e.get('wins', 0) + 1
+                        e['win_rate'] = round(e['wins'] / max(1, e['trades']), 3)
+                        e['expectancy'] = round(e['total_pnl'] / max(1, e['trades']), 4)
+                        e['last_close_ts'] = _t.time()
+                        if pnl < 0:
+                            rec = {'ts': _t.time(), 'symbol': base,
+                                   'being': r.get('being'), 'pnl': pnl,
+                                   'meta': meta}
+                            with open('/app/runtime/pair_losses.jsonl', 'a') as f:
+                                f.write(json.dumps(rec) + '\n')
+                            e['losses'] += 1
+                            e['total_lost'] = round(e['total_lost'] + pnl, 4)
+                            e['last_loss_ts'] = _t.time()
+                            e['last_context'] = {'being': r.get('being'),
+                                                 'pnl': pnl, 'meta': meta}
+                            bkey = str(r.get('being'))
+                            e['beings'][bkey] = e['beings'].get(bkey, 0) + 1
+                            skey = str(strat)
+                            e['strategies'][skey] = e['strategies'].get(skey, 0) + 1
+                            logger.info(f'LOSS STUDY: {base} loss #{e["losses"]} '
+                                        f'({pnl:+.4f} by {r.get("being")}) - '
+                                        f'pair under study, total {e["total_lost"]:+.4f}')
+                        tmp = sp + '.tmp'
+                        with open(tmp, 'w') as f:
+                            json.dump(study, f, indent=1)
+                        os.replace(tmp, sp)
+                    except Exception as e:
+                        logger.warning(f'pair study {sym}: {e}')
+                if r.get('real'):
                     try:
                         brain.learn_from_trade({
                             'strategy': strat,
@@ -142,6 +197,52 @@ def main():
                                'approved': approved}, f, indent=1)
             except Exception as e:
                 logger.warning(f'capacity persist: {e}')
+            # STUDY SEEDING (Princewill): every NEW pair the
+            # system discovers enters study on sight - before any
+            # trade - so the analysis is already vast when capital
+            # arrives. Watching entries carry no record yet, only
+            # presence; closes build their measured record.
+            try:
+                sp = '/app/runtime/pair_study.json'
+                try:
+                    with open(sp) as f:
+                        study = json.load(f)
+                except Exception:
+                    study = {}
+                added = 0
+                for path in ('/tmp/discovered_pairs.json',
+                             '/tmp/trending_pairs.json'):
+                    try:
+                        with open(path) as f:
+                            data = json.load(f)
+                        items = data.get('pairs', data) if isinstance(data, dict) else data
+                        for x in items or []:
+                            v = x.get('symbol') if isinstance(x, dict) else x
+                            if not v:
+                                continue
+                            base = str(v).replace(':USDT', '')
+                            if '/' not in base:
+                                base = base + '/USDT'
+                            if base not in study:
+                                study[base] = {
+                                    'losses': 0, 'total_lost': 0.0,
+                                    'trades': 0, 'wins': 0, 'total_pnl': 0.0,
+                                    'win_rate': 0.0, 'expectancy': 0.0,
+                                    'beings': {}, 'strategies': {},
+                                    'first_seen_ts': time.time(),
+                                    'watching': True}
+                                added += 1
+                    except Exception:
+                        pass
+                if added:
+                    tmp = sp + '.tmp'
+                    with open(tmp, 'w') as f:
+                        json.dump(study, f, indent=1)
+                    os.replace(tmp, sp)
+                    logger.info(f'STUDY SEED: {added} new pair(s) entered study '
+                                f'({len(study)} pairs under study)')
+            except Exception as e:
+                logger.warning(f'study seed: {e}')
             summary_tick += 1
             if summary_tick >= 20:
                 summary_tick = 0

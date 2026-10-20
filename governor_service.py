@@ -265,7 +265,6 @@ def compute(tn):
     else:
         weights = {b: 0.05 + 0.85 * adj[b] / total for b in BEINGS}
 
-    halted, guard_reasons, guard_info = _guard_evaluate(tn)
     selected, _mu = _allocator_select(stats, free)
 
     modes = {}
@@ -296,13 +295,6 @@ def compute(tn):
         for b in BEINGS:
             if b != top:
                 modes[b] = 'paper'
-    if halted:
-        # The 2025 gates override everything: entries halt fleet-
-        # wide; exits keep running inside each being (paper mode
-        # blocks opens only). Reasons ride in allocation.json.
-        for b in BEINGS:
-            modes[b] = 'paper'
-        logger.warning(f'GUARD HALT: {guard_reasons}')
 
     beings = {
         'zoo': {
@@ -337,7 +329,6 @@ def compute(tn):
                    for b in BEINGS},
         'weights': {b: round(weights[b], 3) for b in BEINGS},
         'stats': {b: stats.get(b) for b in BEINGS},
-        'guard': {'halted': halted, 'reasons': guard_reasons, **guard_info},
         'allocator': {'selected': sorted(selected) if selected is not None
                       else None,
                       'mu': {b: round(_mu[b], 5) for b in BEINGS}},

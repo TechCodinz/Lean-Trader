@@ -242,9 +242,64 @@ async def main():
     logger.info('SWARM SERVICE: consciousness live with real execution (relay)')
     tg(f'SWARM LIVE - {swarm.agent_count} agents on {len(swarm.symbols)} pairs (wallet ${free:.2f})')
 
+    async def _study_watch():
+        # LOSS STUDY deployment (Princewill's design, 2026-10-20):
+        # when a pair loses, deploy MORE swarm to study its whole
+        # pattern. Studied pairs (loss within 24h) join the swarm's
+        # rotation so its agents analyze them continuously - the
+        # pair is understood, never gated.
+        import json as _j
+        import time as _t
+        announced = set()
+        while True:
+            try:
+                with open('/app/runtime/pair_study.json') as f:
+                    study = _j.load(f)
+                now = _t.time()
+                hot = [(sym, e) for sym, e in study.items()
+                       if now - float(e.get('last_loss_ts', 0)) < 86400]
+                hot.sort(key=lambda kv: kv[1].get('total_lost', 0))
+                added = 0
+                for sym, e in hot[:6]:
+                    if sym not in swarm.symbols and added < 6:
+                        swarm.symbols.append(sym)
+                        added += 1
+                    if sym not in announced:
+                        announced.add(sym)
+                        logger.info(
+                            f'STUDY DEPLOY: swarm studying {sym} - '
+                            f'{e.get("losses")} loss(es), '
+                            f'{e.get("total_lost"):+.4f} total, '
+                            f'last by {e.get("last_context", {}).get("being")}')
+                        tg(f'🔬 SWARM STUDYING {sym}: {e.get("losses")} loss(es), '
+                           f'{e.get("total_lost"):+.2f} - agents deployed on its pattern')
+                # NEW pairs study too (Princewill): the freshest
+                # discoveries join the rotation continuously, so
+                # their patterns are understood BEFORE capital
+                # commits - vast analysis up front is what makes
+                # each trade high-probability.
+                fresh = [(sym, e) for sym, e in study.items()
+                         if e.get('watching') and not e.get('trades')]
+                fresh.sort(key=lambda kv: -float(kv[1].get('first_seen_ts', 0)))
+                added = 0
+                for sym, e in fresh[:6]:
+                    if sym not in swarm.symbols and added < 6:
+                        swarm.symbols.append(sym)
+                        added += 1
+                        if sym not in announced:
+                            announced.add(sym)
+                            logger.info(f'STUDY DEPLOY: swarm studying NEW pair {sym} '
+                                        f'(entered study on discovery)')
+            except FileNotFoundError:
+                pass
+            except Exception as e:
+                logger.warning(f'study watch: {e}')
+            await asyncio.sleep(120)
+
     await asyncio.gather(
         swarm.start_swarm_consciousness(),
         swarm.executor.sweep(),
+        _study_watch(),
     )
 
 
