@@ -456,9 +456,20 @@ def reconcile_from_exchange():
     try:
         if not tn:
             return
+        # The compounding engine owns its positions: the zoo must
+        # not adopt (and exit) them - it did exactly that to all
+        # five orchestrator positions on 2026-10-20.
+        _orch_owned = set()
+        try:
+            import json as _oj
+            _orch_owned = set(_oj.load(open('/app/runtime/orchestrator_positions.json')).keys())
+        except Exception:
+            pass
         live = {}
         for _p in tn.positions():
             if float(_p.get('positionValue') or 0) >= 1.0:
+                if (_p.get('symbol') or '') in _orch_owned:
+                    continue
                 _base = (_p.get('symbol') or '')[:-4]
                 live[_base + '/USDT:USDT'] = _p
         _EXCH_REAL_N = len(live)

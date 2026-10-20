@@ -121,6 +121,23 @@ class RelayExecutionArm:
             if isinstance(res, dict) and res.get('orderId'):
                 logger.info(f'⚡ REAL BUY {raw} qty {qty} @ {price}')
                 tg(f'⚡ Orchestrator BUY {raw} qty {qty} @ {price}')
+                # Claim ownership: the zoo's reconcile must not adopt
+                # (and exit) the compounding engine's positions -
+                # on 2026-10-20 it exited all five of them under zoo
+                # rules and left this book clogged with ghosts.
+                try:
+                    import json as _jj
+                    _own = {}
+                    try:
+                        _own = _jj.load(open('/app/runtime/orchestrator_positions.json'))
+                    except Exception:
+                        pass
+                    _own[raw] = {'qty': qty, 'entry': float(price),
+                                 'ts': time.time()}
+                    with open('/app/runtime/orchestrator_positions.json', 'w') as _f:
+                        _jj.dump(_own, _f)
+                except Exception:
+                    pass
                 return {'symbol': symbol, 'side': 'buy', 'amount': qty,
                         'price': price, 'orderId': res['orderId'],
                         'simulated': False}
@@ -137,6 +154,16 @@ class RelayExecutionArm:
     def close_position(self, symbol, size, side):
         if side != 'buy':
             return True  # nothing real was opened for shorts
+        _raw_cp = symbol.split('/')[0] + 'USDT'
+        try:
+            import json as _jj
+            _own = _jj.load(open('/app/runtime/orchestrator_positions.json'))
+            if _raw_cp in _own:
+                _own.pop(_raw_cp, None)
+                with open('/app/runtime/orchestrator_positions.json', 'w') as _f:
+                    _jj.dump(_own, _f)
+        except Exception:
+            pass
         raw = symbol.split('/')[0] + 'USDT'
         try:
             from testnet_client import qty_str, quantize
