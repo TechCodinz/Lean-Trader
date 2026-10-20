@@ -276,22 +276,29 @@ class UltraContinuousTradingOrchestrator:
             return cache[1]
         top = 8 if timeframe in ('M1', 'M5') else (
             10 if timeframe in ('M15', 'M30') else 12)
+        def _extract(data):
+            out = []
+            items = data.get('pairs', data) if isinstance(data, dict) else data
+            for x in items or []:
+                if isinstance(x, dict) and x.get('symbol'):
+                    out.append(x['symbol'])
+                elif isinstance(x, str):
+                    # discovery stores perp form 'ABC/USDT:USDT'
+                    v = x.replace(':USDT', '')
+                    out.append(v if '/' in v else v + '/USDT')
+            return out
         syms = []
         try:
             import json as _j
             with open('/tmp/discovered_pairs.json') as f:
-                data = _j.load(f)
-            syms = [x['symbol'] for x in data
-                    if isinstance(x, dict) and x.get('symbol')]
+                syms = _extract(_j.load(f))
         except Exception:
             syms = []
         if len(syms) < 4:
             try:
                 import json as _j
                 with open('/tmp/trending_pairs.json') as f:
-                    data = _j.load(f)
-                syms = [x['symbol'] for x in data
-                        if isinstance(x, dict) and x.get('symbol')]
+                    syms = _extract(_j.load(f))
             except Exception:
                 pass
         if not syms:
