@@ -339,6 +339,55 @@ class MomentumThrust(BaseStrategy):
                     "features": {}}
 
 # ----------------- Regime / Session filters -----------------
+class VolumeProfile(BaseStrategy):
+    """Transplant (2026-10-20): critical_features_addon's
+    VolumeProfileAnalyzer as an ensemble voter. Where price sits
+    against the volume profile's value area carries information
+    the price-only strategies cannot see: above the value-area
+    high, buyers have accepted higher prices (continuation lean);
+    below the value-area low, acceptance sits lower (bearish
+    lean); inside the area, price is near fair value - a mild
+    pull toward the point of control. Distance is normalized by
+    the value area's width and capped."""
+    name = "volume_profile"
+    _analyzer = None
+
+    def compute(self, df: pd.DataFrame, **kw):
+        try:
+            if len(df) < 100:
+                return {"score": 0.0, "reasons": ["vp: short df"],
+                        "features": {}}
+            if VolumeProfile._analyzer is None:
+                from critical_features_addon import VolumeProfileAnalyzer
+                VolumeProfile._analyzer = VolumeProfileAnalyzer()
+            view = df.tail(110).copy()
+            if 'volume' not in view.columns and 'vol' in view.columns:
+                view['volume'] = view['vol']
+            res = VolumeProfile._analyzer.analyze(view)
+            if not res:
+                return {"score": 0.0, "reasons": ["vp: no profile"],
+                        "features": {}}
+            close = float(view['close'].iloc[-1])
+            vah = float(res['value_area_high'])
+            val = float(res['value_area_low'])
+            poc = float(res['poc'])
+            width = max(vah - val, close * 0.0005)
+            if close > vah:
+                score = min(1.0, (close - vah) / width)
+                why = f"vp: above value area (POC {poc:.4g})"
+            elif close < val:
+                score = -min(1.0, (val - close) / width)
+                why = f"vp: below value area (POC {poc:.4g})"
+            else:
+                score = max(-0.4, min(0.4, (poc - close) / width * 0.5))
+                why = f"vp: inside value area, POC pull (POC {poc:.4g})"
+            return {"score": float(score), "reasons": [why],
+                    "features": {"poc": poc, "vah": vah, "val": val}}
+        except Exception as e:
+            return {"score": 0.0, "reasons": [f"vp: {e}"],
+                    "features": {}}
+
+
 class FractalRegime(BaseStrategy):
     """Excavated 2025 logic (DIVINE_INTELLIGENCE_FEATURES'
     FractalDimensionAnalyzer, wired 2026-10-20): a regime voter.
@@ -462,6 +511,7 @@ class AlphaRouter:
             VolumeSpike(),
             MomentumThrust(),
             FractalRegime(),
+            VolumeProfile(),
             VolRegime(),
             SessionBias(),
         ]

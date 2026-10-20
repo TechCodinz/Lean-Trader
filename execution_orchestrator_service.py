@@ -352,6 +352,27 @@ async def alpha_loop(orchestrator, hub, bus_hub):
                         pairs.append(p)
             except Exception:
                 pass
+            # LEARNED session winners (wired 2026-10-20): the
+            # session performance tracker - fed by every zoo close
+            # and persisted in runtime/session_perf.json - names
+            # the markets that have actually won in this session;
+            # they join the hunt beside the static session lists.
+            # Fresh tracker per cycle (the learning is never
+            # stale); the tracker's own evidence thresholds apply
+            # (>=10 trades, >=60% win rate) - until a market earns
+            # them, this adds nothing, by design.
+            try:
+                from session_intelligence import (SessionPerformanceTracker,
+                                                  MarketSession)
+                _trk = SessionPerformanceTracker()
+                for _sym, _sc in _trk.get_optimal_markets(
+                        MarketSession.get_current_session()):
+                    _s = _sym.replace(':USDT', '')
+                    if _s not in pairs:
+                        pairs.append(_s)
+                        logger.info(f'session tracker: learned winner {_s} joins the hunt')
+            except Exception:
+                pass
             session_now = sessions.get_current_session()
             frames = [('15m', 40 * 3600, 160), ('1h', 130 * 3600, 120)]
             # Parallel market reads (speed fix, 2026-10-20): the
