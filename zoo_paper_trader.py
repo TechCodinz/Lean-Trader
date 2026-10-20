@@ -724,9 +724,11 @@ while True:
             for _psym, _ppos in list(positions.items()):
                 if _psym not in partial.positions:
                     partial.add_position(_psym, _ppos['entry'], _ppos['qty'])
-                _ptp = profit_taker.open_positions.get(_psym) if profit_taker else None
-                if _ptp and _ptp.get('strategy_type', _ptp.get('strategy', '')) != 'micro_scalp':
-                    _ptp['profit_target'] = 0.035
+                # Designed targets stand (micro 0.5% / normal 1.0%):
+                # a restoration-era override forced 3.5% here, which
+                # the shadow trial proved costs ~$10/era vs the
+                # fleet taker's own profile (+$6.07 vs -$4.02 on the
+                # same positions, 2026-10-20). Removed on evidence.
                 _ptk = tickers.get(_psym)
                 if not _ptk or not _ptk.get('last'):
                     continue

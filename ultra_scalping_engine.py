@@ -509,6 +509,12 @@ class UltraScalpingEngine:
     # executors: live-ticker sizing, conflict guard, margin backoff,
     # allocation-governed slice/cap, ledger-recorded closes.
     def _real_open(self, signal) -> None:
+        # Evidence demotion (2026-10-20): M30 scalps ran 74 paper
+        # closes at -$0.048 avg / 31% WR while M15 (+$0.029, 64%)
+        # and M5 (+$0.006, 63%) earned. M30 keeps learning on paper;
+        # it does not open real positions until its record turns.
+        if getattr(signal, 'timeframe', None) == 'M30':
+            return
         import time as _t
         if signal.target_price <= signal.entry_price:
             return  # long-only v1: short signals stay simulated
