@@ -1,58 +1,73 @@
 #!/usr/bin/env python3
 """
-SCANNER SERVICE - the multi-platform scanner as its own being.
+LeanTrader Dynamic Market Scanner Service (2025 microservice).
 
-UltraMultiPlatformScanner (ultra_multi_platform_scanner.py) sweeps CEX,
-DEX and DeFi venues for PlatformOpportunities. Its own file's main() uses
-a stale UltraCore(mode='paper', ...) constructor, so this service builds
-the core the live way (router/universe) and hands it to the scanner's own
-integrate helper. Discovery-only for now: it places no orders; its
-opportunities are logged for the other beings (and a later engine_hot
-bridge) to act on.
+Continuously scans exchanges for trending pairs, high-volume opportunities.
+Publishes signals for the adaptive pair selector.
+
+2025 original: DYNAMIC_MARKET_SCANNER.py (2025-10-16)
 """
+
 import asyncio
 import logging
-import os
-import urllib.request
-import json as _json
+import sys
 
-logging.basicConfig(level=logging.INFO,
-                    format='%(asctime)s - %(name)s - %(message)s')
-logger = logging.getLogger('SCANNER')
+sys.path.insert(0, '/app')
 
-from router import ExchangeRouter
-from universe import Universe
-from ultra_core import UltraCore
-from risk_engine import RiskEngine
+from DYNAMIC_MARKET_SCANNER import DynamicMarketScanner
+from REAL_PROFIT_BOT import REAL_PROFIT_BOT
 
-
-def tg(msg):
-    tok = os.environ.get('TELEGRAM_BOT_TOKEN')
-    cid = os.environ.get('TELEGRAM_CHAT_ID')
-    if not tok or not cid:
-        return
-    try:
-        data = _json.dumps({'chat_id': cid, 'text': msg}).encode()
-        req = urllib.request.Request(
-            f'https://api.telegram.org/bot{tok}/sendMessage',
-            data=data, headers={'Content-Type': 'application/json'})
-        urllib.request.urlopen(req, timeout=10).read()
-    except Exception:
-        pass
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger('SCANNER_SERVICE')
 
 
 async def main():
-    router = ExchangeRouter()
-    universe = Universe(router)
-    core = UltraCore(router, universe)
-    risk = RiskEngine()
+    logger.info("🔍 Starting Dynamic Market Scanner Service (2025 microservice)")
+    
+    # REPAIRED 2026-10-20: the old build scanned through the profit
+    # bot's dead Gate/testnet client - every scan errored (invalid
+    # keys) and the fleet was fed an empty universe: 0 active, 0
+    # trending. Tickers are PUBLIC: no keys needed. And the class
+    # loop never called publish - it scanned and told no one.
+    import ccxt.async_support as ccxt_async
+    pub = ccxt_async.bybit({'enableRateLimit': True})
+    exchanges = {'bybit': pub}
+    from data_hub import MarketDataHub
+    hub = MarketDataHub()
+    scanner = DynamicMarketScanner(exchanges=exchanges, data_hub=hub)
+    logger.info('Scanner initialized: public Bybit feed + data hub')
 
-    from ultra_multi_platform_scanner import integrate_multi_platform_scanner
-    scanner = integrate_multi_platform_scanner(core, risk)
-    logger.info('SCANNER SERVICE: multi-platform scanner live (discovery-only)')
-    tg('SCANNER LIVE - sweeping CEX/DEX/DeFi for opportunities')
-    await scanner.start_multi_platform_scanning()
+    import json as _json
+    while True:
+        try:
+            await scanner.scan_all_exchanges()
+            scanner.scan_count += 1
+            from datetime import datetime as _dt
+            scanner.last_scan = _dt.now()
+            logger.info(f'Scan #{scanner.scan_count} complete - '
+                        f'active {len(scanner.active_pairs)}, '
+                        f'trending {len(scanner.trending_pairs)}')
+            try:
+                await scanner.publish_trending_signals()
+            except Exception as e:
+                logger.warning(f'trending publish: {e}')
+            try:
+                tops = scanner.get_trending_opportunities(limit=20)
+                with open('/tmp/trending_pairs.json', 'w') as f:
+                    _json.dump({'pairs': [t['symbol'] for t in tops],
+                                'changes': {t['symbol']:
+                                            t['price_change_pct']
+                                            for t in tops}}, f)
+            except Exception as e:
+                logger.warning(f'trending file: {e}')
+            await asyncio.sleep(scanner.rescan_interval)
+        except Exception as e:
+            logger.error(f'Dynamic scanner error: {e}')
+            await asyncio.sleep(300)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     asyncio.run(main())

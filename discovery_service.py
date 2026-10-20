@@ -28,7 +28,7 @@ logging.basicConfig(
 logger = logging.getLogger('DISCOVERY')
 
 OUTPUT_FILE = Path('/tmp/discovered_pairs.json')
-TOP_K = 12
+TOP_K = 30
 
 
 class _Ex:
@@ -54,10 +54,22 @@ class _Ex:
 def discover_pairs():
     """Run the 2025 discovery pipeline: universe -> trend selection."""
     try:
-        from EXPANDED_MARKET_UNIVERSE import FULL_MARKET_UNIVERSE
         from market_router import select_markets
-        perps = [f'{s}:USDT' if s.endswith('/USDT') else s
-                 for s in FULL_MARKET_UNIVERSE]
+        # Princewill's rule: the universe is EVERY pair the exchange
+        # offers, read live - not a frozen list (the static file held
+        # 65 pairs while the venue lists hundreds).
+        perps = []
+        try:
+            _mkts = _Ex()._ex.load_markets()
+            perps = [s for s, m in _mkts.items()
+                     if m.get('swap') and m.get('quote') == 'USDT'
+                     and m.get('active', True)]
+        except Exception as e:
+            logger.warning(f'live universe failed ({e}); static fallback')
+        if not perps:
+            from EXPANDED_MARKET_UNIVERSE import FULL_MARKET_UNIVERSE
+            perps = [f'{s}:USDT' if s.endswith('/USDT') else s
+                     for s in FULL_MARKET_UNIVERSE]
         logger.info(f'📡 Base universe: {len(perps)} pairs - scoring trends...')
         selected = select_markets(_Ex(), perps, '1h', None, {}, top_k=TOP_K)
         pairs = [r['symbol'] for r in selected]

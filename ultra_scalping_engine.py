@@ -143,13 +143,40 @@ class UltraScalpingEngine:
                 self.logger.error(f"Error in {timeframe} scalping: {e}")
                 await asyncio.sleep(5)
 
+    def _universe_symbols(self):
+        """Top pairs by 24h quote volume, refreshed every 10 min.
+        The hardcoded five survive only as an offline fallback."""
+        import time as _t
+        if (_t.time() - getattr(self, '_uni_ts', 0) < 600
+                and getattr(self, '_uni', None)):
+            return self._uni
+        syms = ['BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'ADA/USDT', 'SOL/USDT']
+        try:
+            pub = getattr(self, '_pub', None)
+            if pub is None:
+                import ccxt as _c
+                pub = _c.bybit({'enableRateLimit': True})
+                self._pub = pub
+            ticks = pub.fetch_tickers()
+            ranked = sorted(
+                (x for x in ticks if x.endswith('/USDT:USDT')),
+                key=lambda x: -(ticks[x].get('quoteVolume') or 0))
+            top = [x.replace(':USDT', '') for x in ranked[:12]]
+            if top:
+                syms = top
+        except Exception:
+            pass
+        self._uni, self._uni_ts = syms, _t.time()
+        return syms
+
     async def _scan_scalp_opportunities(self, timeframe: str) -> List[ScalpSignal]:
         """Scan for scalping opportunities in specific timeframe"""
         opportunities = []
 
         try:
-            # Get market data for all symbols
-            symbols = ['BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'ADA/USDT', 'SOL/USDT']
+            # Get market data for all symbols - the whole market is
+            # the hunting ground, ranked by live volume
+            symbols = self._universe_symbols()
 
             for symbol in symbols:
                 # Get price data

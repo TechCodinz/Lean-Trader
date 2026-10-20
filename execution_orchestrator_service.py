@@ -121,23 +121,6 @@ class RelayExecutionArm:
             if isinstance(res, dict) and res.get('orderId'):
                 logger.info(f'⚡ REAL BUY {raw} qty {qty} @ {price}')
                 tg(f'⚡ Orchestrator BUY {raw} qty {qty} @ {price}')
-                # Claim ownership: the zoo's reconcile must not adopt
-                # (and exit) the compounding engine's positions -
-                # on 2026-10-20 it exited all five of them under zoo
-                # rules and left this book clogged with ghosts.
-                try:
-                    import json as _jj
-                    _own = {}
-                    try:
-                        _own = _jj.load(open('/app/runtime/orchestrator_positions.json'))
-                    except Exception:
-                        pass
-                    _own[raw] = {'qty': qty, 'entry': float(price),
-                                 'ts': time.time()}
-                    with open('/app/runtime/orchestrator_positions.json', 'w') as _f:
-                        _jj.dump(_own, _f)
-                except Exception:
-                    pass
                 return {'symbol': symbol, 'side': 'buy', 'amount': qty,
                         'price': price, 'orderId': res['orderId'],
                         'simulated': False}
@@ -154,16 +137,6 @@ class RelayExecutionArm:
     def close_position(self, symbol, size, side):
         if side != 'buy':
             return True  # nothing real was opened for shorts
-        _raw_cp = symbol.split('/')[0] + 'USDT'
-        try:
-            import json as _jj
-            _own = _jj.load(open('/app/runtime/orchestrator_positions.json'))
-            if _raw_cp in _own:
-                _own.pop(_raw_cp, None)
-                with open('/app/runtime/orchestrator_positions.json', 'w') as _f:
-                    _jj.dump(_own, _f)
-        except Exception:
-            pass
         raw = symbol.split('/')[0] + 'USDT'
         try:
             from testnet_client import qty_str, quantize
@@ -280,10 +253,41 @@ async def alpha_loop(orchestrator, hub, bus_hub):
             pairs = list(BASE_PAIRS)
             try:
                 with open('/tmp/discovered_pairs.json') as f:
-                    for p in (json.load(f).get('pairs') or [])[:6]:
+                    for p in (json.load(f).get('pairs') or [])[:20]:
                         s = p.replace(':USDT', '')
                         if s not in pairs:
                             pairs.append(s)
+            except Exception:
+                pass
+            # FAST MOVERS LEAD: the dynamic scanner's trending pairs
+            # (big % moves on real volume) are what grows a small
+            # wallet - they enter analysis first.
+            try:
+                with open('/tmp/trending_pairs.json') as f:
+                    for p in (json.load(f).get('pairs') or [])[:10]:
+                        s = p.replace(':USDT', '')
+                        if s not in pairs:
+                            pairs.append(s)
+            except Exception:
+                pass
+            # FULL-MARKET ROTATION (Princewill's rule): every pair
+            # the exchange offers gets analyzed - a rotating
+            # VELOCITY-ranked slice joins each cycle (fast movers
+            # first, $1M volume floor), so the whole market passes
+            # through the router over time.
+            try:
+                ticks = hub.ex.fetch_tickers()
+                ranked = sorted(
+                    (x for x in ticks if x.endswith('/USDT:USDT')
+                     and (ticks[x].get('quoteVolume') or 0) >= 1_000_000),
+                    key=lambda x: -abs(ticks[x].get('percentage') or 0))
+                rot = getattr(alpha_loop, '_rot', 0)
+                window = ranked[rot:rot + 20]
+                alpha_loop._rot = (rot + 20) % max(1, len(ranked) - 20)
+                for x in window:
+                    b = x.replace(':USDT', '')
+                    if b not in pairs:
+                        pairs.append(b)
             except Exception:
                 pass
             # Session stationing: the session's optimal pairs hunt too
@@ -299,6 +303,12 @@ async def alpha_loop(orchestrator, hub, bus_hub):
             session_now = sessions.get_current_session()
             frames = [('15m', 40 * 3600, 160), ('1h', 130 * 3600, 120)]
             for pair in pairs:
+                # Analysis only where the testnet arm can execute
+                try:
+                    if hub.market_spec(pair) is None:
+                        continue
+                except Exception:
+                    pass
                 for tf, span, limit in frames:
                     try:
                         since = int((time.time() - span) * 1000)
