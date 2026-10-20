@@ -197,6 +197,10 @@ class UltraContinuousTradingOrchestrator:
 
                 # Get trading opportunities across all timeframes
                 opportunities = await self._scan_all_opportunities()
+                self.logger.info(
+                    f'CONT SCAN: {len(opportunities)} opportunities '
+                    f'(balance ${self.daily_balance:.2f}, '
+                    f'active {len(self.active_sessions)})')
 
                 # Execute opportunities based on priority
                 for opportunity in opportunities:
@@ -258,17 +262,45 @@ class UltraContinuousTradingOrchestrator:
         return opportunities
 
     async def _get_symbols_for_timeframe(self, timeframe: str) -> List[str]:
-        """Get symbols suitable for specific timeframe"""
-        if timeframe in ['M1', 'M5']:
-            # High-frequency symbols
-            return ['BTC/USDT', 'ETH/USDT', 'BNB/USDT']
-        elif timeframe in ['M15', 'M30']:
-            # Medium-frequency symbols
-            return ['BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'ADA/USDT', 'SOL/USDT']
-        else:
-            # All symbols
-            return ['BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'ADA/USDT', 'SOL/USDT', 'POL/USDT']
-
+        """Symbols from the fleet's REAL scored universe (2026-10-20
+        fix #2: discover_symbols ranks by volume metadata that is 0
+        for most markets here, so its reverse sort degenerated into
+        reverse-ALPHABETICAL - the grower was scanning Z-tokens that
+        are not even listed on testnet, and the executor silently
+        refused every one). Primary source: discovery_service's
+        scored pairs (live exchange list, testnet-aware); secondary:
+        the scanner's trending fast movers; majors as last resort."""
+        import time as _t
+        cache = getattr(self, '_sym_cache', None)
+        if cache and _t.time() - cache[0] < 600:
+            return cache[1]
+        top = 8 if timeframe in ('M1', 'M5') else (
+            10 if timeframe in ('M15', 'M30') else 12)
+        syms = []
+        try:
+            import json as _j
+            with open('/tmp/discovered_pairs.json') as f:
+                data = _j.load(f)
+            syms = [x['symbol'] for x in data
+                    if isinstance(x, dict) and x.get('symbol')]
+        except Exception:
+            syms = []
+        if len(syms) < 4:
+            try:
+                import json as _j
+                with open('/tmp/trending_pairs.json') as f:
+                    data = _j.load(f)
+                syms = [x['symbol'] for x in data
+                        if isinstance(x, dict) and x.get('symbol')]
+            except Exception:
+                pass
+        if not syms:
+            syms = ['BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'ADA/USDT',
+                    'SOL/USDT']
+        syms = syms[:top]
+        self._sym_cache = (_t.time(), syms)
+        self.logger.info(f'CONT UNIVERSE ({timeframe}): {syms}')
+        return syms
     async def _analyze_symbol_opportunities(
         self, symbol: str, timeframe: str, market_data: Dict[str, Any], weight: float
     ) -> List[Dict[str, Any]]:

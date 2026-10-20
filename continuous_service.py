@@ -84,7 +84,10 @@ class RelayExecutor:
         sym = opportunity['symbol']                 # 'SOL/USDT' style
         perp = sym + ':USDT'
         raw = ccxt_to_raw(perp)
-        if not raw or raw in self.open_raw:
+        if not raw:
+            logger.info(f'cont skip {sym}: not testnet-tradable')
+            return False
+        if raw in self.open_raw:
             return False
         if _alloc('continuous', 'mode', 'real') != 'real':
             return False

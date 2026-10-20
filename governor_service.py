@@ -24,7 +24,7 @@ Rules:
 - A being with negative expectancy on >= 15 closes is demoted to
   paper-learning (never stopped - it keeps learning until its numbers
   recover). This is the zoo's own flow rule generalised.
-- Thin wallet (< $15 free): only the strongest being trades real.
+- Thin wallet (< $8 free): only the strongest being trades real.
 - Regime tilts are mild: ranging favours the swarm, bear trims the
   zoo and favours the swarm, bull/trend favours zoo + continuous.
 - November (inside continuous_service) remains the growth brain -
@@ -132,7 +132,7 @@ def compute(tn):
         rehabilitated = (pst.get('paper_closes', 0) >= 20
                           and pst.get('paper_expectancy', 0.0) > 0)
         modes[b] = 'paper' if (demoted and not rehabilitated) else 'real'
-    if 0 < free < 15:
+    if 0 < free < 8:
         top = max(weights, key=weights.get)
         for b in BEINGS:
             if b != top:
