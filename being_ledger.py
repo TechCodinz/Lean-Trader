@@ -60,7 +60,8 @@ def capacity_summary(window_hours=72):
     out = {}
     for r in load_closes(since):
         b = out.setdefault(r['being'], {
-            'closes': 0, 'wins': 0, 'realized_pnl': 0.0, 'paper_closes': 0})
+            'closes': 0, 'wins': 0, 'realized_pnl': 0.0, 'paper_closes': 0,
+            'paper_pnl': 0.0})
         if r.get('real'):
             b['closes'] += 1
             b['realized_pnl'] += r['pnl']
@@ -68,10 +69,13 @@ def capacity_summary(window_hours=72):
                 b['wins'] += 1
         else:
             b['paper_closes'] += 1
+            b['paper_pnl'] += r['pnl']
     for b in out.values():
         n = b['closes']
         b['win_rate'] = (b['wins'] / n) if n else 0.0
         b['expectancy'] = (b['realized_pnl'] / n) if n else 0.0
+        pn = b['paper_closes']
+        b['paper_expectancy'] = (b['paper_pnl'] / pn) if pn else 0.0
     return out
 
 

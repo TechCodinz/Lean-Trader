@@ -462,6 +462,34 @@ def reconcile_from_exchange():
                 _base = (_p.get('symbol') or '')[:-4]
                 live[_base + '/USDT:USDT'] = _p
         _EXCH_REAL_N = len(live)
+        # Prune ghosts: book-real entries the exchange no longer
+        # holds AT ALL (a 2026-10-20 BNB entry lingered after its
+        # close). Two consecutive absences required (close-lag
+        # safety). No P&L is booked here - whichever path closed
+        # the position already booked it; this is book hygiene.
+        _existing = set()
+        for _p in tn.positions():
+            if float(_p.get('size') or 0) != 0:
+                _existing.add((_p.get('symbol') or '')[:-4] + '/USDT:USDT')
+        for _bsym in [k for k, v in positions.items() if v.get('real')]:
+            if _bsym not in _existing:
+                _seen = getattr(reconcile_from_exchange, '_ghosts', None)
+                if _seen is None:
+                    _seen = reconcile_from_exchange._ghosts = {}
+                _seen[_bsym] = _seen.get(_bsym, 0) + 1
+                if _seen[_bsym] >= 2:
+                    logger.warning(f'RECONCILE pruned ghost {_bsym} (exchange holds none)')
+                    tg(f'\U0001f6e0 Zoo pruned ghost position {_bsym} - not on the exchange')
+                    del positions[_bsym]
+                    _seen.pop(_bsym, None)
+                    try:
+                        partial.positions.pop(_bsym, None)
+                    except Exception:
+                        pass
+            else:
+                _seen = getattr(reconcile_from_exchange, '_ghosts', None)
+                if _seen:
+                    _seen.pop(_bsym, None)
         for _sym, _p in live.items():
             _size = abs(float(_p.get('size') or 0))
             _avg = float(_p.get('avgPrice') or 0)

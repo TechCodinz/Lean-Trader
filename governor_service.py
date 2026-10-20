@@ -122,7 +122,16 @@ def compute(tn):
         # wide on four-tenths of a cent, 2026-10-20). Require a real
         # sample AND material negativity.
         exp = (stats.get(b) or {}).get('expectancy', 0.0)
-        modes[b] = 'paper' if (n >= 30 and exp <= -0.02) else 'real'
+        demoted = (n >= 30 and exp <= -0.02)
+        # Rehabilitation by ADVANCEMENT (Peters' no-demotion rule):
+        # a benched being keeps working on paper; if its CURRENT
+        # paper form measures profitable over a real sample, it has
+        # earned its way back - it does not serve a 72h sentence
+        # waiting for old closes to age out.
+        pst = stats.get(b) or {}
+        rehabilitated = (pst.get('paper_closes', 0) >= 20
+                          and pst.get('paper_expectancy', 0.0) > 0)
+        modes[b] = 'paper' if (demoted and not rehabilitated) else 'real'
     if 0 < free < 15:
         top = max(weights, key=weights.get)
         for b in BEINGS:
