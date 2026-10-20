@@ -509,12 +509,41 @@ class UltraScalpingEngine:
     # executors: live-ticker sizing, conflict guard, margin backoff,
     # allocation-governed slice/cap, ledger-recorded closes.
     def _real_open(self, signal) -> None:
-        # Evidence demotion (2026-10-20): M30 scalps ran 74 paper
-        # closes at -$0.048 avg / 31% WR while M15 (+$0.029, 64%)
-        # and M5 (+$0.006, 63%) earned. M30 keeps learning on paper;
-        # it does not open real positions until its record turns.
-        if getattr(signal, 'timeframe', None) == 'M30':
-            return
+        # Continuous profitability allowance (Peters' design -
+        # replaces a hard M30 gate, which froze stale evidence):
+        # NO station is demoted. Each real open is allowed only
+        # while its timeframe's RECENT measured expectancy (last 40
+        # ledger closes for that timeframe) is not clearly negative.
+        # A cold station is simply not used for this trade; it keeps
+        # analyzing and learning, and re-enters by itself when its
+        # window turns profitable again.
+        try:
+            import time as _tt
+            if _tt.time() - getattr(self, '_tf_allow_ts', 0) > 300:
+                self._tf_allow_ts = _tt.time()
+                import json as _jj
+                from collections import defaultdict as _dd
+                _acc = _dd(list)
+                with open('/app/runtime/being_ledger.jsonl') as _f:
+                    for _ln in _f:
+                        try:
+                            _r = _jj.loads(_ln)
+                        except Exception:
+                            continue
+                        if _r.get('being') == 'master':
+                            _tf = (_r.get('meta') or {}).get('tf')
+                            if _tf:
+                                _acc[_tf].append(float(_r.get('pnl') or 0))
+                self._tf_allow = {}
+                for _tf, _ps in _acc.items():
+                    _recent = _ps[-40:]
+                    self._tf_allow[_tf] = not (
+                        len(_recent) >= 25
+                        and sum(_recent) / len(_recent) < -0.005)
+            if not self._tf_allow.get(getattr(signal, 'timeframe', ''), True):
+                return
+        except Exception:
+            pass
         import time as _t
         if signal.target_price <= signal.entry_price:
             return  # long-only v1: short signals stay simulated
