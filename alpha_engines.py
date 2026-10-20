@@ -285,6 +285,59 @@ class VolumeSpike(BaseStrategy):
             "features": {"vol_z": float(z.iloc[-1])},
         }
 
+class MomentumThrust(BaseStrategy):
+    """RPB transplant (2026-10-20): the Real Profit Bot's momentum
+    brain - 24h price thrust confirmed by volume - as an ensemble
+    voter. RPB fired alone with invented profit accounting and no
+    exits; here its signal votes under the router's learned
+    reliability and the fleet's real exit machinery."""
+    name = "momentum_thrust"
+
+    def compute(self, df: pd.DataFrame, **kw):
+        try:
+            close = df["close"]
+            vol = df["vol"]
+            if len(close) < 30:
+                return {"score": 0.0, "reasons": ["thrust: short df"],
+                        "features": {}}
+            # bars spanning ~24h, inferred from the index spacing
+            k = 24
+            try:
+                idx = df.index
+                if len(idx) > 2:
+                    step_h = (idx[-1] - idx[-2]).total_seconds() / 3600.0
+                    if step_h > 0:
+                        k = max(4, min(96, int(round(24.0 / step_h))))
+            except Exception:
+                pass
+            k = min(k, len(close) - 1)
+            thrust = float(close.iloc[-1] / close.iloc[-k] - 1.0)
+            vmean = float(vol.rolling(50).mean().iloc[-1] or 0)
+            vrecent = float(vol.iloc[-3:].mean() or 0)
+            vratio = (vrecent / vmean) if vmean > 0 else 1.0
+            # RPB tiers: 1.5% stirs, 3% fires, 5%+ is a moonshot
+            mag = abs(thrust)
+            if mag < 0.015:
+                base = mag / 0.015 * 0.25
+            elif mag < 0.03:
+                base = 0.25 + (mag - 0.015) / 0.015 * 0.45
+            elif mag < 0.05:
+                base = 0.70 + (mag - 0.03) / 0.02 * 0.20
+            else:
+                base = 0.95
+            score = base if thrust > 0 else -base
+            if vratio < 0.8:  # no volume, no conviction (RPB's rule)
+                score *= 0.5
+            elif vratio > 1.5:
+                score *= 1.1
+            return {"score": _clip(score, -1, 1),
+                    "reasons": [f"Thrust {thrust * 100:+.1f}%/24h "
+                                f"volx{vratio:.1f}"],
+                    "features": {"thrust": thrust, "vratio": vratio}}
+        except Exception as e:
+            return {"score": 0.0, "reasons": [f"thrust err {e}"],
+                    "features": {}}
+
 # ----------------- Regime / Session filters -----------------
 class VolRegime(BaseStrategy):
     name = "regime"
@@ -331,6 +384,7 @@ class AlphaRouter:
             KeltnerBreakout(),
             VWAPBounce(),
             VolumeSpike(),
+            MomentumThrust(),
             VolRegime(),
             SessionBias(),
         ]
