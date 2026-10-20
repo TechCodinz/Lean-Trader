@@ -98,6 +98,23 @@ class MainnetClient:
                          {'category': 'linear', 'symbol': symbol, 'side': 'Sell',
                           'orderType': 'Market', 'qty': str(qty), 'reduceOnly': True})
 
+    # --- Spot arm (triangular organ, staged 2026-10-20) ---
+    # The relay forwards order/create params verbatim, so spot is
+    # just category='spot'. Inert until the mainnet activation
+    # rails exist (keys + kill-switch file); qty is passed at 6dp
+    # which satisfies the majors' spot lot sizes.
+    def spot_market_buy(self, symbol, qty):
+        return self._req('POST', '/v5/order/create',
+                         {'category': 'spot', 'symbol': symbol,
+                          'side': 'Buy', 'orderType': 'Market',
+                          'qty': f'{float(qty):.6f}'})
+
+    def spot_market_sell(self, symbol, qty):
+        return self._req('POST', '/v5/order/create',
+                         {'category': 'spot', 'symbol': symbol,
+                          'side': 'Sell', 'orderType': 'Market',
+                          'qty': f'{float(qty):.6f}'})
+
     def create_limit_postonly(self, symbol, side, qty, price):
         return self._req('POST', '/v5/order/create',
                          {'category': 'linear', 'symbol': symbol, 'side': side,
