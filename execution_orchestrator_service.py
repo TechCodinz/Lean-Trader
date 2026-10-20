@@ -484,7 +484,9 @@ async def exchange_sync_loop(orchestrator, arm):
             truth = {}
             for pos in tn.positions():
                 truth[pos['symbol']] = (abs(float(pos.get('size') or 0)),
-                                        float(pos.get('positionValue') or 0))
+                                        float(pos.get('positionValue') or 0),
+                                        pos.get('side') or 'Buy',
+                                        float(pos.get('avgPrice') or 0))
             rm = orchestrator.risk_manager
             for sym in list(rm.open_positions.keys()):
                 raw = ccxt_to_raw(sym)
@@ -509,6 +511,45 @@ async def exchange_sync_loop(orchestrator, arm):
                         rm.open_positions[sym]['size'] = have[0]
                         logger.info(f'EXCHANGE SYNC: {sym} size corrected '
                                     f'{cur} -> {have[0]}')
+            # Adopt orphan shorts + guarantee claims (2026-10-20):
+            # claims were originally written only on the market-
+            # buy path, so maker fills and every short went
+            # unclaimed and the zoo adopted them - and the zoo's
+            # long-only exits mismanage shorts. Now: (a) every
+            # tracked position gets its claim (re)written here;
+            # (b) an untracked Sell-side position >= $3 can only
+            # be this engine's (it is the fleet's only short
+            # source) - adopt it into the book with the exchange's
+            # own side/entry/size so the -1%/+2% exits govern it.
+            try:
+                rp = '/app/runtime/orchestrator_positions.json'
+                reg = _j.load(open(rp)) if _o.path.exists(rp) else {}
+                dirty = False
+                tracked_raw = {}
+                for s2 in list(rm.open_positions.keys()):
+                    r2 = ccxt_to_raw(s2)
+                    if r2:
+                        tracked_raw[r2] = s2
+                for raw, have in truth.items():
+                    if have[1] >= 3.0 and have[2] == 'Sell' \
+                            and raw not in tracked_raw:
+                        sym = raw[:-4] + '/USDT:USDT'
+                        rm.record_position(sym, 'sell', have[0], have[3])
+                        tracked_raw[raw] = sym
+                        logger.warning(f'EXCHANGE SYNC: adopted orphan '
+                                       f'short {sym} size {have[0]} @ {have[3]}')
+                for raw, s2 in tracked_raw.items():
+                    if raw not in reg:
+                        _pos = rm.open_positions.get(s2) or {}
+                        reg[raw] = {'qty': _pos.get('size', 0),
+                                    'entry': _pos.get('entry_price', 0),
+                                    'ts': time.time()}
+                        dirty = True
+                if dirty:
+                    with open(rp, 'w') as f:
+                        _j.dump(reg, f)
+            except Exception as e:
+                logger.warning(f'exchange sync adopt/claim: {e}')
             # Prune orphaned ownership claims: a registry symbol
             # with no exchange position and no tracked position is
             # a leftover from a dead era - left in place it makes

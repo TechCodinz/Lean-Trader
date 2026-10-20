@@ -482,6 +482,16 @@ def reconcile_from_exchange():
             if float(_p.get('positionValue') or 0) >= 1.0:
                 if (_p.get('symbol') or '') in _orch_owned:
                     continue
+                # Shorts are never the zoo's (2026-10-20): the zoo
+                # is long-only, and an adopted short inverts its
+                # exit math - a rising price reads as profit while
+                # the short bleeds (an adopted XRP short sat at
+                # -4.4% unmanaged this way). The only short-capable
+                # being is the orchestrator; leave them to it, and
+                # prune any already in the book via the usual
+                # two-absence rule.
+                if (_p.get('side') or '') == 'Sell':
+                    continue
                 _base = (_p.get('symbol') or '')[:-4]
                 live[_base + '/USDT:USDT'] = _p
         _EXCH_REAL_N = len(live)
