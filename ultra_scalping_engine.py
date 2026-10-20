@@ -450,6 +450,26 @@ class UltraScalpingEngine:
             # Store result
             self.completed_trades.append(result)
 
+            # Capacity evidence: paper closes belong in the ledger
+            # too - until now the sniper's internal results vanished
+            # and the governor had nothing to measure it by (0 rows).
+            if not getattr(signal, 'real_qty', None):
+                try:
+                    import allocation as _alloc
+                    _slice = float(_alloc.get('master').get('slice_usd', 12.0))
+                except Exception:
+                    _slice = 12.0
+                try:
+                    import being_ledger as _bl
+                    _qty = _slice / signal.entry_price if signal.entry_price else 0
+                    _bl.record_close(
+                        'master', signal.symbol, profit * _qty, real=False,
+                        meta={'strat': 'scalping_engine',
+                              'tf': signal.timeframe,
+                              'pips': round(profit_pips, 2)})
+                except Exception:
+                    pass
+
             # Update performance metrics
             self.daily_profit += profit
             self.total_profit += profit

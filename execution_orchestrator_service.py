@@ -244,7 +244,9 @@ async def alpha_loop(orchestrator, hub, bus_hub):
     zoo's reliability keys."""
     import pandas as pd
     from alpha_engines import AlphaRouter
-    logger.info('alpha loop: AlphaRouter ensemble on 1h candles -> alert queue')
+    from SESSION_AWARE_TRADING import SessionAwareTrading
+    sessions = SessionAwareTrading()
+    logger.info('alpha loop: AlphaRouter on 15m+1h, session-adjusted -> alert queue')
     while True:
         try:
             router = AlphaRouter()
@@ -257,26 +259,45 @@ async def alpha_loop(orchestrator, hub, bus_hub):
                             pairs.append(s)
             except Exception:
                 pass
-            since = int((time.time() - 130 * 3600) * 1000)
-            for pair in pairs:
-                try:
-                    rows = hub.ex.fetch_ohlcv(pair + ':USDT', '1h', since, 120)
-                    if not rows or len(rows) < 60:
+            # Session stationing: the session's optimal pairs hunt too
+            try:
+                for p in sessions.get_optimal_pairs_for_session():
+                    s = p.replace(':USDT', '')
+                    if s in BASE_PAIRS + ['EUR/USD', 'GBP/USD']:
                         continue
-                    df = pd.DataFrame(rows, columns=['ts', 'open', 'high',
-                                                     'low', 'close', 'vol'])
-                    dec = router.pick(df, pair, '1h')
-                    if dec is not None and dec.side == 'buy':
-                        logger.info(f'📡 alpha_router: {pair} BUY p={dec.prob:.2f}')
-                        await bus_hub.alert_queue.put({
-                            'signal': {'symbol': pair,
-                                       'data': {'symbol': pair,
-                                                'price': float(df['close'].iloc[-1])}},
-                            'action': 'buy',
-                            'confidence': float(dec.prob),
-                        })
-                except Exception:
-                    continue
+                    if p not in pairs and '/' in p:
+                        pairs.append(p)
+            except Exception:
+                pass
+            session_now = sessions.get_current_session()
+            frames = [('15m', 40 * 3600, 160), ('1h', 130 * 3600, 120)]
+            for pair in pairs:
+                for tf, span, limit in frames:
+                    try:
+                        since = int((time.time() - span) * 1000)
+                        rows = hub.ex.fetch_ohlcv(pair + ':USDT', tf, since, limit)
+                        if not rows or len(rows) < 60:
+                            continue
+                        df = pd.DataFrame(rows, columns=['ts', 'open', 'high',
+                                                         'low', 'close', 'vol'])
+                        dec = router.pick(df, pair, tf)
+                        if dec is not None and dec.side == 'buy':
+                            # Peters' session organ: confidence (and
+                            # through Kelly, size) scales by session
+                            sess, mult = sessions.get_session_multiplier(pair)
+                            conf = min(0.98, float(dec.prob) * mult)
+                            logger.info(f'📡 alpha_router[{tf}]: {pair} BUY '
+                                        f'p={dec.prob:.2f} session {sess} x{mult:.2f} '
+                                        f'-> conf {conf:.2f}')
+                            await bus_hub.alert_queue.put({
+                                'signal': {'symbol': pair,
+                                           'data': {'symbol': pair,
+                                                    'price': float(df['close'].iloc[-1])}},
+                                'action': 'buy',
+                                'confidence': conf,
+                            })
+                    except Exception:
+                        continue
         except Exception as e:
             logger.warning(f'alpha loop: {e}')
         await asyncio.sleep(60)
