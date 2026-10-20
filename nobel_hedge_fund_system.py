@@ -713,39 +713,99 @@ class NobelHedgeFundSystem:
         except Exception as e:
             logger.error(f"Market data collection error: {e}")
 
-    async def collect_sentiment_data(self):
-        """Collect sentiment data from various sources"""
+    def _news_sentiment(self, symbol_base=None):
+        """REAL news sentiment: VADER over the fleet news organ's
+        own harvested headlines (/app/data/news_raw.csv)."""
         try:
-            # This would integrate with sentiment APIs
-            # For now, we'll simulate sentiment data
+            import csv as _csv
+            from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+            rows = []
+            with open('/app/data/news_raw.csv', newline='',
+                      encoding='utf-8') as f:
+                rows = list(_csv.DictReader(f))
+            if not rows:
+                return 0.0
+            rows = rows[-120:]
+            if symbol_base:
+                keys = [symbol_base.upper()]
+                names = {'BTC': 'bitcoin', 'ETH': 'ethereum',
+                         'SOL': 'solana', 'BNB': 'binance',
+                         'XRP': 'ripple', 'ADA': 'cardano',
+                         'DOGE': 'dogecoin'}
+                if symbol_base.upper() in names:
+                    keys.append(names[symbol_base.upper()])
+                sel = [r for r in rows if any(
+                    k.lower() in (r.get('title') or '').lower() for k in keys)]
+                if len(sel) >= 5:
+                    rows = sel
+            sia = SentimentIntensityAnalyzer()
+            vals = [sia.polarity_scores(r.get('title') or '')['compound']
+                    for r in rows]
+            return float(sum(vals) / len(vals)) if vals else 0.0
+        except Exception:
+            return 0.0
+
+    def _fear_greed(self):
+        """REAL Fear & Greed index (alternative.me public API)."""
+        try:
+            import json as _j
+            import urllib.request as _u
+            with _u.urlopen('https://api.alternative.me/fng/?limit=1',
+                            timeout=8) as r:
+                d = _j.loads(r.read().decode())
+            return float(d['data'][0]['value'])
+        except Exception:
+            return 50.0
+
+    def _market_sentiment(self):
+        """REAL market thrust: BTC/ETH 24h change, tanh-scaled."""
+        try:
+            import ccxt as _c
+            import math as _m
+            ex = _c.bybit({'enableRateLimit': True})
+            vals = []
+            for sym in ('BTC/USDT', 'ETH/USDT'):
+                t = ex.fetch_ticker(sym)
+                vals.append(float(t.get('percentage') or 0))
+            return float(_m.tanh((sum(vals) / len(vals)) / 5.0))
+        except Exception:
+            return 0.0
+
+    async def collect_sentiment_data(self):
+        """Collect REAL sentiment (wired 2026-10-20; every value here
+        was a dice roll). Fear/greed from the public index, news
+        sentiment = VADER over the fleet's own harvested headlines,
+        market sentiment from real BTC/ETH thrust."""
+        try:
+            news_s = self._news_sentiment()
             sentiment_data = {
-                'fear_greed_index': np.random.uniform(0, 100),
-                'social_sentiment': np.random.uniform(-1, 1),
-                'news_sentiment': np.random.uniform(-1, 1),
-                'market_sentiment': np.random.uniform(-1, 1)
+                'fear_greed_index': self._fear_greed(),
+                'social_sentiment': round(news_s * 0.8, 4),
+                'news_sentiment': round(news_s, 4),
+                'market_sentiment': round(self._market_sentiment(), 4)
             }
-            
             self.data_cache['sentiment'] = sentiment_data
-            
         except Exception as e:
             logger.error(f"Sentiment data collection error: {e}")
-
     async def collect_news_data(self):
-        """Collect news data from various sources"""
+        """REAL headlines from the fleet news organ's harvest."""
         try:
-            # This would integrate with news APIs
-            # For now, we'll simulate news data
-            news_data = {
-                'crypto_news': [],
-                'market_news': [],
+            import csv as _csv
+            titles = []
+            try:
+                with open('/app/data/news_raw.csv', newline='',
+                          encoding='utf-8') as f:
+                    rows = list(_csv.DictReader(f))
+                titles = [(r.get('title') or '') for r in rows[-30:]]
+            except Exception:
+                titles = []
+            self.data_cache['news'] = {
+                'crypto_news': titles,
+                'market_news': titles,
                 'economic_news': []
             }
-            
-            self.data_cache['news'] = news_data
-            
         except Exception as e:
             logger.error(f"News data collection error: {e}")
-
     async def collect_social_data(self):
         """Collect social media data"""
         try:
@@ -1815,16 +1875,48 @@ class SentimentAnalyzer:
         self.sentiment_cache = {}
     
     async def analyze_sentiment(self, symbol: str) -> float:
-        """Analyze sentiment for a symbol"""
+        """REAL per-symbol sentiment (wired 2026-10-20; was a dice
+        roll): VADER over the fleet news organ's headlines naming
+        the asset, blended with the symbol's real 24h momentum."""
         try:
-            # This would integrate with sentiment APIs
-            # For now, return random sentiment
-            return np.random.uniform(-0.5, 0.5)
-            
+            base = symbol.split('/')[0].upper()
+            news_s = 0.0
+            try:
+                import csv as _csv
+                from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+                with open('/app/data/news_raw.csv', newline='',
+                          encoding='utf-8') as f:
+                    rows = list(_csv.DictReader(f))[-120:]
+                names = {'BTC': 'bitcoin', 'ETH': 'ethereum',
+                         'SOL': 'solana', 'BNB': 'binance',
+                         'XRP': 'ripple', 'ADA': 'cardano',
+                         'DOGE': 'dogecoin'}
+                keys = [base.lower()]
+                if base in names:
+                    keys.append(names[base])
+                sel = [r for r in rows if any(
+                    k in (r.get('title') or '').lower() for k in keys)]
+                use = sel if len(sel) >= 5 else rows
+                sia = SentimentIntensityAnalyzer()
+                vals = [sia.polarity_scores(r.get('title') or '')['compound']
+                        for r in use]
+                news_s = float(sum(vals) / len(vals)) if vals else 0.0
+            except Exception:
+                news_s = 0.0
+            mom = 0.0
+            try:
+                import ccxt as _c
+                import math as _m
+                ex = _c.bybit({'enableRateLimit': True})
+                t = ex.fetch_ticker(symbol if '/' in symbol
+                                    else f'{base}/USDT')
+                mom = float(_m.tanh(float(t.get('percentage') or 0) / 6.0))
+            except Exception:
+                pass
+            return float(0.6 * news_s + 0.4 * mom)
         except Exception as e:
             logger.error(f"Sentiment analysis error: {e}")
             return 0.0
-
 class NewsAnalyzer:
     """News analysis system"""
     

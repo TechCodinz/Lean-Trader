@@ -667,6 +667,29 @@ class SwarmConsciousness:
                 self.logger.error(f"Error in performance monitoring: {e}")
                 await asyncio.sleep(60)
 
+    async def _price_cache(self, symbol):
+        """Current real price for a symbol (60s cache), via any
+        agent's UltraCore feed."""
+        import time as _t
+        cache = getattr(self, '_px_cache', None)
+        if cache is None:
+            cache = {}
+            self._px_cache = cache
+        hit = cache.get(symbol)
+        if hit and _t.time() - hit[0] < 60:
+            return hit[1]
+        price = None
+        try:
+            if self.agents:
+                md = await self.agents[0].ultra_core.get_market_data(
+                    symbol, '5m')
+                if md and md.get('close'):
+                    price = float(md['close'])
+        except Exception:
+            price = None
+        cache[symbol] = (_t.time(), price)
+        return price
+
     async def _update_performance_metrics(self):
         """Update performance metrics for all agents"""
         current_time = time.time()
@@ -680,9 +703,26 @@ class SwarmConsciousness:
                 ]  # Last hour
 
                 if recent_trades:
-                    # Simulate performance calculation
-                    performance = np.random.normal(0.02, 0.05)  # 2% average, 5% std
-                    agent.performance_history[-1]['performance'] = performance
+                    # REAL performance (2026-10-20 - was a random
+                    # draw): signed move of the signal's symbol
+                    # since the signal fired, from live prices.
+                    try:
+                        _sig = recent_trades[-1].get('signal')
+                        _sym = getattr(_sig, 'symbol', None)
+                        _px = (getattr(_sig, 'price', None)
+                               or getattr(_sig, 'entry_price', None))
+                        _act = str(getattr(_sig, 'signal_type', '') or
+                                   getattr(_sig, 'action', '') or
+                                   getattr(_sig, 'side', '')).lower()
+                        if _sym and _px:
+                            _md = await self._price_cache(_sym)
+                            if _md:
+                                _ret = _md / float(_px) - 1.0
+                                if 'sell' in _act or 'short' in _act:
+                                    _ret = -_ret
+                                agent.performance_history[-1]['performance'] = float(_ret)
+                    except Exception:
+                        pass
 
         # Log swarm performance
         total_agents = len(self.agents)

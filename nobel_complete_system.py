@@ -212,7 +212,7 @@ class DataProvider:
                 logger.warning(f"YFinance fallback failed: {e}")
             
             # Fallback to simulated data
-            return await self.get_simulated_data(symbol, timeframe, limit)
+            return await self.get_exchange_data(symbol, timeframe, limit)
             
         except Exception as e:
             logger.error(f"Market data retrieval error: {e}")
@@ -255,40 +255,31 @@ class DataProvider:
             logger.error(f"YFinance data error: {e}")
             raise
     
-    async def get_simulated_data(self, symbol: str, timeframe: str, limit: int) -> pd.DataFrame:
-        """Generate simulated data for testing"""
-        try:
-            # Generate realistic price data
-            np.random.seed(hash(symbol) % 2**32)
-            
-            # Base price
-            base_price = 50000 if 'BTC' in symbol else 3000 if 'ETH' in symbol else 100
-            
-            # Generate price walk
-            returns = np.random.normal(0, 0.001, limit)
-            prices = [base_price]
-            
-            for ret in returns[1:]:
-                new_price = prices[-1] * (1 + ret)
-                prices.append(max(new_price, base_price * 0.5))  # Prevent negative prices
-            
-            # Generate OHLCV data
-            df = pd.DataFrame()
-            df['timestamp'] = pd.date_range(end=datetime.now(), periods=limit, freq=timeframe)
-            df['close'] = prices
-            df['open'] = [prices[0]] + prices[:-1]
-            df['high'] = df[['open', 'close']].max(axis=1) * (1 + np.random.uniform(0, 0.01, limit))
-            df['low'] = df[['open', 'close']].min(axis=1) * (1 - np.random.uniform(0, 0.01, limit))
-            df['volume'] = np.random.uniform(1000, 10000, limit)
-            df['vwap'] = (df['high'] + df['low'] + df['close']) / 3
-            df['spread'] = df['high'] - df['low']
-            
-            return df
-            
-        except Exception as e:
-            logger.error(f"Simulated data error: {e}")
-            return pd.DataFrame()
-
+    async def get_exchange_data(self, symbol: str, timeframe: str, limit: int) -> pd.DataFrame:
+        """REAL exchange fallback (2026-10-20: this was get_simulated_data,
+        a random generator used whenever Yahoo failed). Real since-bounded
+        OHLCV from public Bybit in the provider's frame shape."""
+        import time as _t
+        import ccxt as _c
+        ex = _c.bybit({'enableRateLimit': True})
+        tf = timeframe if timeframe in ('1m', '5m', '15m', '30m', '1h', '4h', '1d') else '1h'
+        tf_secs = {'1m': 60, '5m': 300, '15m': 900, '30m': 1800,
+                   '1h': 3600, '4h': 14400, '1d': 86400}[tf]
+        sym = symbol if ':USDT' in symbol or '/' not in symbol else symbol + ':USDT'
+        since = int((_t.time() - (limit + 5) * tf_secs) * 1000)
+        rows = ex.fetch_ohlcv(sym, tf, since, limit)
+        if not rows:
+            raise Exception(f'no exchange data for {symbol}')
+        df = pd.DataFrame()
+        df['timestamp'] = pd.to_datetime([r[0] for r in rows], unit='ms')
+        df['open'] = [float(r[1]) for r in rows]
+        df['high'] = [float(r[2]) for r in rows]
+        df['low'] = [float(r[3]) for r in rows]
+        df['close'] = [float(r[4]) for r in rows]
+        df['volume'] = [float(r[5]) for r in rows]
+        df['vwap'] = (df['high'] + df['low'] + df['close']) / 3
+        df['spread'] = df['high'] - df['low']
+        return df.tail(limit)
 class AIEngine:
     """Advanced AI engine with real machine learning models"""
     
@@ -411,7 +402,20 @@ class AIEngine:
         """Predict price movement using AI models"""
         try:
             if not self.is_trained:
-                return np.random.uniform(-0.5, 0.5)
+                # Untrained ensemble: fall back to a REAL technical
+                # estimate (2026-10-20 - was a dice roll): momentum
+                # + mean-reversion blend over the actual candles.
+                try:
+                    _c = market_data['close'].astype(float)
+                    if len(_c) >= 30:
+                        _mom = float(_c.iloc[-1] / _c.iloc[-20] - 1.0)
+                        _ma = float(_c.rolling(20).mean().iloc[-1])
+                        _dev = float(_c.iloc[-1] / _ma - 1.0) if _ma else 0.0
+                        return float(max(-0.5, min(0.5,
+                                       (_mom * 6.0 - _dev * 3.0) / 2.0)))
+                except Exception:
+                    pass
+                return 0.0
             
             features = self.prepare_features(market_data)
             
