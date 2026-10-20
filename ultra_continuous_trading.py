@@ -724,8 +724,16 @@ class UltraContinuousTradingOrchestrator:
                 _exit = await self.executor.close_position(session)
                 profit = (_exit - session.entry_price) * session.qty
             else:
-                import random
-                profit = random.uniform(-0.01, 0.05)
+                # No real fill prices this close (executor absent or
+                # the session never filled): book ZERO, loudly. This
+                # branch used to draw random.uniform profit into the
+                # balances feeding growth sizing - a fabrication on
+                # a money path (external audit MP-02, cross-checked
+                # 2026-10-20). Zero is the only honest number here.
+                self.logger.error(
+                    f'CONT CLOSE UNPRICED {session.symbol}: no executor '
+                    f'fill - booking 0.0 (never fabricated)')
+                profit = 0.0
 
             # Update session
             session.end_time = time.time()

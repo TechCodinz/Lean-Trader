@@ -144,6 +144,56 @@ class RelayExecutionArm:
                 tn.set_leverage(raw, 10)
             except Exception:
                 pass
+            # Maker-first entry (parity with the testnet arm,
+            # 2026-10-20 audit cross-check MP-06): post-only limit
+            # at the signal price, 15s fuse; partial >= $5 stands;
+            # dust topped up by market; unfilled -> one market
+            # fallback. The $7.50 cap above already bounded qty.
+            try:
+                lr = tn.create_limit_postonly(raw, 'Buy', qty, price)
+                oid = lr.get('orderId') if isinstance(lr, dict) else None
+                if oid:
+                    deadline = time.time() + 15
+                    filled_qty = 0.0
+                    avg = float(price)
+                    status = ''
+                    while time.time() < deadline:
+                        st = tn.order_status(raw, oid) or {}
+                        status = st.get('orderStatus') or ''
+                        try:
+                            filled_qty = float(st.get('cumExecQty') or 0)
+                            if st.get('avgPrice'):
+                                avg = float(st['avgPrice'])
+                        except Exception:
+                            pass
+                        if status in ('Filled', 'Cancelled', 'Rejected', 'Expired'):
+                            break
+                        time.sleep(1.5)
+                    if status != 'Filled':
+                        try:
+                            tn.cancel_order(raw, oid)
+                        except Exception:
+                            pass
+                        st = tn.order_status(raw, oid) or {}
+                        try:
+                            filled_qty = float(st.get('cumExecQty') or filled_qty)
+                            if st.get('avgPrice'):
+                                avg = float(st['avgPrice'])
+                        except Exception:
+                            pass
+                    if filled_qty > 0 and filled_qty * avg >= 5.0:
+                        logger.info(f'⚡ MAINNET MAKER BUY {raw} qty {filled_qty} @ {avg} (post-only)')
+                        tg(f'🟢 MAINNET MAKER BUY {raw} qty {filled_qty} @ {avg}')
+                        return {'symbol': symbol, 'side': 'buy',
+                                'amount': filled_qty, 'price': avg,
+                                'orderId': oid, 'simulated': False}
+                    if filled_qty > 0:
+                        qty = round(qty - filled_qty, 10)
+                        logger.info(f'arm: maker dust partial {filled_qty} on {raw}; market top-up {qty}')
+                    else:
+                        logger.info(f'arm: maker unfilled on {raw} - market fallback')
+            except Exception as e:
+                logger.info(f'arm: maker path failed on {raw} ({e}) - market fallback')
             res = tn.create_market_buy(raw, qty_str(qty))
             if isinstance(res, dict) and res.get('orderId'):
                 logger.info(f'⚡ REAL BUY {raw} qty {qty} @ {price}')
@@ -302,6 +352,41 @@ async def stats_loop(orchestrator, arm):
             logger.warning(f'stats: {e}')
 
 
+async def exchange_sync_loop(orchestrator, arm):
+    """Exchange-truth sync (parity with the testnet service,
+    2026-10-20): drop tracked positions the exchange no longer
+    holds (no booked close - the exit record lives wherever the
+    position actually closed), correct drifted sizes. Mainnet has
+    no shared ownership registry (separate account), so no claim
+    pruning here."""
+    from mainnet_client import ccxt_to_raw
+    await asyncio.sleep(20)
+    while True:
+        try:
+            tn = arm._client()
+            truth = {}
+            for pos in tn.positions():
+                truth[pos['symbol']] = (abs(float(pos.get('size') or 0)),
+                                        float(pos.get('positionValue') or 0))
+            rm = orchestrator.risk_manager
+            for sym in list(rm.open_positions.keys()):
+                raw = ccxt_to_raw(sym)
+                have = truth.get(raw) if raw else None
+                if not have or have[1] < 1.0:
+                    del rm.open_positions[sym]
+                    logger.warning(f'EXCHANGE SYNC: dropped phantom {sym} '
+                                   f'(no exchange position; no P&L booked)')
+                else:
+                    cur = float(rm.open_positions[sym].get('size') or 0)
+                    if cur and abs(have[0] - cur) / cur > 0.05:
+                        rm.open_positions[sym]['size'] = have[0]
+                        logger.info(f'EXCHANGE SYNC: {sym} size corrected '
+                                    f'{cur} -> {have[0]}')
+        except Exception as e:
+            logger.warning(f'exchange sync: {e}')
+        await asyncio.sleep(180)
+
+
 async def main():
     from data_hub import MarketDataHub
     from EXECUTION_ORCHESTRATOR import ExecutionOrchestrator
@@ -332,6 +417,7 @@ async def main():
         orchestrator.run_execution_loop(),
         alpha_loop(orchestrator, hub, bus_hub, arm),
         stats_loop(orchestrator, arm),
+        exchange_sync_loop(orchestrator, arm),
     )
 
 

@@ -391,6 +391,8 @@ class ExchangeRouter:
             step_s = _tf_seconds(timeframe)
             now_ms = int(time.time() * 1000)
             bars: List[List[float]] = []
+            print(f'[router] SYNTHETIC BARS served for {symbol} {timeframe} '
+                  f'(exchange malformed) - flat @ {price}, volume 0 - NOT real market data')
             for i in range(max(1, limit)):
                 ts = now_ms - (max(1, limit) - i) * step_s * 1000
                 bars.append([ts, price, price, price, price, 0.0])
@@ -520,6 +522,8 @@ class ExchangeRouter:
         for i in range(max(1, limit)):
             ts = now_ms - (max(1, limit) - i) * step_s * 1000
             bars.append([ts, price, price, price, price, 0.0])
+        print(f'[router] SYNTHETIC BARS served for {symbol} {timeframe} '
+              f'(fetch failed) - flat @ {price}, volume 0 - NOT real market data')
         return bars
 
     # ---------- simple account view ----------
