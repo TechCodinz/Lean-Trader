@@ -807,66 +807,78 @@ class MoneyFlowAnalyzer:
             'distribution_phase': self._detect_distribution(whale_movements, exchange_flows),
         }
 
+    def _ex(self):
+        """Lazy public Bybit client (real book/trades need no keys)."""
+        ex = getattr(self, '_pub_ex', None)
+        if ex is None:
+            import ccxt as _c
+            ex = _c.bybit({'enableRateLimit': True})
+            self._pub_ex = ex
+        return ex
+
+    @staticmethod
+    def _ccxt_sym(symbol):
+        if ':USDT' in symbol or '/' not in symbol:
+            return symbol
+        return symbol + ':USDT'
+
     async def _analyze_order_book(self, symbol: str) -> Dict[str, Any]:
-        """Analyze order book for smart money patterns."""
-        # Simulated order book analysis
-        # In production, connect to exchange order book data
-
-        large_orders = []
-        total_bid_volume = np.random.uniform(100000, 1000000)
-        total_ask_volume = np.random.uniform(100000, 1000000)
-
-        # Detect large orders (whales)
-        for _ in range(np.random.randint(0, 5)):
-            large_orders.append(
-                {
-                    'side': np.random.choice(['buy', 'sell']),
-                    'size': np.random.uniform(10000, 100000),
-                    'price_level': np.random.uniform(0.99, 1.01),
-                }
-            )
-
-        # Calculate imbalance
-        imbalance = (total_bid_volume - total_ask_volume) / (total_bid_volume + total_ask_volume)
-
-        # Detect walls
-        bid_wall = total_bid_volume > total_ask_volume * 1.5
-        ask_wall = total_ask_volume > total_bid_volume * 1.5
-
-        return {
-            'imbalance': float(imbalance),
-            'large_orders': large_orders,
-            'bid_wall': bid_wall,
-            'ask_wall': ask_wall,
-            'total_bid_volume': total_bid_volume,
-            'total_ask_volume': total_ask_volume,
-            'spread': np.random.uniform(0.0001, 0.001),
-        }
-
+        """REAL order book (wired 2026-10-20; this fabricated volumes
+        and whale orders for its whole life). Real depth from the
+        public Bybit book; neutral zeros on failure, never invented."""
+        try:
+            ob = self._ex().fetch_order_book(self._ccxt_sym(symbol), 50)
+            bids = ob.get('bids') or []
+            asks = ob.get('asks') or []
+            if not bids or not asks:
+                raise ValueError('empty book')
+            total_bid = float(sum(p * a for p, a in bids))
+            total_ask = float(sum(p * a for p, a in asks))
+            mid = (bids[0][0] + asks[0][0]) / 2.0
+            large = []
+            for side, levels in (('buy', bids), ('sell', asks)):
+                for px, amt in levels:
+                    usd = px * amt
+                    if usd >= 25000:
+                        large.append({'side': side, 'size': float(usd),
+                                      'price_level': float(px / mid) if mid else 1.0})
+            imb = (total_bid - total_ask) / max(1.0, total_bid + total_ask)
+            return {'imbalance': float(imb),
+                    'large_orders': large,
+                    'bid_wall': total_bid > total_ask * 1.5,
+                    'ask_wall': total_ask > total_bid * 1.5,
+                    'total_bid_volume': total_bid,
+                    'total_ask_volume': total_ask,
+                    'spread': float((asks[0][0] - bids[0][0]) / mid) if mid else 0.001}
+        except Exception:
+            return {'imbalance': 0.0, 'large_orders': [],
+                    'bid_wall': False, 'ask_wall': False,
+                    'total_bid_volume': 0.0, 'total_ask_volume': 0.0,
+                    'spread': 0.001}
     async def _track_whale_movements(self, symbol: str) -> Dict[str, Any]:
-        """Track whale wallet movements."""
-        # Simulated whale tracking
-        # In production, use blockchain APIs
-
+        """REAL large prints (wired 2026-10-20; whale movements were
+        invented). Exchange-visible proxy: recent real trades >= $50k;
+        taker buys read as accumulation, sells as distribution."""
         movements = []
-
-        # Generate some whale movements
-        n_whales = np.random.randint(0, 10)
-
-        for _ in range(n_whales):
-            movement = {
-                'type': np.random.choice(['accumulation', 'distribution', 'transfer']),
-                'amount': np.random.uniform(100000, 10000000),
-                'from': 'exchange' if np.random.rand() > 0.5 else 'wallet',
-                'to': 'wallet' if np.random.rand() > 0.5 else 'exchange',
-                'timestamp': datetime.now() - timedelta(hours=np.random.randint(0, 24)),
-            }
-            movements.append(movement)
-
-        # Analyze patterns
+        try:
+            trades = self._ex().fetch_trades(
+                self._ccxt_sym(symbol), None, 300) or []
+            for t in trades:
+                usd = float(t.get('amount') or 0) * float(t.get('price') or 0)
+                if usd >= 50000:
+                    side = t.get('side')
+                    ts = t.get('timestamp')
+                    movements.append({
+                        'type': 'accumulation' if side == 'buy' else 'distribution',
+                        'amount': usd,
+                        'from': 'exchange',
+                        'to': 'wallet' if side == 'buy' else 'exchange',
+                        'timestamp': datetime.fromtimestamp(ts / 1000.0) if ts else datetime.now(),
+                    })
+        except Exception:
+            pass
         accumulation_count = sum(1 for m in movements if m['type'] == 'accumulation')
         distribution_count = sum(1 for m in movements if m['type'] == 'distribution')
-
         return {
             'movements': movements,
             'accumulation_count': accumulation_count,
@@ -874,7 +886,6 @@ class MoneyFlowAnalyzer:
             'net_flow': accumulation_count - distribution_count,
             'whale_confidence': (accumulation_count - distribution_count) / max(1, len(movements)),
         }
-
     def _detect_institutional_patterns(self, order_book: Dict[str, Any]) -> Dict[str, Any]:
         """Detect institutional trading patterns."""
 
@@ -915,64 +926,43 @@ class MoneyFlowAnalyzer:
         }
 
     async def _analyze_exchange_flows(self, symbol: str) -> Dict[str, Any]:
-        """Analyze flows to/from exchanges."""
-        # Simulated exchange flow analysis
-
-        inflow = np.random.uniform(0, 1000000)
-        outflow = np.random.uniform(0, 1000000)
-        netflow = outflow - inflow  # Positive = accumulation (leaving exchanges)
-
-        # Historical comparison
-        historical_avg = np.random.uniform(100000, 500000)
-        flow_ratio = netflow / historical_avg if historical_avg > 0 else 0
-
+        """REAL taker flow (wired 2026-10-20; inflows/outflows were
+        invented). From the last 300 real trades: sell-side USD is
+        flow onto the exchange, buy-side USD is flow off it."""
+        inflow = outflow = 0.0
+        try:
+            trades = self._ex().fetch_trades(
+                self._ccxt_sym(symbol), None, 300) or []
+            for t in trades:
+                usd = float(t.get('amount') or 0) * float(t.get('price') or 0)
+                if t.get('side') == 'sell':
+                    inflow += usd
+                elif t.get('side') == 'buy':
+                    outflow += usd
+        except Exception:
+            pass
+        netflow = outflow - inflow
+        historical_avg = max(1.0, (inflow + outflow) / 2.0)
         return {
             'inflow': inflow,
             'outflow': outflow,
             'netflow': netflow,
-            'flow_ratio': flow_ratio,
+            'flow_ratio': netflow / historical_avg,
             'accumulation_signal': netflow > historical_avg,
             'distribution_signal': netflow < -historical_avg,
         }
-
     async def _analyze_options_flow(self, symbol: str) -> Dict[str, Any]:
-        """Analyze options flow for sentiment."""
-        # Simulated options analysis
-
-        call_volume = np.random.uniform(1000, 10000)
-        put_volume = np.random.uniform(1000, 10000)
-
-        put_call_ratio = put_volume / call_volume if call_volume > 0 else 1
-
-        # Unusual options activity
-        unusual_activity = []
-        if np.random.rand() > 0.7:
-            unusual_activity.append(
-                {
-                    'type': np.random.choice(['call_sweep', 'put_sweep']),
-                    'strike': np.random.uniform(0.9, 1.1),
-                    'volume': np.random.uniform(1000, 5000),
-                    'sentiment': 'bullish' if np.random.rand() > 0.5 else 'bearish',
-                }
-            )
-
-        # Overall sentiment
-        if put_call_ratio < 0.7:
-            sentiment = 'bullish'
-        elif put_call_ratio > 1.3:
-            sentiment = 'bearish'
-        else:
-            sentiment = 'neutral'
-
+        """No live options-flow source is wired into this system.
+        Reports a NEUTRAL absence (2026-10-20) - the old build
+        fabricated call/put volumes and sweeps."""
         return {
-            'put_call_ratio': put_call_ratio,
-            'call_volume': call_volume,
-            'put_volume': put_volume,
-            'unusual_activity': unusual_activity,
-            'sentiment': sentiment,
-            'smart_money_options': len(unusual_activity) > 0,
+            'put_call_ratio': 1.0,
+            'call_volume': 0.0,
+            'put_volume': 0.0,
+            'unusual_activity': [],
+            'sentiment': 'neutral',
+            'smart_money_options': False,
         }
-
     def _calculate_smart_money_score(
         self,
         order_book: Dict[str, Any],

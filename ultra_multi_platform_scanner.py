@@ -12,6 +12,7 @@ This system scans:
 - Other: NFT marketplaces, cross-chain bridges, derivatives
 """
 
+import numpy as np
 import asyncio
 import time
 import logging
@@ -117,75 +118,25 @@ class DEXScanner:
             return []
 
     async def _scan_platform(self, blockchain: str, platform: str) -> List[PlatformOpportunity]:
-        """Scan a specific DEX platform"""
-        opportunities = []
-
+        """No live data source is wired for this leg; it fabricated opportunities until 2026-10-20. Honest empty result."""
         try:
-            # Simulate platform scanning
-            # In real implementation, this would connect to actual DEX APIs
-
-            # Generate realistic opportunities
-            symbols = ['BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'ADA/USDT', 'SOL/USDT']
-
-            for symbol in symbols:
-                # Simulate opportunity detection
-                if np.random.random() < 0.3:  # 30% chance of opportunity
-                    opportunity = PlatformOpportunity(
-                        platform_type='dex',
-                        platform_name=platform,
-                        opportunity_type=np.random.choice(['arbitrage', 'liquidity', 'trading']),
-                        symbol=symbol,
-                        price=np.random.uniform(100, 100000),
-                        volume_24h=np.random.uniform(1000000, 100000000),
-                        liquidity=np.random.uniform(1000000, 50000000),
-                        apy=np.random.uniform(5, 50),
-                        confidence=np.random.uniform(0.6, 0.95),
-                        risk_level=np.random.choice(['low', 'medium', 'high']),
-                        timestamp=time.time(),
-                        metadata={
-                            'blockchain': blockchain,
-                            'pool_address': f"0x{hashlib.md5(f'{platform}{symbol}'.encode()).hexdigest()[:40]}",
-                            'fee_tier': np.random.choice([0.01, 0.05, 0.3, 1.0]),
-                            'tick_spacing': np.random.choice([1, 10, 60, 200]),
-                        },
-                    )
-                    opportunities.append(opportunity)
-
-            return opportunities
-
-        except Exception as e:
-            self.logger.error(f"Error scanning {platform}: {e}")
-            return []
-
+            self.logger.info(
+                "DEXScanner._scan_platform: no live data "
+                "source wired - returning none (fabrication "
+                "removed 2026-10-20)")
+        except Exception:
+            pass
+        return []
     async def scan_liquidity_pools(self, symbol: str) -> List[Dict[str, Any]]:
-        """Scan liquidity pools for a specific symbol"""
-        pools = []
-
+        """No live data source is wired for this leg; it fabricated opportunities until 2026-10-20. Honest empty result."""
         try:
-            # Simulate liquidity pool scanning
-            for blockchain, platforms in self.dex_platforms.items():
-                for platform in platforms:
-                    if np.random.random() < 0.4:  # 40% chance of finding pool
-                        pool = {
-                            'platform': platform,
-                            'blockchain': blockchain,
-                            'symbol': symbol,
-                            'liquidity': np.random.uniform(100000, 10000000),
-                            'apy': np.random.uniform(5, 100),
-                            'fee_tier': np.random.choice([0.01, 0.05, 0.3, 1.0]),
-                            'tvl': np.random.uniform(1000000, 50000000),
-                            'volume_24h': np.random.uniform(100000, 10000000),
-                            'price': np.random.uniform(100, 100000),
-                            'timestamp': time.time(),
-                        }
-                        pools.append(pool)
-
-            return pools
-
-        except Exception as e:
-            self.logger.error(f"Error scanning liquidity pools for {symbol}: {e}")
-            return []
-
+            self.logger.info(
+                "DEXScanner.scan_liquidity_pools: no live data "
+                "source wired - returning none (fabrication "
+                "removed 2026-10-20)")
+        except Exception:
+            pass
+        return []
 class CEXScanner:
     """Scanner for Centralized Exchanges"""
 
@@ -235,95 +186,98 @@ class CEXScanner:
             self.logger.error(f"Error scanning CEX opportunities: {e}")
             return []
 
+    def _cex_client(self, platform):
+        """Lazy public client per venue (real tickers need no keys)."""
+        cache = getattr(self, '_cex_clients', None)
+        if cache is None:
+            cache = {}
+            self._cex_clients = cache
+        key = str(platform).lower()
+        if key not in cache:
+            try:
+                import ccxt as _c
+                cls = getattr(_c, key, None)
+                cache[key] = cls({'enableRateLimit': True}) if cls else None
+            except Exception:
+                cache[key] = None
+        return cache[key]
+
     async def _scan_cex_platform(self, platform: str) -> List[PlatformOpportunity]:
-        """Scan a specific CEX platform"""
+        """REAL CEX scan (wired 2026-10-20; prices and volumes were
+        invented). Real public tickers; an opportunity is a real
+        >=2% 24h move on real quote volume."""
         opportunities = []
-
-        try:
-            # Simulate platform scanning
-            # In real implementation, this would connect to actual CEX APIs
-
-            symbols = ['BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'ADA/USDT', 'SOL/USDT']
-
-            for symbol in symbols:
-                # Simulate opportunity detection
-                if np.random.random() < 0.25:  # 25% chance of opportunity
-                    opportunity = PlatformOpportunity(
-                        platform_type='cex',
-                        platform_name=platform,
-                        opportunity_type=np.random.choice(
-                            ['arbitrage', 'trading', 'futures', 'options']
-                        ),
-                        symbol=symbol,
-                        price=np.random.uniform(100, 100000),
-                        volume_24h=np.random.uniform(10000000, 1000000000),
-                        liquidity=np.random.uniform(10000000, 100000000),
-                        apy=0.0,  # CEX doesn't have APY
-                        confidence=np.random.uniform(0.7, 0.95),
-                        risk_level=np.random.choice(['low', 'medium']),
-                        timestamp=time.time(),
-                        metadata={
-                            'trading_fee': np.random.uniform(0.001, 0.01),
-                            'maker_fee': np.random.uniform(0.0005, 0.005),
-                            'taker_fee': np.random.uniform(0.001, 0.01),
-                            'min_trade_size': np.random.uniform(0.001, 0.1),
-                            'max_trade_size': np.random.uniform(1000, 100000),
-                        },
-                    )
-                    opportunities.append(opportunity)
-
+        ex = self._cex_client(platform)
+        if ex is None:
             return opportunities
-
-        except Exception as e:
-            self.logger.error(f"Error scanning {platform}: {e}")
-            return []
-
+        symbols = ['BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'ADA/USDT', 'SOL/USDT']
+        for symbol in symbols:
+            try:
+                t = ex.fetch_ticker(symbol)
+            except Exception:
+                continue
+            price = float(t.get('last') or 0)
+            change = float(t.get('percentage') or 0)
+            qvol = float(t.get('quoteVolume') or 0)
+            if not price or abs(change) < 2.0 or qvol <= 0:
+                continue
+            opportunities.append(PlatformOpportunity(
+                platform_type='cex',
+                platform_name=platform,
+                opportunity_type='trading',
+                symbol=symbol,
+                price=price,
+                volume_24h=qvol,
+                liquidity=qvol,
+                apy=0.0,
+                confidence=min(0.95, 0.55 + abs(change) / 20.0),
+                risk_level='low' if abs(change) < 5 else 'medium',
+                timestamp=time.time(),
+                metadata={'change_24h_pct': change,
+                          'source': 'real public ticker'},
+            ))
+        return opportunities
     async def scan_arbitrage_opportunities(self) -> List[CrossPlatformArbitrage]:
-        """Scan for arbitrage opportunities between CEX platforms"""
-        arbitrage_opportunities = []
-
-        try:
-            # Simulate arbitrage scanning
-            symbols = ['BTC/USDT', 'ETH/USDT', 'BNB/USDT']
-
-            for symbol in symbols:
-                # Generate random prices for different platforms
-                platform_prices = {}
-                for platform in self.cex_platforms[:5]:  # Use first 5 platforms
-                    platform_prices[platform] = np.random.uniform(100, 100000)
-
-                # Find arbitrage opportunities
-                sorted_prices = sorted(platform_prices.items(), key=lambda x: x[1])
-                if len(sorted_prices) >= 2:
-                    lowest_price = sorted_prices[0]
-                    highest_price = sorted_prices[-1]
-
-                    profit_potential = highest_price[1] - lowest_price[1]
-                    profit_percentage = (profit_potential / lowest_price[1]) * 100
-
-                    if profit_percentage > 0.1:  # Only consider opportunities > 0.1%
-                        arbitrage = CrossPlatformArbitrage(
-                            symbol=symbol,
-                            buy_platform=lowest_price[0],
-                            sell_platform=highest_price[0],
-                            buy_price=lowest_price[1],
-                            sell_price=highest_price[1],
-                            profit_potential=profit_potential,
-                            profit_percentage=profit_percentage,
-                            volume_available=np.random.uniform(1000, 100000),
-                            gas_cost=np.random.uniform(5, 50),
-                            net_profit=profit_potential - np.random.uniform(5, 50),
-                            confidence=np.random.uniform(0.6, 0.9),
-                            timestamp=time.time(),
-                        )
-                        arbitrage_opportunities.append(arbitrage)
-
-            return arbitrage_opportunities
-
-        except Exception as e:
-            self.logger.error(f"Error scanning arbitrage opportunities: {e}")
-            return []
-
+        """REAL cross-venue spreads (wired 2026-10-20; platform
+        prices were invented). Public tickers across real venues."""
+        out = []
+        symbols = ['BTC/USDT', 'ETH/USDT', 'BNB/USDT']
+        for symbol in symbols:
+            prices = {}
+            vols = {}
+            for platform in self.cex_platforms[:5]:
+                ex = self._cex_client(platform)
+                if ex is None:
+                    continue
+                try:
+                    t = ex.fetch_ticker(symbol)
+                    if t.get('last'):
+                        prices[platform] = float(t['last'])
+                        vols[platform] = float(t.get('quoteVolume') or 0)
+                except Exception:
+                    continue
+            if len(prices) < 2:
+                continue
+            lo = min(prices.items(), key=lambda kv: kv[1])
+            hi = max(prices.items(), key=lambda kv: kv[1])
+            pct = (hi[1] - lo[1]) / lo[1] * 100 if lo[1] else 0
+            if pct > 0.1:
+                out.append(CrossPlatformArbitrage(
+                    symbol=symbol,
+                    buy_platform=lo[0],
+                    sell_platform=hi[0],
+                    buy_price=lo[1],
+                    sell_price=hi[1],
+                    profit_potential=hi[1] - lo[1],
+                    profit_percentage=pct,
+                    volume_available=min(vols.get(lo[0], 0),
+                                         vols.get(hi[0], 0)),
+                    gas_cost=0.0,
+                    net_profit=hi[1] - lo[1],
+                    confidence=min(0.9, 0.5 + pct),
+                    timestamp=time.time(),
+                ))
+        return out
 class DeFiScanner:
     """Scanner for DeFi protocols"""
 
@@ -368,79 +322,25 @@ class DeFiScanner:
             return []
 
     async def _scan_defi_protocol(self, category: str, protocol: str) -> List[PlatformOpportunity]:
-        """Scan a specific DeFi protocol"""
-        opportunities = []
-
+        """No live data source is wired for this leg; it fabricated opportunities until 2026-10-20. Honest empty result."""
         try:
-            # Simulate protocol scanning
-            symbols = ['BTC', 'ETH', 'USDC', 'USDT', 'DAI', 'WETH']
-
-            for symbol in symbols:
-                # Simulate opportunity detection
-                if np.random.random() < 0.2:  # 20% chance of opportunity
-                    opportunity = PlatformOpportunity(
-                        platform_type='defi',
-                        platform_name=protocol,
-                        opportunity_type=category,
-                        symbol=symbol,
-                        price=np.random.uniform(100, 100000),
-                        volume_24h=np.random.uniform(1000000, 100000000),
-                        liquidity=np.random.uniform(1000000, 100000000),
-                        apy=np.random.uniform(5, 200),
-                        confidence=np.random.uniform(0.5, 0.9),
-                        risk_level=np.random.choice(['low', 'medium', 'high']),
-                        timestamp=time.time(),
-                        metadata={
-                            'category': category,
-                            'protocol_address': f"0x{hashlib.md5(f'{protocol}{symbol}'.encode()).hexdigest()[:40]}",
-                            'tvl': np.random.uniform(1000000, 1000000000),
-                            'risk_score': np.random.uniform(0.1, 0.9),
-                            'impermanent_loss': np.random.uniform(0, 0.1),
-                        },
-                    )
-                    opportunities.append(opportunity)
-
-            return opportunities
-
-        except Exception as e:
-            self.logger.error(f"Error scanning {protocol}: {e}")
-            return []
-
+            self.logger.info(
+                "DeFiScanner._scan_defi_protocol: no live data "
+                "source wired - returning none (fabrication "
+                "removed 2026-10-20)")
+        except Exception:
+            pass
+        return []
     async def scan_yield_opportunities(self) -> List[DeFiYieldOpportunity]:
-        """Scan for yield farming opportunities"""
-        yield_opportunities = []
-
+        """No live data source is wired for this leg; it fabricated opportunities until 2026-10-20. Honest empty result."""
         try:
-            # Simulate yield farming scanning
-            protocols = ['aave', 'compound', 'yearn', 'convex', 'curve']
-            token_pairs = ['ETH/USDC', 'BTC/USDT', 'USDC/USDT', 'ETH/BTC', 'DAI/USDC']
-
-            for protocol in protocols:
-                for token_pair in token_pairs:
-                    if np.random.random() < 0.3:  # 30% chance of yield opportunity
-                        yield_opp = DeFiYieldOpportunity(
-                            protocol=protocol,
-                            pool_name=f"{protocol}_{token_pair}",
-                            token_pair=token_pair,
-                            apy=np.random.uniform(5, 500),
-                            tvl=np.random.uniform(1000000, 100000000),
-                            risk_score=np.random.uniform(0.1, 0.9),
-                            impermanent_loss=np.random.uniform(0, 0.2),
-                            rewards_token=np.random.choice(['CRV', 'CVX', 'YFI', 'AAVE', 'COMP']),
-                            staking_period=np.random.choice(
-                                ['7d', '30d', '90d', '1y', 'unlimited']
-                            ),
-                            confidence=np.random.uniform(0.6, 0.95),
-                            timestamp=time.time(),
-                        )
-                        yield_opportunities.append(yield_opp)
-
-            return yield_opportunities
-
-        except Exception as e:
-            self.logger.error(f"Error scanning yield opportunities: {e}")
-            return []
-
+            self.logger.info(
+                "DeFiScanner.scan_yield_opportunities: no live data "
+                "source wired - returning none (fabrication "
+                "removed 2026-10-20)")
+        except Exception:
+            pass
+        return []
 class OtherPlatformScanner:
     """Scanner for other platforms (NFT, Bridges, etc.)"""
 
@@ -483,75 +383,15 @@ class OtherPlatformScanner:
             return []
 
     async def _scan_other_platform(self, category: str, platform: str) -> List[PlatformOpportunity]:
-        """Scan a specific other platform"""
-        opportunities = []
-
+        """No live data source is wired for this leg; it fabricated opportunities until 2026-10-20. Honest empty result."""
         try:
-            # Simulate platform scanning
-            if category == 'nft':
-                # NFT opportunities
-                collections = ['Bored Ape', 'CryptoPunks', 'Azuki', 'CloneX', 'Doodles']
-                for collection in collections:
-                    if np.random.random() < 0.1:  # 10% chance of NFT opportunity
-                        opportunity = PlatformOpportunity(
-                            platform_type='nft',
-                            platform_name=platform,
-                            opportunity_type='trading',
-                            symbol=collection,
-                            price=np.random.uniform(0.1, 100),
-                            volume_24h=np.random.uniform(1000, 1000000),
-                            liquidity=0.0,  # NFTs don't have liquidity
-                            apy=0.0,
-                            confidence=np.random.uniform(0.5, 0.8),
-                            risk_level='high',
-                            timestamp=time.time(),
-                            metadata={
-                                'category': category,
-                                'collection_address': f"0x{hashlib.md5(f'{platform}{collection}'.encode()).hexdigest()[:40]}",
-                                'floor_price': np.random.uniform(0.1, 100),
-                                'total_supply': np.random.randint(1000, 10000),
-                                'trait_rarity': np.random.uniform(0.01, 1.0),
-                            },
-                        )
-                        opportunities.append(opportunity)
-
-            elif category == 'bridge':
-                # Bridge opportunities
-                tokens = ['ETH', 'USDC', 'USDT', 'BTC', 'AVAX']
-                for token in tokens:
-                    if np.random.random() < 0.15:  # 15% chance of bridge opportunity
-                        opportunity = PlatformOpportunity(
-                            platform_type='bridge',
-                            platform_name=platform,
-                            opportunity_type='arbitrage',
-                            symbol=token,
-                            price=np.random.uniform(100, 100000),
-                            volume_24h=np.random.uniform(1000000, 100000000),
-                            liquidity=np.random.uniform(1000000, 100000000),
-                            apy=np.random.uniform(0, 10),
-                            confidence=np.random.uniform(0.6, 0.9),
-                            risk_level='medium',
-                            timestamp=time.time(),
-                            metadata={
-                                'category': category,
-                                'source_chain': np.random.choice(
-                                    ['ethereum', 'bsc', 'polygon', 'avalanche']
-                                ),
-                                'destination_chain': np.random.choice(
-                                    ['ethereum', 'bsc', 'polygon', 'avalanche']
-                                ),
-                                'bridge_fee': np.random.uniform(0.001, 0.01),
-                                'bridge_time': np.random.uniform(1, 60),
-                            },
-                        )
-                        opportunities.append(opportunity)
-
-            return opportunities
-
-        except Exception as e:
-            self.logger.error(f"Error scanning {platform}: {e}")
-            return []
-
+            self.logger.info(
+                "OtherPlatformScanner._scan_other_platform: no live data "
+                "source wired - returning none (fabrication "
+                "removed 2026-10-20)")
+        except Exception:
+            pass
+        return []
 class UltraMultiPlatformScanner:
     """Main multi-platform scanner coordinator"""
 

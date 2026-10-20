@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import numpy as np
 import asyncio
 import ccxt
 import sqlite3
@@ -263,15 +264,9 @@ class UltimateBot450Models:
             except:
                 pass
 
-        # For forex, simulate realistic data
-        if market_type == 'forex' and not price_data:
-            base_prices = {
-                'EUR/USD': 1.0950,
-                'GBP/USD': 1.2750,
-                'USD/JPY': 150.25,
-                'USD/CHF': 0.8750,
-                'AUD/USD': 0.6550,
-            }
+        # Forex is NOT wired to a live feed in this system; the
+        # old build fabricated forex prices around static bases.
+        # Honest absence (2026-10-20): return only real venues.
 
             base_price = base_prices.get(symbol, 1.0000)
             price_data['forex_sim'] = {

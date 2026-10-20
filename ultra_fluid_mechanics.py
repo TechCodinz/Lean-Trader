@@ -9,6 +9,7 @@ This system implements fluid dynamics principles for trading:
 - Top-notch analytics with scary good performance
 """
 
+import numpy as np
 import asyncio
 import time
 import logging
@@ -474,31 +475,48 @@ class SentinelBrillianceSystem:
             self.logger.error(f"Error in brilliance cycle: {e}")
 
     async def _get_market_data(self) -> pd.DataFrame:
-        """Get market data for analysis"""
-        # Simulate market data
-        # In real implementation, this would fetch from exchanges
-        data_points = 100
-        base_price = 50000
-
-        prices = []
-        current_price = base_price
-        for i in range(data_points):
-            change = np.random.normal(0, 0.02) * current_price
-            current_price += change
-            prices.append(current_price)
-
-        df = pd.DataFrame(
-            {
-                'timestamp': [time.time() - (data_points - i) * 60 for i in range(data_points)],
-                'open': prices,
-                'high': [p * (1 + abs(np.random.normal(0, 0.01))) for p in prices],
-                'low': [p * (1 - abs(np.random.normal(0, 0.01))) for p in prices],
-                'close': prices,
-                'volume': [np.random.uniform(100, 1000) for _ in range(data_points)],
-            }
-        )
-
-        return df
+        """REAL market data (wired 2026-10-20 on Princewill's order -
+        this organ fabricated a random-walk series for its whole
+        life). Real 1m candles via the UltraCore's live router feed,
+        rotating majors, cached 30s so the 100ms brilliance cycle
+        analyzes real markets without hammering the exchange. On a
+        fetch failure the last real frame is reused - never invented
+        data."""
+        now = time.time()
+        cache = getattr(self, '_real_df_cache', None)
+        if cache is not None and now - cache[0] < 30:
+            return cache[1]
+        symbols = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'BNB/USDT']
+        idx = getattr(self, '_real_df_idx', 0)
+        sym = symbols[idx % len(symbols)]
+        self._real_df_idx = idx + 1
+        try:
+            md = await self.ultra_core.get_market_data(sym, '1m')
+            candles = (md or {}).get('candles') or []
+            if len(candles) >= 30:
+                df = pd.DataFrame(
+                    {
+                        'timestamp': [c[0] / 1000.0 for c in candles],
+                        'open': [float(c[1]) for c in candles],
+                        'high': [float(c[2]) for c in candles],
+                        'low': [float(c[3]) for c in candles],
+                        'close': [float(c[4]) for c in candles],
+                        'volume': [float(c[5]) if len(c) > 5 else 0.0
+                                   for c in candles],
+                    }
+                )
+                self._real_df_cache = (now, df)
+                self.logger.info(
+                    f'SENTINEL real feed: {sym} 1m x{len(df)} '
+                    f'last={float(candles[-1][4]):.4f}')
+                return df
+        except Exception as e:
+            self.logger.warning(f'sentinel real feed failed: {e}')
+        if cache is not None:
+            return cache[1]
+        return pd.DataFrame(
+            {'timestamp': [], 'open': [], 'high': [], 'low': [],
+             'close': [], 'volume': []})
 
     async def _update_brilliance_level(self, execution_result: Dict[str, Any]):
         """Update brilliance level based on execution results"""
