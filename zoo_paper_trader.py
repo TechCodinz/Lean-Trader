@@ -193,7 +193,7 @@ def _partial_close(symbol, price, qty_sell, level):
     except Exception:
         pass
     logger.info(f"PARTIAL {level} {symbol} sold {qty_sell} @ {price} pnl ${pnl:+.2f}")
-    tg(f"PARTIAL {level} {symbol} sold {qty_sell} @ ${price:.4f} | P&L ${pnl:+.2f} | Cash {_cash_str()} | W:{_w}/{len(trades)}")
+    tg(f"{'💰 REAL' if positions.get(symbol, {}).get('real') else '📄 PAPER'} PARTIAL {level} {symbol} sold {qty_sell} @ {price:.4f} | P&L ${pnl:+.2f} | Cash {_cash_str()} | W:{_w}/{len(trades)}")
     return True
 
 def _paper_close(symbol, side, size, price, reason):
@@ -248,8 +248,9 @@ def _paper_close(symbol, side, size, price, reason):
     del positions[symbol]
     save_state()
     w = sum(1 for x in trades if x > 0)
-    logger.info(f"PT SELL {symbol} ({reason}) ${pnl:+.2f}")
-    tg(f"PT SELL {symbol} ({reason})\nP&L: ${pnl:+.2f}\nCash: {_cash_str()}\nW:{w}/{len(trades)}")
+    _tag = 'REAL' if pos.get('real') else 'PAPER'
+    logger.info(f"PT SELL {symbol} ({reason}) ${pnl:+.2f} [{_tag}]")
+    tg(f"{'💰 REAL' if _tag == 'REAL' else '📄 PAPER'} PT SELL {symbol} ({reason})\nP&L: ${pnl:+.2f}\nCash: {_cash_str()}\nW:{w}/{len(trades)}")
     return {'ok': True, 'pnl': pnl}
 
 try:
