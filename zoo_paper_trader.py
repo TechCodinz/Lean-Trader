@@ -328,10 +328,21 @@ class _TestnetClient:
             raise Exception(f"bybit {j.get('retCode')}: {j.get('retMsg')}")
         return j['result']
     def wallet_free_usdt(self):
+        # True spendable (totalAvailableBalance) - the zoo-local copy
+        # of the client kept the old walletBalance lie after the
+        # shared client was repaired (zoo sized on $21 while $0.71
+        # was actually available, 2026-10-20).
         res = self._req('GET', '/v5/account/wallet-balance', {'accountType': 'UNIFIED'})
-        coins = res['list'][0].get('coin', [])
+        acct = res['list'][0]
+        avail = acct.get('totalAvailableBalance')
+        if avail not in (None, ''):
+            return float(avail)
+        coins = acct.get('coin', [])
         u = next((c for c in coins if c.get('coin') == 'USDT'), {})
         return float(u.get('availableToWithdraw') or u.get('walletBalance') or 0)
+    def positions(self):
+        res = self._req('GET', '/v5/position/list', {'category': 'linear', 'settleCoin': 'USDT'})
+        return res.get('list', [])
     def set_leverage(self, symbol, lev=10):
         return self._req('POST', '/v5/position/set-leverage', {'category': 'linear', 'symbol': symbol, 'buyLeverage': str(lev), 'sellLeverage': str(lev)})
     def create_market_buy(self, symbol, qty):
@@ -434,6 +445,44 @@ def get_signal(sym):
     _sig_memo[sym] = (_bucket, _res)
     return _res
 
+def reconcile_from_exchange():
+    """The book drifts from the exchange (partial fills, rung
+    bookkeeping, restarts) - by 2026-10-20 it had LOST ETH/ADA/BNB
+    entirely: real positions with NO exit management, and a real-cap
+    count of 2 against 5 on the exchange. The exchange is truth:
+    adopt orphans, correct quantities, and count real positions
+    from the exchange for the cap."""
+    global _EXCH_REAL_N
+    try:
+        if not tn:
+            return
+        live = {}
+        for _p in tn.positions():
+            if float(_p.get('positionValue') or 0) >= 1.0:
+                _base = (_p.get('symbol') or '')[:-4]
+                live[_base + '/USDT:USDT'] = _p
+        _EXCH_REAL_N = len(live)
+        for _sym, _p in live.items():
+            _size = abs(float(_p.get('size') or 0))
+            _avg = float(_p.get('avgPrice') or 0)
+            _cur = positions.get(_sym)
+            if _cur is None or not _cur.get('real'):
+                positions[_sym] = {'qty': _size, 'entry': _avg,
+                                   'real': True, 'strat': 'reconciled'}
+                logger.warning(f'RECONCILE adopted orphan {_sym} qty {_size} @ {_avg}')
+                tg(f'\U0001f6e0 Zoo reconciled orphan position {_sym} qty {_size} @ {_avg} - exit management restored')
+                try:
+                    trailer.update(_sym, _avg, _avg, _avg * 0.98)
+                except Exception:
+                    pass
+            elif abs(float(_cur.get('qty') or 0) - _size) > 1e-9:
+                logger.warning(f'RECONCILE qty {_sym}: book {_cur.get("qty")} -> exchange {_size}')
+                _cur['qty'] = _size
+    except Exception as e:
+        logger.warning(f'reconcile failed: {e}')
+
+
+_EXCH_REAL_N = 99
 ENGINE_HOT = {}
 
 while True:
@@ -447,6 +496,7 @@ while True:
             # killed the 2025 run). Conditions cleared -> unlatch.
             emergency.reset()
             logger.info("✅ Emergency conditions cleared - entries resumed")
+        reconcile_from_exchange()
         tickers = ex.fetch_tickers()
         cands = [(s,t['last']) for s,t in tickers.items() if '/USDT' in s and t.get('quoteVolume',0)>1000000 and t['last']]
         try:
@@ -620,7 +670,7 @@ while True:
             pos_real = False
             if TRADING_MODE == 'testnet':
                 _rs = _ccxt_to_raw(sym)
-                if _rs and sum(1 for _p in positions.values() if _p.get('real')) >= _alloc_zoo_cap():
+                if _rs and _EXCH_REAL_N >= _alloc_zoo_cap():
                     logger.info(f"real cap ({_alloc_zoo_cap()}) reached - {sym} paper-only, margin reserved for other beings")
                     _rs = None
                 if _rs:
