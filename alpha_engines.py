@@ -700,6 +700,33 @@ class AlphaRouter:
             features=feats,
         )
 
+    def _save_merged(self):
+        """Multi-writer safe save: the zoo (1h) and the orchestrator
+        service (15m/1h) both teach this memo from separate
+        processes; a blind overwrite would erase the other writer's
+        learning on every save. Reload and merge instead:
+        reliability cells merge per key (this writer wins the cells
+        it touched), calibration rows merge as a multiset union
+        (duplicates from distinct trades survive)."""
+        try:
+            cur = _load_memo()
+            rel = dict(cur.get('rel') or {})
+            rel.update(self.memo.get('rel') or {})
+            from collections import Counter
+            cur_rows = [tuple(r) for r in (cur.get('calib') or [])]
+            my_rows = [tuple(r) for r in (self.memo.get('calib') or [])]
+            extra = list((Counter(my_rows) - Counter(cur_rows)).elements())
+            merged = dict(self.memo)
+            merged['rel'] = rel
+            merged['calib'] = [list(r) for r in (cur_rows + extra)][-300:]
+            self.memo = merged
+            _save_memo(merged)
+        except Exception:
+            try:
+                _save_memo(self.memo)
+            except Exception:
+                pass
+
     def note_outcome(self, conviction: float, pnl: float):
         """Calibration feed: a router-attributed trade closed.
         Records (conviction, win) in the memo so the decision
@@ -709,7 +736,7 @@ class AlphaRouter:
             c.append([round(float(conviction), 3), 1 if pnl > 0 else 0])
             del c[:-300]
             self.memo['calib'] = c
-            _save_memo(self.memo)
+            self._save_merged()
         except Exception:
             pass
 
@@ -748,4 +775,4 @@ class AlphaRouter:
         # reward), same [0.2, 3.0] clip.
         w = _clip(w + 0.1 * np.tanh(reward), 0.2, 3.0)
         row[strat_name] = float(w)
-        _save_memo(self.memo)
+        self._save_merged()

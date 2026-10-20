@@ -309,6 +309,8 @@ class PriceAdapter:
             return {}
 
 
+_PENDING_ATTR = {}
+
 class BusHub:
     """The orchestrator's data hub: alert queue in, trade records
     out to the capacity ledger + Telegram."""
@@ -326,6 +328,26 @@ class BusHub:
                     float(record.get('pnl') or 0.0), real=True,
                     meta={'reason': record.get('reason'),
                           'strat': 'alpha_router'})
+                try:
+                    _key = str(record.get('symbol') or '').replace(':USDT', '')
+                    _attr = _PENDING_ATTR.pop(_key, None)
+                    if _attr:
+                        from alpha_engines import AlphaRouter
+                        _r = AlphaRouter()
+                        _prob, _votes, _tf, _side = _attr
+                        _conv = _prob if _side == 'buy' else 1.0 - _prob
+                        _pnl = float(record.get('pnl') or 0.0)
+                        _r.note_outcome(_conv, _pnl)
+                        for _sn, _sv in _votes.items():
+                            _r.update_reliability(
+                                _key, _tf, _sn,
+                                (1.0 if _pnl > 0 else -1.0)
+                                * min(1.0, abs(_sv)))
+                        logger.info(f'ATTRIBUTION: {_key} close '
+                                    f'${_pnl:+.2f} taught the router '
+                                    f'({_tf}, conv {_conv:.2f})')
+                except Exception:
+                    pass
                 tg(f"⚡ Orchestrator close {record.get('symbol')} "
                    f"${float(record.get('pnl') or 0.0):+.2f} "
                    f"({record.get('reason')})")
@@ -507,6 +529,15 @@ async def alpha_loop(orchestrator, hub, bus_hub):
                             logger.info(f'📡 alpha_router[{tf}]: {pair} {dec.side.upper()} '
                                         f'p={dec.prob:.2f} session {sess} x{mult:.2f} '
                                         f'-> conf {conf:.2f}')
+                            # Attribution stash: when this trade
+                            # closes, its outcome teaches the router
+                            # (reliability + calibration) - the zoo
+                            # has fed that learning alone until now,
+                            # while the router's biggest real user
+                            # closed in silence.
+                            _PENDING_ATTR[pair] = (
+                                float(dec.prob), dict(dec.votes or {}),
+                                tf, dec.side)
                             await bus_hub.alert_queue.put({
                                 'signal': {'symbol': pair,
                                            'data': {'symbol': pair,

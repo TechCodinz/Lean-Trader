@@ -362,6 +362,28 @@ class _TestnetClient:
     def create_market_sell_reduce(self, symbol, qty):
         return self._req('POST', '/v5/order/create', {'category': 'linear', 'symbol': symbol, 'side': 'Sell', 'orderType': 'Market', 'qty': str(qty), 'reduceOnly': True})
 
+_MARK_CACHE = {'ts': 0.0, 'marks': {}}
+
+
+def _exchange_mark(sym):
+    """The exchange's own markPrice for a held position (20s
+    cache). The public ticker read returns 0.00 for the 1000x
+    PEPE contract form, which corrupted the trailing stop for
+    that position all day (2026-10-20); a held position's mark
+    is always available and is the truth its exits should use."""
+    import time as _t
+    if _t.time() - _MARK_CACHE['ts'] > 20:
+        try:
+            _MARK_CACHE['marks'] = {
+                (pp.get('symbol') or ''): float(pp.get('markPrice') or 0)
+                for pp in tn.positions()}
+            _MARK_CACHE['ts'] = _t.time()
+        except Exception:
+            pass
+    raw = _ccxt_to_raw(sym)
+    return _MARK_CACHE['marks'].get(raw) if raw else None
+
+
 def _ccxt_to_raw(sym):
     # 'BTC/USDT:USDT' -> 'BTCUSDT'; dated/odd symbols -> None (paper-only)
     if sym.endswith('/USDT:USDT'):
@@ -819,7 +841,9 @@ while True:
                 logger.warning(f"profit taker: {e}")
         for sym, pos in list(positions.items()):
             try:
-                cur = ex.fetch_ticker(sym)['last']
+                cur = _exchange_mark(sym) or ex.fetch_ticker(sym)['last']
+                if not cur:
+                    continue
                 trailer.update(sym, cur, pos['entry'], pos['entry']*0.98)
                 trail_stop = trailer.get_stop(sym)
                 pct = (cur-pos['entry'])/pos['entry']*100
