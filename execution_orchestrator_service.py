@@ -363,6 +363,81 @@ async def stats_loop(orchestrator, arm):
             logger.warning(f'stats: {e}')
 
 
+async def exchange_sync_loop(orchestrator, arm):
+    """Exchange-truth sync (the zoo reconcile pattern, applied to
+    the orchestrator): its in-process book can phantom when another
+    being exits a position it opened (the pre-registry era did
+    exactly that - 5 phantom opens, endless failed closes). Every
+    180s: a tracked symbol with NO exchange position >= $1 is
+    dropped WITHOUT a booked close (the exiter's own ledger record
+    carries the truth) and its ownership claim is pruned; a tracked
+    size that drifted from the exchange is corrected."""
+    import json as _j
+    import os as _o
+    from testnet_client import ccxt_to_raw
+    await asyncio.sleep(20)
+    while True:
+        try:
+            tn = arm._client()
+            truth = {}
+            for pos in tn.positions():
+                truth[pos['symbol']] = (abs(float(pos.get('size') or 0)),
+                                        float(pos.get('positionValue') or 0))
+            rm = orchestrator.risk_manager
+            for sym in list(rm.open_positions.keys()):
+                raw = ccxt_to_raw(sym)
+                have = truth.get(raw) if raw else None
+                if not have or have[1] < 1.0:
+                    del rm.open_positions[sym]
+                    logger.warning(f'EXCHANGE SYNC: dropped phantom {sym} '
+                                   f'(no exchange position; closed outside '
+                                   f'the orchestrator - no P&L booked)')
+                    try:
+                        rp = '/app/runtime/orchestrator_positions.json'
+                        reg = _j.load(open(rp)) if _o.path.exists(rp) else {}
+                        if raw in reg:
+                            del reg[raw]
+                            with open(rp, 'w') as f:
+                                _j.dump(reg, f)
+                    except Exception:
+                        pass
+                else:
+                    cur = float(rm.open_positions[sym].get('size') or 0)
+                    if cur and abs(have[0] - cur) / cur > 0.05:
+                        rm.open_positions[sym]['size'] = have[0]
+                        logger.info(f'EXCHANGE SYNC: {sym} size corrected '
+                                    f'{cur} -> {have[0]}')
+            # Prune orphaned ownership claims: a registry symbol
+            # with no exchange position and no tracked position is
+            # a leftover from a dead era - left in place it makes
+            # the zoo skip that symbol forever.
+            try:
+                rp = '/app/runtime/orchestrator_positions.json'
+                if _o.path.exists(rp):
+                    reg = _j.load(open(rp))
+                    tracked_raw = set()
+                    for s2 in rm.open_positions.keys():
+                        r2 = ccxt_to_raw(s2)
+                        if r2:
+                            tracked_raw.add(r2)
+                    changed = False
+                    for raw in list(reg.keys()):
+                        have = truth.get(raw)
+                        if raw not in tracked_raw and (not have or have[1] < 1.0):
+                            del reg[raw]
+                            changed = True
+                            logger.warning(f'EXCHANGE SYNC: pruned stale '
+                                           f'ownership claim {raw}')
+                    if changed:
+                        with open(rp, 'w') as f:
+                            _j.dump(reg, f)
+            except Exception:
+                pass
+        except Exception as e:
+            logger.warning(f'exchange sync: {e}')
+        await asyncio.sleep(180)
+
+
 async def main():
     from data_hub import MarketDataHub
     from EXECUTION_ORCHESTRATOR import ExecutionOrchestrator
@@ -394,6 +469,7 @@ async def main():
         decision_feeder(bus_hub),
         alpha_loop(orchestrator, hub, bus_hub),
         stats_loop(orchestrator, arm),
+        exchange_sync_loop(orchestrator, arm),
     )
 
 
