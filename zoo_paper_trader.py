@@ -182,6 +182,12 @@ def _partial_close(symbol, price, qty_sell, level):
             try:
                 for _sn, _sv in (alpha_votes.pop(symbol, {}) or {}).items():
                     alpha_router.update_reliability(symbol, '1h', _sn, (1.0 if pnl > 0 else -1.0) * min(1.0, abs(_sv)))
+                _pr = globals().setdefault('alpha_probs', {}).pop(symbol, None)
+                if _pr is not None:
+                    try:
+                        alpha_router.note_outcome(_pr, pnl)
+                    except Exception:
+                        pass
             except Exception:
                 pass
     except Exception:
@@ -218,6 +224,12 @@ def _paper_close(symbol, side, size, price, reason):
             try:
                 for _sn, _sv in (alpha_votes.pop(symbol, {}) or {}).items():
                     alpha_router.update_reliability(symbol, '1h', _sn, (1.0 if pnl > 0 else -1.0) * min(1.0, abs(_sv)))
+                _pr = globals().setdefault('alpha_probs', {}).pop(symbol, None)
+                if _pr is not None:
+                    try:
+                        alpha_router.note_outcome(_pr, pnl)
+                    except Exception:
+                        pass
                 logger.info(f"ALPHA ROUTER learn {symbol} pnl {pnl:+.2f}")
             except Exception:
                 pass
@@ -647,6 +659,7 @@ while True:
                         if _dec.side == 'buy':
                             sig = 'alpha_router'
                             alpha_votes[sym] = dict(_dec.votes or {})
+                            globals().setdefault('alpha_probs', {})[sym] = float(_dec.prob)
                             logger.info(f"ALPHA ROUTER buy {sym} p={_dec.prob:.2f} size_mult={_dec.size_mult:.2f}")
                 except Exception as e:
                     logger.warning(f"alpha router {sym}: {e}")

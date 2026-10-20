@@ -671,12 +671,16 @@ class AlphaRouter:
         # had forgotten how to say "sell", so every downtrend was
         # dead time. Symmetric thresholds: p >= 0.58 long,
         # p <= 0.42 short, between them the ensemble abstains.
-        if p >= 0.58:
+        _thr = self._adaptive_threshold()
+        if p >= _thr:
             side = "buy"
-        elif p <= 0.42:
+        elif p <= 1.0 - _thr:
             side = "sell"
         else:
             side = None
+        if abs(_thr - 0.58) > 1e-9:
+            notes.append(f"adaptive thr {_thr:.2f} "
+                         f"(calib n={len(self.memo.get('calib') or [])})")
         size_mult = _clip(0.5 + 1.5 * (p - 0.5) / 0.5, 0.5, 2.0)
         sleep = 5 if p > 0.7 else 8 if p > 0.6 else 12
 
@@ -695,6 +699,40 @@ class AlphaRouter:
             votes=votes,
             features=feats,
         )
+
+    def note_outcome(self, conviction: float, pnl: float):
+        """Calibration feed: a router-attributed trade closed.
+        Records (conviction, win) in the memo so the decision
+        threshold can be set by evidence, not by hand."""
+        try:
+            c = self.memo.setdefault('calib', [])
+            c.append([round(float(conviction), 3), 1 if pnl > 0 else 0])
+            del c[:-300]
+            self.memo['calib'] = c
+            _save_memo(self.memo)
+        except Exception:
+            pass
+
+    def _adaptive_threshold(self) -> float:
+        """The intelligent threshold (Princewill, 2026-10-20:
+        'make it intelligent, not manual'). The bar floats to the
+        lowest conviction band whose realized record pays under
+        the fleet's payoff math (+2% target / -1% stop: a band
+        clears at ~45% win rate after fees at these notionals).
+        Bands are 0.10 wide, sliding by 0.05, needing >= 8
+        attributed closes. Bounded [0.52, 0.65]; until 30
+        attributed closes exist at all, the designed 0.58 stands.
+        If NO band pays, the bar rises to the 0.65 cap - the
+        system trades only its best ideas until evidence earns
+        it more room."""
+        c = self.memo.get('calib') or []
+        if len(c) < 30:
+            return 0.58
+        for lo in (0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80):
+            rows = [w for p, w in c if lo <= p < lo + 0.10]
+            if len(rows) >= 8 and (sum(rows) / len(rows)) >= 0.45:
+                return max(0.52, min(0.65, lo + 0.02))
+        return 0.65
 
     def update_reliability(self, symbol: str, timeframe: str, strat_name: str, reward: float):
         r = self.memo.setdefault("reliability", {})
