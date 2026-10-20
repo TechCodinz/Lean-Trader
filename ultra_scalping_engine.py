@@ -407,6 +407,22 @@ class UltraScalpingEngine:
                 current_time = time.time()
 
                 for position_id, signal in list(self.active_positions.items()):
+                    # REAL positions decide in the testnet frame
+                    # (exchange mark vs exchange entry); paper
+                    # positions keep the analysis frame below.
+                    if getattr(signal, 'real_qty', None):
+                        _pos = self._testnet_pos(
+                            signal.symbol.split('/')[0] + 'USDT')
+                        _mark = float((_pos or {}).get('markPrice') or 0)
+                        if _mark > 0:
+                            _hit = self._real_exit_hit(signal, _mark)
+                            if _hit is not None:
+                                await self._close_scalp_position(
+                                    position_id, signal, _mark, _hit)
+                            elif current_time - signal.timestamp > 300:
+                                await self._close_scalp_position(
+                                    position_id, signal, _mark, False)
+                            continue
                     # Check if target or stop loss hit
                     current_price = await self._get_current_price(signal.symbol)
 
@@ -449,10 +465,16 @@ class UltraScalpingEngine:
         """Close scalping position and record result"""
         try:
             # Real testnet close first (if this position is real)
+            _rc = True
             try:
-                self._real_close(signal, exit_price)
+                _rc = self._real_close(signal, exit_price)
             except Exception as e:
                 self.logger.error(f"real close hook: {e}")
+            if getattr(signal, 'real_qty', None) and _rc is False:
+                # The close did not execute (illiquid testnet
+                # book): the position is still real - keep
+                # monitoring it; never book a phantom exit.
+                return
             # Calculate profit
             if signal.target_price > signal.entry_price:  # Long position
                 profit = exit_price - signal.entry_price
@@ -528,6 +550,50 @@ class UltraScalpingEngine:
         except Exception as e:
             self.logger.error(f"Error getting current price: {e}")
             return 0.0
+
+    # === TESTNET PRICE TRUTH (2026-10-20) ==========================
+    # The sniper analyzes mainnet prices (its design), but its REAL
+    # positions live on testnet, whose marks drift from mainnet on
+    # illiquid pairs - the same mismatch that fired phantom stops
+    # in the orchestrator (KAS, +6.8%). Real positions therefore
+    # enter, exit and book in the exchange's own frame.
+    def _tn_client(self):
+        tn = getattr(self, '_tn', None)
+        if tn is None:
+            from testnet_client import make_client
+            tn = make_client()
+            self._tn = tn
+        return tn
+
+    def _testnet_pos(self, raw):
+        try:
+            for pp in self._tn_client().positions():
+                if (pp.get('symbol') or '') == raw:
+                    return pp
+        except Exception:
+            pass
+        return None
+
+    def _real_exit_hit(self, signal, mark):
+        """Exit decision for a REAL position in the testnet frame:
+        entry = exchange avgPrice, now = exchange mark, target/stop
+        = the signal's intended fractional distances."""
+        entry = float(getattr(signal, 'real_entry', 0) or 0)
+        if not entry or not mark or not signal.entry_price:
+            return None
+        tgt_f = (signal.target_price - signal.entry_price) / signal.entry_price
+        stp_f = (signal.stop_loss - signal.entry_price) / signal.entry_price
+        if signal.target_price > signal.entry_price:  # long design
+            if mark >= entry * (1 + tgt_f):
+                return True
+            if mark <= entry * (1 + stp_f):
+                return False
+        else:  # short design
+            if mark <= entry * (1 + tgt_f):
+                return True
+            if mark >= entry * (1 + stp_f):
+                return False
+        return None
 
     # === REAL EXECUTION (relay graft, 2026-10-19) ===================
     # The 2025 engine's execution tail was simulated (store + log).
@@ -625,6 +691,14 @@ class UltraScalpingEngine:
             if isinstance(res, dict) and res.get('orderId'):
                 signal.real_qty = qty
                 signal.real_entry = float(price)
+                # Entry truth: the exchange avgPrice is the real
+                # fill; the sizing ticker is a mainnet quote.
+                for _ in range(3):
+                    _pp = self._testnet_pos(raw)
+                    if _pp and float(_pp.get('avgPrice') or 0) > 0:
+                        signal.real_entry = float(_pp['avgPrice'])
+                        break
+                    time.sleep(1)
                 self.logger.info(
                     f"REAL scalp buy {raw} qty {qty} @ {price} "
                     f"(strat {signal.strategy} conf {signal.confidence:.2f})")
@@ -637,38 +711,70 @@ class UltraScalpingEngine:
                 self._real_backoff_until = _t.time() + 60
             self.logger.warning(f"real open {signal.symbol}: {e}")
 
-    def _real_close(self, signal, exit_price: float) -> None:
+    def _real_close(self, signal, exit_price: float) -> bool:
         qty = getattr(signal, 'real_qty', None)
         if not qty:
-            return
+            return True
         base = signal.symbol.split('/')[0]
         raw = base + 'USDT'
         try:
-            from testnet_client import make_client, qty_str
-            tn = getattr(self, '_tn', None)
-            if tn is None:
-                tn = make_client()
-                self._tn = tn
+            from testnet_client import qty_str
+            tn = self._tn_client()
+            # Attempts throttled per symbol: an unfillable pair is
+            # retried calmly by the monitor, not every second.
+            _att = getattr(self, '_close_attempts', None)
+            if _att is None:
+                _att = self._close_attempts = {}
+            if time.time() - _att.get(raw, 0) < 120:
+                return False
+            pos = self._testnet_pos(raw)
+            if not pos:
+                # Already gone from the exchange (closed
+                # elsewhere): nothing to execute or book.
+                self.logger.warning(
+                    f"REAL scalp close {raw}: no exchange position "
+                    f"- closed elsewhere, releasing")
+                signal.real_qty = None
+                return True
+            before = abs(float(pos.get('size') or 0))
+            upnl = float(pos.get('unrealisedPnl') or 0)
+            _att[raw] = time.time()
             res = None
             for _ in range(3):
                 res = tn.create_market_sell_reduce(raw, qty_str(qty))
                 if isinstance(res, dict) and res.get('orderId'):
                     break
-            if isinstance(res, dict) and res.get('orderId'):
-                pnl = (float(exit_price) - float(signal.real_entry)) * float(qty)
-                self.logger.info(f"REAL scalp close {raw} qty {qty} pnl ${pnl:+.4f}")
-                try:
-                    import being_ledger
-                    being_ledger.record_close(
-                        'master', signal.symbol, pnl, real=True,
-                        meta={'strat': signal.strategy, 'engine': 'scalp',
-                              'tf': signal.timeframe})
-                except Exception:
-                    pass
-            else:
+            if not (isinstance(res, dict) and res.get('orderId')):
                 self.logger.error(f"REAL CLOSE FAILED {raw}: {res} - position may be orphaned, check the exchange")
+                return False
+            for _ in range(3):
+                time.sleep(2)
+                pos2 = self._testnet_pos(raw)
+                after = abs(float((pos2 or {}).get('size') or 0))
+                if after < before * 0.99:
+                    # Book the exchange's own P&L (its unrealised
+                    # P&L at the moment of closing), not engine
+                    # math over mainnet prices.
+                    self.logger.info(
+                        f"REAL scalp close {raw} qty {qty} "
+                        f"pnl ${upnl:+.4f} (exchange uPnL, verified)")
+                    try:
+                        import being_ledger
+                        being_ledger.record_close(
+                            'master', signal.symbol, upnl, real=True,
+                            meta={'strat': signal.strategy,
+                                  'engine': 'scalp',
+                                  'tf': signal.timeframe})
+                    except Exception:
+                        pass
+                    return True
+            self.logger.warning(
+                f"REAL scalp close {raw}: order accepted but "
+                f"position unchanged (unfilled); not booking")
+            return False
         except Exception as e:
             self.logger.error(f"real close {signal.symbol}: {e}")
+            return False
 
     async def _manage_risk(self) -> None:
         """Manage scalping risk"""

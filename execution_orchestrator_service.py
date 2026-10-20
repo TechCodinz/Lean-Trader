@@ -62,6 +62,22 @@ class RelayExecutionArm:
         self._tn = None
         self._backoff_until = 0.0
 
+    def _fill_price(self, raw):
+        """The exchange's avgPrice for the position just opened -
+        the true fill, vs the quote that sized the order."""
+        try:
+            tn = self._client()
+            for _ in range(3):
+                for pp in tn.positions():
+                    if (pp.get('symbol') or '') == raw:
+                        ap = float(pp.get('avgPrice') or 0)
+                        if ap > 0:
+                            return ap
+                time.sleep(1)
+        except Exception:
+            pass
+        return None
+
     def _client(self):
         if self._tn is None:
             from testnet_client import make_client
@@ -161,7 +177,8 @@ class RelayExecutionArm:
                         tg(f'⚡ Orchestrator MAKER {signal} {raw} qty {filled_qty} @ {avg}')
                         return {'symbol': symbol, 'side': 'buy' if signal == 'BUY' else 'sell',
                                 'amount': filled_qty, 'price': avg,
-                                'orderId': oid, 'simulated': False}
+                                'orderId': oid, 'simulated': False,
+                                'fill_price': avg}
                     if filled_qty > 0:
                         qty = round(qty - filled_qty, 10)
                         logger.info(f'arm: maker dust partial {filled_qty} on {raw}; market top-up {qty}')
@@ -178,7 +195,8 @@ class RelayExecutionArm:
                 tg(f'⚡ Orchestrator {signal} {raw} qty {qty} @ {price}')
                 return {'symbol': symbol, 'side': 'buy' if signal == 'BUY' else 'sell', 'amount': qty,
                         'price': price, 'orderId': res['orderId'],
-                        'simulated': False}
+                        'simulated': False,
+                        'fill_price': self._fill_price(raw)}
             if isinstance(res, dict) and '110007' in str(res):
                 self._backoff_until = time.time() + 60
             logger.warning(f'arm buy rejected {raw}: {res}')
@@ -572,6 +590,13 @@ async def exchange_sync_loop(orchestrator, arm):
                         rm.open_positions[sym]['size'] = have[0]
                         logger.info(f'EXCHANGE SYNC: {sym} size corrected '
                                     f'{cur} -> {have[0]}')
+                    _ep = float(rm.open_positions[sym].get('entry_price') or 0)
+                    if _ep and len(have) > 3 and have[3] \
+                            and abs(have[3] - _ep) / _ep > 0.005:
+                        rm.open_positions[sym]['entry_price'] = have[3]
+                        logger.info(f'EXCHANGE SYNC: {sym} entry '
+                                    f'corrected {_ep} -> {have[3]} '
+                                    f'(exchange truth)')
             # Adopt orphan shorts + guarantee claims (2026-10-20):
             # claims were originally written only on the market-
             # buy path, so maker fills and every short went

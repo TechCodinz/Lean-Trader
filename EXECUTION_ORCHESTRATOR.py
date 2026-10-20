@@ -14,6 +14,42 @@ import time
 logger = logging.getLogger(__name__)
 
 
+_EVIDENCE_CACHE = {'size': -1, 'n': 0, 'exp': None}
+
+
+def _orch_evidence():
+    """This engine's measured record: (n, expectancy) over its
+    last 40 REAL closes in the being ledger. Cached on the ledger
+    file's size - the file only grows when a close lands."""
+    import os as _os
+    try:
+        sz = _os.path.getsize('/app/runtime/being_ledger.jsonl')
+    except Exception:
+        return 0, None
+    if sz == _EVIDENCE_CACHE['size']:
+        return _EVIDENCE_CACHE['n'], _EVIDENCE_CACHE['exp']
+    n, exp = 0, None
+    try:
+        import json as _j
+        rows = []
+        with open('/app/runtime/being_ledger.jsonl') as f:
+            for line in f:
+                try:
+                    r = _j.loads(line)
+                except Exception:
+                    continue
+                if r.get('being') == 'orchestrator' and r.get('real'):
+                    rows.append(float(r.get('pnl') or 0))
+        rows = rows[-40:]
+        n = len(rows)
+        if n:
+            exp = sum(rows) / n
+    except Exception:
+        pass
+    _EVIDENCE_CACHE.update({'size': sz, 'n': n, 'exp': exp})
+    return n, exp
+
+
 class SmartPositionSizer:
     """Smart position sizing based on account balance and risk"""
     
@@ -27,6 +63,31 @@ class SmartPositionSizer:
         self.use_dynamic_sizing = True
         self.aggressive_mode = True  # ENABLED - but SMART (auto-scales to balance size)
         
+    def _eff_max_pct(self) -> float:
+        """INTELLIGENT SIZE RATCHET (Princewill 2026-10-20: 'the
+        profit takes are very small, they are not compounding').
+        The per-position cap was a fixed 15% of balance - at $35
+        that pins every trade at ~$5.25 and every +2% take at
+        ~$0.11, so the curve cannot bite. The cap now ratchets on
+        this engine's own proven record: >= 8 closes at >= +$0.02
+        expectancy -> 20%; >= 15 at >= +$0.05 -> 25%; >= 25 at
+        >= +$0.10 -> 30%. It never drops below the designed 15%,
+        and it cannot run ahead of the evidence."""
+        n, exp = _orch_evidence()
+        pct = self.max_position_pct
+        if exp is not None:
+            if n >= 25 and exp >= 0.10:
+                pct = 0.30
+            elif n >= 15 and exp >= 0.05:
+                pct = 0.25
+            elif n >= 8 and exp >= 0.02:
+                pct = 0.20
+        if pct != getattr(self, '_pct_logged', None):
+            self._pct_logged = pct
+            logger.info(f'SIZE RATCHET: max position {pct:.0%} of '
+                        f'balance (evidence n={n} exp={exp})')
+        return pct
+
     def calculate_position_size(self, 
                                confidence: float,
                                volatility: float = 0.02,
@@ -73,7 +134,7 @@ class SmartPositionSizer:
             logger.info(f"🚀 Smart aggressive sizing: {confidence:.1%} conf × ${self.balance:.0f} balance → {confidence_boost:.2f}x boost")
         
         # Apply limits
-        max_position = self.balance * self.max_position_pct
+        max_position = self.balance * self._eff_max_pct()
         position_size = min(position_size, max_position)
         position_size = max(position_size, self.min_position_usd)
         
@@ -458,12 +519,25 @@ class ExecutionOrchestrator:
                     logger.debug(f"Enhanced bot execution: {e}")
             
             if execution_result:
-                # Record position with risk manager
+                # Record position with risk manager. ENTRY TRUTH:
+                # the engine's fill price (the exchange's avgPrice,
+                # attached by the arm) is the real entry - the
+                # decision price comes from a quote frame that can
+                # sit percent away from the testnet fill on illiquid
+                # pairs, and booking it fired an instant phantom
+                # stop on XPL (2026-10-20, -3.96% in 0.16s).
+                _entry = price
+                try:
+                    _fp = float(execution_result.get('fill_price') or 0)
+                    if _fp > 0:
+                        _entry = _fp
+                except Exception:
+                    pass
                 self.risk_manager.record_position(
                     symbol=symbol,
                     side=side,
                     size=amount,
-                    entry_price=price
+                    entry_price=_entry
                 )
                 
                 # Record in ledger
@@ -594,6 +668,17 @@ class ExecutionOrchestrator:
                 if not current_price:
                     continue
                 
+                # Young-position grace: a position is not stop-
+                # evaluated in its first 20 seconds. Its entry may
+                # still be reconciling with the exchange, and no
+                # 15m/1h decision invalidates in 20 seconds - the
+                # XPL phantom stop fired at 0.16s.
+                try:
+                    _age = (datetime.now() - position['opened_at']).total_seconds()
+                    if _age < 20:
+                        continue
+                except Exception:
+                    pass
                 entry_price = position['entry_price']
                 side = position['side']
                 
