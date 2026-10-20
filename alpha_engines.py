@@ -369,6 +369,38 @@ class SessionBias(BaseStrategy):
         }
 
 # ----------------- Alpha Router -----------------
+
+_STUDY_CACHE = {'mtime': 0.0, 'data': {}}
+
+
+def _study_tilt(symbol):
+    """Fleet pair-study tilt for a symbol: the measured expectancy
+    of EVERY being's real closes on this pair (pair_study.json),
+    sample-scaled and capped - knowledge weight, never a veto."""
+    import json as _j
+    import os as _os
+    path = '/app/runtime/pair_study.json'
+    try:
+        m = _os.path.getmtime(path)
+    except Exception:
+        return 0.0
+    if m != _STUDY_CACHE['mtime']:
+        try:
+            with open(path) as f:
+                _STUDY_CACHE['data'] = _j.load(f)
+            _STUDY_CACHE['mtime'] = m
+        except Exception:
+            return 0.0
+    e = _STUDY_CACHE['data'].get(symbol)
+    if not e:
+        return 0.0
+    n = int(e.get('trades') or 0)
+    if n < 5:
+        return 0.0
+    exp = float(e.get('expectancy') or 0.0)
+    return max(-0.06, min(0.06, exp * 0.5)) * min(1.0, n / 25.0)
+
+
 class AlphaRouter:
     """
     Fuses many strategies, calibrates to probability, adapts by (symbol,timeframe).
@@ -435,6 +467,20 @@ class AlphaRouter:
         if random.random() < float(self.memo.get("explore_eps", 0.08)):
             k_max = max(votes, key=lambda k: votes[k])
             p = 0.65 + 0.25 * votes[k_max]
+
+        # PAIR STUDY tilt (Princewill's awareness design): the
+        # fleet's lived record on this pair weighs the ensemble's
+        # confidence before the side is called. A studied pair that
+        # has hurt the fleet drags confidence a few points; a proven
+        # pair lifts it. Capped and sample-scaled in _study_tilt -
+        # it can shade a marginal call, never veto a strong one.
+        try:
+            _tilt = _study_tilt(symbol)
+            if _tilt:
+                p = _clip(p + _tilt, 0.01, 0.99)
+                notes.append(f"study tilt {_tilt:+.3f} ({symbol})")
+        except Exception:
+            pass
 
         side = "buy" if p >= 0.58 else None
         size_mult = _clip(0.5 + 1.5 * (p - 0.5) / 0.5, 0.5, 2.0)
