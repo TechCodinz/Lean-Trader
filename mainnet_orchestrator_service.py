@@ -96,8 +96,8 @@ class RelayExecutionArm:
             return False
 
     def execute_trade(self, symbol, signal, price, amount=None):
-        if signal != 'BUY':
-            return None  # long-only
+        if signal not in ('BUY', 'SELL'):
+            return None
         if not self._enabled():
             logger.info('mainnet kill-switch OFF - not executing')
             return None
@@ -150,7 +150,7 @@ class RelayExecutionArm:
             # dust topped up by market; unfilled -> one market
             # fallback. The $7.50 cap above already bounded qty.
             try:
-                lr = tn.create_limit_postonly(raw, 'Buy', qty, price)
+                lr = tn.create_limit_postonly(raw, 'Buy' if signal == 'BUY' else 'Sell', qty, price)
                 oid = lr.get('orderId') if isinstance(lr, dict) else None
                 if oid:
                     deadline = time.time() + 15
@@ -183,8 +183,8 @@ class RelayExecutionArm:
                             pass
                     if filled_qty > 0 and filled_qty * avg >= 5.0:
                         logger.info(f'⚡ MAINNET MAKER BUY {raw} qty {filled_qty} @ {avg} (post-only)')
-                        tg(f'🟢 MAINNET MAKER BUY {raw} qty {filled_qty} @ {avg}')
-                        return {'symbol': symbol, 'side': 'buy',
+                        tg(f'🟢 MAINNET MAKER {signal} {raw} qty {filled_qty} @ {avg}')
+                        return {'symbol': symbol, 'side': 'buy' if signal == 'BUY' else 'sell',
                                 'amount': filled_qty, 'price': avg,
                                 'orderId': oid, 'simulated': False}
                     if filled_qty > 0:
@@ -194,11 +194,14 @@ class RelayExecutionArm:
                         logger.info(f'arm: maker unfilled on {raw} - market fallback')
             except Exception as e:
                 logger.info(f'arm: maker path failed on {raw} ({e}) - market fallback')
-            res = tn.create_market_buy(raw, qty_str(qty))
+            if signal == 'BUY':
+                res = tn.create_market_buy(raw, qty_str(qty))
+            else:
+                res = tn.create_market_sell_open(raw, qty_str(qty))
             if isinstance(res, dict) and res.get('orderId'):
-                logger.info(f'⚡ REAL BUY {raw} qty {qty} @ {price}')
-                tg(f'🟢 MAINNET BUY {raw} qty {qty} @ {price}')
-                return {'symbol': symbol, 'side': 'buy', 'amount': qty,
+                logger.info(f'⚡ REAL {signal} {raw} qty {qty} @ {price}')
+                tg(f'🟢 MAINNET {signal} {raw} qty {qty} @ {price}')
+                return {'symbol': symbol, 'side': 'buy' if signal == 'BUY' else 'sell', 'amount': qty,
                         'price': price, 'orderId': res['orderId'],
                         'simulated': False}
             if isinstance(res, dict) and '110007' in str(res):
@@ -212,8 +215,6 @@ class RelayExecutionArm:
             return None
 
     def close_position(self, symbol, size, side):
-        if side != 'buy':
-            return True  # nothing real was opened for shorts
         raw = symbol.split('/')[0] + 'USDT'
         try:
             from mainnet_client import qty_str, quantize
@@ -226,7 +227,10 @@ class RelayExecutionArm:
             except Exception:
                 pass
             for _ in range(3):
-                res = tn.create_market_sell_reduce(raw, qty_str(qty))
+                if side == 'buy':
+                    res = tn.create_market_sell_reduce(raw, qty_str(qty))
+                else:
+                    res = tn.create_market_buy_reduce(raw, qty_str(qty))
                 if isinstance(res, dict) and res.get('orderId'):
                     logger.info(f'⚡ REAL CLOSE {raw} qty {qty}')
                     return True
@@ -328,14 +332,14 @@ async def alpha_loop(orchestrator, hub, bus_hub, arm):
                     df = pd.DataFrame(rows, columns=['ts', 'open', 'high',
                                                      'low', 'close', 'vol'])
                     dec = router.pick(df, pair, '1h')
-                    if dec is not None and dec.side == 'buy':
-                        logger.info(f'📡 alpha_router: {pair} BUY p={dec.prob:.2f}')
+                    if dec is not None and dec.side in ('buy', 'sell'):
+                        logger.info(f'📡 alpha_router: {pair} {dec.side.upper()} p={dec.prob:.2f}')
                         await bus_hub.alert_queue.put({
                             'signal': {'symbol': pair,
                                        'data': {'symbol': pair,
                                                 'price': float(df['close'].iloc[-1])}},
-                            'action': 'buy',
-                            'confidence': float(dec.prob),
+                            'action': dec.side,
+                            'confidence': float(dec.prob) if dec.side == 'buy' else 1.0 - float(dec.prob),
                         })
                 except Exception:
                     continue

@@ -665,7 +665,18 @@ class AlphaRouter:
         except Exception:
             pass
 
-        side = "buy" if p >= 0.58 else None
+        # Bidirectional (restored 2026-10-20, Opus audit Fix #1 -
+        # verified live): the 2025 core, both execution arms and
+        # the risk manager were always side-aware; only this line
+        # had forgotten how to say "sell", so every downtrend was
+        # dead time. Symmetric thresholds: p >= 0.58 long,
+        # p <= 0.42 short, between them the ensemble abstains.
+        if p >= 0.58:
+            side = "buy"
+        elif p <= 0.42:
+            side = "sell"
+        else:
+            side = None
         size_mult = _clip(0.5 + 1.5 * (p - 0.5) / 0.5, 0.5, 2.0)
         sleep = 5 if p > 0.7 else 8 if p > 0.6 else 12
 
@@ -690,6 +701,13 @@ class AlphaRouter:
         key = self._key(symbol, timeframe)
         row = r.setdefault(key, {})
         w = float(row.get(strat_name, 1.0))
-        w = _clip(w + 0.1 * np.tanh(reward / 100.0), 0.2, 3.0)
+        # Recalibrated 2026-10-20 (Princewill approved): the
+        # reward arriving here is bounded to +/-1 by the
+        # callers, so tanh(reward/100) made every step
+        # ~0.001 - after 500+ closes all weights still sat
+        # at 1.000, i.e. the router was not learning. The
+        # step is now 0.1*tanh(reward) (~0.076 at full
+        # reward), same [0.2, 3.0] clip.
+        w = _clip(w + 0.1 * np.tanh(reward), 0.2, 3.0)
         row[strat_name] = float(w)
         _save_memo(self.memo)

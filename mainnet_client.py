@@ -115,6 +115,16 @@ class MainnetClient:
                           'side': 'Sell', 'orderType': 'Market',
                           'qty': f'{float(qty):.6f}'})
 
+    def create_market_sell_open(self, symbol, qty):
+        return self._req('POST', '/v5/order/create',
+                         {'category': 'linear', 'symbol': symbol, 'side': 'Sell',
+                          'orderType': 'Market', 'qty': str(qty)})
+
+    def create_market_buy_reduce(self, symbol, qty):
+        return self._req('POST', '/v5/order/create',
+                         {'category': 'linear', 'symbol': symbol, 'side': 'Buy',
+                          'orderType': 'Market', 'qty': str(qty), 'reduceOnly': True})
+
     def create_limit_postonly(self, symbol, side, qty, price):
         return self._req('POST', '/v5/order/create',
                          {'category': 'linear', 'symbol': symbol, 'side': side,
