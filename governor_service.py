@@ -116,7 +116,13 @@ def compute(tn):
     for b in BEINGS:
         s = scores[b]
         n = (stats.get(b) or {}).get('closes', 0)
-        modes[b] = 'paper' if (s is not None and s < 0 and n >= 15) else 'real'
+        # Demotion must be EVIDENCE, not noise: at these notionals a
+        # close's sigma is ~$0.30, so n=15-18 cannot resolve a
+        # -$0.004 expectancy from zero (the zoo was benched fleet-
+        # wide on four-tenths of a cent, 2026-10-20). Require a real
+        # sample AND material negativity.
+        exp = (stats.get(b) or {}).get('expectancy', 0.0)
+        modes[b] = 'paper' if (n >= 30 and exp <= -0.02) else 'real'
     if 0 < free < 15:
         top = max(weights, key=weights.get)
         for b in BEINGS:
