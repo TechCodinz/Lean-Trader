@@ -168,8 +168,12 @@ async def main():
     core = UltraCore(router, universe)
     risk = RiskEngine()
     orch = UltraContinuousTradingOrchestrator(core, risk)
-    orch.daily_balance = free
-    orch.total_balance = free
+    # Seed from EQUITY, never from momentary available: available can
+    # be ~$0 while positions are open, and a sub-$5 seed trips the
+    # orchestrator's own minimum-balance gate permanently.
+    _eq = tn.wallet_equity_usdt() or free
+    orch.daily_balance = _eq
+    orch.total_balance = _eq
     pub = ccxt.bybit()
     pub.load_markets()
     orch.executor = RelayExecutor(tn, pub)
@@ -194,7 +198,31 @@ async def main():
         nov = None
         logger.warning(f'NOVEMBER GROWTH unavailable: {e}')
 
+    async def _balance_sync():
+        # ROOT CAUSE of the zero-trade era (found 2026-10-20): the
+        # orchestrator and the November grower read their balance
+        # ONCE at boot. This instance booted when available was
+        # $0.64, so _can_trade's $5 minimum refused every trade for
+        # 16h while equity sat at $40 - and the grower "thought"
+        # about a $0.64 balance. Sync both to TRUE equity forever.
+        last = -1.0
+        while True:
+            try:
+                eq = tn.wallet_equity_usdt()
+                if eq and eq > 0:
+                    orch.total_balance = eq
+                    orch.daily_balance = eq
+                    if nov is not None:
+                        nov.current_balance = eq
+                    if abs(eq - last) > 0.5:
+                        logger.info(f'BALANCE SYNC: orchestrator + grower now on true equity ${eq:.2f}')
+                        last = eq
+            except Exception as e:
+                logger.warning(f'balance sync: {e}')
+            await asyncio.sleep(120)
+
     tasks = [
+        asyncio.create_task(_balance_sync()),
         asyncio.create_task(orch._continuous_trading_loop()),
         asyncio.create_task(orch._monitor_all_positions()),
         asyncio.create_task(orch._manage_compound_growth()),
