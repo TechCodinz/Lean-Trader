@@ -305,9 +305,24 @@ async def alpha_loop(orchestrator, hub, bus_hub, arm):
             except Exception:
                 pass
             since = int((time.time() - 130 * 3600) * 1000)
+            # Parallel market reads (parity with the testnet speed
+            # fix, 2026-10-20): public reads only, small pool.
+            from concurrent.futures import ThreadPoolExecutor
+
+            def _fetch(_pair):
+                try:
+                    return _pair, hub.ex.fetch_ohlcv(_pair + ':USDT', '1h',
+                                                     since, 120)
+                except Exception:
+                    return _pair, None
+
+            fetched = {}
+            with ThreadPoolExecutor(max_workers=6) as pool:
+                for _pair, _rows in pool.map(_fetch, pairs):
+                    fetched[_pair] = _rows
             for pair in pairs:
                 try:
-                    rows = hub.ex.fetch_ohlcv(pair + ':USDT', '1h', since, 120)
+                    rows = fetched.get(pair)
                     if not rows or len(rows) < 60:
                         continue
                     df = pd.DataFrame(rows, columns=['ts', 'open', 'high',

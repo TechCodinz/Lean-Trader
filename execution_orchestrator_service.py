@@ -354,17 +354,41 @@ async def alpha_loop(orchestrator, hub, bus_hub):
                 pass
             session_now = sessions.get_current_session()
             frames = [('15m', 40 * 3600, 160), ('1h', 130 * 3600, 120)]
+            # Parallel market reads (speed fix, 2026-10-20): the
+            # serial loop spent 25-80s per sweep fetching candles
+            # pair by pair - the 2025 design scanned in parallel.
+            # Public reads only, small pool, same decisions after.
+            from concurrent.futures import ThreadPoolExecutor
+
+            def _fetch(job):
+                _pair, _tf, _span, _limit = job
+                try:
+                    _since = int((time.time() - _span) * 1000)
+                    _rows = hub.ex.fetch_ohlcv(_pair + ':USDT', _tf,
+                                               _since, _limit)
+                except Exception:
+                    _rows = None
+                return _pair, _tf, _rows
+
+            jobs = []
             for pair in pairs:
                 # Analysis only where the testnet arm can execute
                 try:
                     if hub.market_spec(pair) is None:
                         continue
                 except Exception:
-                    pass
+                    continue
+                for tf, span, limit in frames:
+                    jobs.append((pair, tf, span, limit))
+            fetched = {}
+            if jobs:
+                with ThreadPoolExecutor(max_workers=6) as pool:
+                    for _pair, _tf, _rows in pool.map(_fetch, jobs):
+                        fetched[(_pair, _tf)] = _rows
+            for pair in pairs:
                 for tf, span, limit in frames:
                     try:
-                        since = int((time.time() - span) * 1000)
-                        rows = hub.ex.fetch_ohlcv(pair + ':USDT', tf, since, limit)
+                        rows = fetched.get((pair, tf))
                         if not rows or len(rows) < 60:
                             continue
                         df = pd.DataFrame(rows, columns=['ts', 'open', 'high',
@@ -389,7 +413,7 @@ async def alpha_loop(orchestrator, hub, bus_hub):
                         continue
         except Exception as e:
             logger.warning(f'alpha loop: {e}')
-        await asyncio.sleep(60)
+        await asyncio.sleep(30)
 
 
 def account_equity(tn):
