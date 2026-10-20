@@ -339,6 +339,50 @@ class MomentumThrust(BaseStrategy):
                     "features": {}}
 
 # ----------------- Regime / Session filters -----------------
+class FractalRegime(BaseStrategy):
+    """Excavated 2025 logic (DIVINE_INTELLIGENCE_FEATURES'
+    FractalDimensionAnalyzer, wired 2026-10-20): a regime voter.
+    The Hurst exponent on closes classifies the tape - trending
+    (H > 0.55): vote WITH the recent direction; mean-reverting
+    (H < 0.45): vote AGAINST it (fade); near 0.5 (random walk):
+    abstain. The ensemble had no regime-conditional voter:
+    momentum strategies fired in chop and reversion strategies
+    fired in trends; this voter leans the other way in each."""
+    name = "fractal_regime"
+    _analyzer = None
+
+    def compute(self, df: pd.DataFrame, **kw):
+        try:
+            close = df["close"]
+            if len(close) < 40:
+                return {"score": 0.0, "reasons": ["fractal: short df"],
+                        "features": {}}
+            if FractalRegime._analyzer is None:
+                from DIVINE_INTELLIGENCE_FEATURES import FractalDimensionAnalyzer
+                FractalRegime._analyzer = FractalDimensionAnalyzer()
+            prices = [float(x) for x in close.tolist()[-160:]]
+            hurst = float(FractalRegime._analyzer
+                          ._calculate_hurst_exponent(prices))
+            look = min(12, len(prices) - 1)
+            base = prices[-1 - look]
+            r = (prices[-1] / base - 1.0) if base else 0.0
+            direction = 1.0 if r >= 0 else -1.0
+            if hurst > 0.55:
+                score = direction * min(1.0, (hurst - 0.5) * 3.0)
+                why = f"fractal: H={hurst:.2f} trending, follow"
+            elif hurst < 0.45:
+                score = -direction * min(1.0, (0.5 - hurst) * 3.0)
+                why = f"fractal: H={hurst:.2f} reverting, fade"
+            else:
+                score = 0.0
+                why = f"fractal: H={hurst:.2f} random walk, abstain"
+            return {"score": float(max(-1.0, min(1.0, score))),
+                    "reasons": [why], "features": {"hurst": hurst}}
+        except Exception as e:
+            return {"score": 0.0, "reasons": [f"fractal: {e}"],
+                    "features": {}}
+
+
 class VolRegime(BaseStrategy):
     name = "regime"
 
@@ -417,6 +461,7 @@ class AlphaRouter:
             VWAPBounce(),
             VolumeSpike(),
             MomentumThrust(),
+            FractalRegime(),
             VolRegime(),
             SessionBias(),
         ]

@@ -695,7 +695,17 @@ while True:
             kelly_size = kelly.calculate_position_size(confidence=0.7, volatility=0.02, stop_loss_pct=0.02)
             # Apex aggressive sizing (2025)
             apex_tier, apex_cfg = apex.get_current_tier(cash)
-            size_usd = min(cash * apex_cfg["risk_pct"], cash * 0.95)
+            # Tier ladder is the sizing authority (restored
+            # 2026-10-20): tier_size was computed above and thrown
+            # away while this apex formula sized the trade instead -
+            # the ladder/compounding disconnect the speed audit
+            # traced. Princewill's BalanceTierCoordinator ladder
+            # now sets the base size; the compound engine adjusts
+            # it; the apex formula remains only as a fallback.
+            if tier_size and tier_size > 0:
+                size_usd = float(tier_size)
+            else:
+                size_usd = min(cash * apex_cfg["risk_pct"], cash * 0.95)
             size_usd = compounder.calculate_position_size(base_size=size_usd)
             if TRADING_MODE == 'testnet':
                 try:
