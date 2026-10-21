@@ -931,6 +931,16 @@ class UltraScalpingEngine:
                 self.logger.warning(
                     f"REAL scalp close {raw}: no exchange position "
                     f"- closed elsewhere, releasing")
+                # Evaporated fill (2026-10-21): when the open was
+                # accepted but no position ever materialised (empty
+                # testnet book), back the symbol off for the same
+                # 120s window order failures use - otherwise the scan
+                # re-fires on the unfillable book every few seconds
+                # (the DOOD loop: an attempt every ~10s all day).
+                _sbk = getattr(self, '_sym_backoff', None)
+                if _sbk is None:
+                    _sbk = self._sym_backoff = {}
+                _sbk[signal.symbol] = time.time() + 120
                 signal.real_qty = None
                 return True
             before = abs(float(pos.get('size') or 0))
