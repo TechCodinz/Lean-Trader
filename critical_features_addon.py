@@ -167,9 +167,30 @@ class PartialTPManager:
         # Calculate profit percentage
         profit_pct = (current_price - pos['entry_price']) / pos['entry_price']
 
+        # --- Ladder discipline (2026-10-21, Princewill's call) ---
+        # ONE rung per check with time spacing (the old code fired
+        # every passed rung in a single call at one price: three
+        # fee-paying confetti closes printing $0.00), a VALUE FLOOR
+        # so sub-fee slices are never shaved off dust positions,
+        # and TP3 arms a RUNNER (final slice rides the trailing
+        # stop) instead of emptying the position at +3%.
+        import time as _time
+        _now = _time.time()
+        if _now - pos.get('last_rung_ts', 0) < 90:
+            return []
+        _pos_value = pos['original_size'] * current_price
+
+        def _worth(size_units):
+            _sv = size_units * current_price
+            _sp = size_units * (current_price - pos['entry_price'])
+            return (_pos_value >= 3.0
+                    and _sp >= max(0.02, 5 * _sv * 0.00055))
+
         # Check TP1
         if not pos['tp1_hit'] and profit_pct >= self.tp_levels['TP1']['target']:
             size = pos['original_size'] * self.tp_levels['TP1']['percent']
+            if not _worth(size):
+                return orders
             orders.append(
                 {
                     'symbol': symbol,
@@ -180,13 +201,17 @@ class PartialTPManager:
                 }
             )
             pos['tp1_hit'] = True
+            pos['last_rung_ts'] = _now
             pos['remaining_size'] -= size
             pos['realized_pnl'] += size * (current_price - pos['entry_price'])
             print(f"🎯 TP1 hit for {symbol}: +{profit_pct:.1%}")
+            return orders
 
         # Check TP2
         if not pos['tp2_hit'] and profit_pct >= self.tp_levels['TP2']['target']:
             size = pos['original_size'] * self.tp_levels['TP2']['percent']
+            if not _worth(size):
+                return orders
             orders.append(
                 {
                     'symbol': symbol,
@@ -197,26 +222,32 @@ class PartialTPManager:
                 }
             )
             pos['tp2_hit'] = True
+            pos['last_rung_ts'] = _now
             pos['remaining_size'] -= size
             pos['realized_pnl'] += size * (current_price - pos['entry_price'])
             print(f"🎯 TP2 hit for {symbol}: +{profit_pct:.1%}")
+            return orders
 
-        # Check TP3
+        # Check TP3 -> RUNNER (2026-10-21): TP1+TP2 banked 75%;
+        # the final slice is NOT sold here - it rides the trailing
+        # stop, so a genuine move compounds instead of being
+        # banked flat at +3%. The zoo arms the runner on this
+        # marker (breakeven trailer floor + profit-taker exempt).
         if not pos['tp3_hit'] and profit_pct >= self.tp_levels['TP3']['target']:
-            size = pos['remaining_size']  # Close remaining
+            pos['tp3_hit'] = True
+            pos['runner'] = True
+            pos['last_rung_ts'] = _now
             orders.append(
                 {
                     'symbol': symbol,
                     'side': 'sell',
-                    'size': size,
+                    'size': 0.0,
                     'tp_level': 'TP3',
+                    'runner': True,
                     'price': current_price,
                 }
             )
-            pos['tp3_hit'] = True
-            pos['remaining_size'] = 0
-            pos['realized_pnl'] += size * (current_price - pos['entry_price'])
-            print(f"🎯 TP3 hit for {symbol}: +{profit_pct:.1%} - Position closed")
+            print(f"🏃 TP3 runner armed for {symbol}: +{profit_pct:.1%}")
 
         return orders
 

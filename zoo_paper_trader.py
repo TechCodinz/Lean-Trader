@@ -248,6 +248,10 @@ def _paper_close(symbol, side, size, price, reason):
     del positions[symbol]
     save_state()
     w = sum(1 for x in trades if x > 0)
+    try:
+        profit_taker.exempt.discard(symbol)
+    except Exception:
+        pass
     _tag = 'REAL' if pos.get('real') else 'PAPER'
     logger.info(f"PT SELL {symbol} ({reason}) ${pnl:+.2f} [{_tag}]")
     tg(f"{'💰 REAL' if _tag == 'REAL' else '📄 PAPER'} PT SELL {symbol} ({reason})\nP&L: ${pnl:+.2f}\nCash: {_cash_str()}\nW:{w}/{len(trades)}")
@@ -806,7 +810,10 @@ while True:
                     profit_taker.register_position(sym, 'buy', price, qty, 'micro_scalp' if sig == 'ultra_engine' else 'normal')
                 except Exception:
                     pass
-            partial.add_position(sym, price, size_usd)
+            # (duplicate dollar-denominated registration removed
+            # 2026-10-21: it overwrote the units registration
+            # above, so ladder slice sizes were computed on
+            # dollars-as-units - wrong in both directions.)
             logger.info(f"📈 BUY {sym} [{sig}] @ {price:.4f} ${size_usd:.2f}")
             tg(f"📈 BUY {sym}\nStrategy: {sig}\nEntry: ${price:.4f}\nSize: ${size_usd:.2f}")
             save_state()
@@ -828,6 +835,26 @@ while True:
                 if not _ptk or not _ptk.get('last'):
                     continue
                 for _ord in asyncio.run(partial.check_tp_levels(_psym, _ptk['last'])):
+                    if _ord.get('runner'):
+                        # TP3 reached: bank nothing more here -
+                        # arm the runner: mark the position, lift
+                        # its trailing floor to breakeven, and
+                        # exempt it from the profit taker.
+                        _ppos['runner'] = True
+                        save_state()
+                        try:
+                            trailer.stop_losses[_psym] = max(
+                                trailer.stop_losses.get(_psym, 0),
+                                _ppos['entry'] * 1.0)
+                        except Exception:
+                            pass
+                        try:
+                            profit_taker.exempt.add(_psym)
+                        except Exception:
+                            pass
+                        logger.info(f"🏃 RUNNER armed {_psym}: ladder banked 75%, final slice rides the trailing stop")
+                        tg(f"🏃 RUNNER {_psym} - TP1+TP2 banked; final slice rides the trailing stop")
+                        continue
                     _partial_close(_psym, _ptk['last'], _ord['size'], _ord['tp_level'])
         except Exception as e:
             logger.warning(f"partial tp: {e}")

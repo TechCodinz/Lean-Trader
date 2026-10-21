@@ -29,6 +29,9 @@ class AutoProfitTaker:
         
         # Track open positions
         self.open_positions = {}  # symbol -> position_data
+        # Runner symbols (ladder's final slice riding the trailer):
+        # never target-close these - the trailing stop owns them.
+        self.exempt = set()
         
         # Profit taking settings
         self.profit_targets = {
@@ -81,6 +84,8 @@ class AutoProfitTaker:
         
         for symbol in list(self.open_positions.keys()):
             try:
+                if symbol in getattr(self, 'exempt', set()):
+                    continue
                 position = self.open_positions[symbol]
                 
                 # Get current price
