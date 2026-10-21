@@ -254,7 +254,22 @@ def _paper_close(symbol, side, size, price, reason):
         pass
     _tag = 'REAL' if pos.get('real') else 'PAPER'
     logger.info(f"PT SELL {symbol} ({reason}) ${pnl:+.2f} [{_tag}]")
-    tg(f"{'💰 REAL' if _tag == 'REAL' else '📄 PAPER'} PT SELL {symbol} ({reason})\nP&L: ${pnl:+.2f}\nCash: {_cash_str()}\nW:{w}/{len(trades)}")
+    # TRUTH ROUTING (2026-10-21): while the truth service's
+    # heartbeat is fresh, IT announces real closes with the
+    # exchange figure - the zoo's internal P&L for real closes
+    # was signal-price fiction ($0.00 prints on positions the
+    # venue still held). Fail-open: no heartbeat, zoo speaks.
+    _truth_live = False
+    if _tag == 'REAL':
+        try:
+            import os as _os
+            import time as _tt
+            _truth_live = (_tt.time() - _os.path.getmtime(
+                '/app/runtime/truth_active') < 180)
+        except Exception:
+            _truth_live = False
+    if not _truth_live:
+        tg(f"{'💰 REAL' if _tag == 'REAL' else '📄 PAPER'} PT SELL {symbol} ({reason})\nP&L: ${pnl:+.2f}\nCash: {_cash_str()}\nW:{w}/{len(trades)}")
     return {'ok': True, 'pnl': pnl}
 
 try:

@@ -58,7 +58,20 @@ def capacity_summary(window_hours=72):
     """Per-being realized stats over the trailing window."""
     since = time.time() - window_hours * 3600
     out = {}
-    for r in load_closes(since):
+    _rows = load_closes(since)
+    # TRUTH OVERLAY (2026-10-21): when the truth service has
+    # written exchange records (source='exchange') into the
+    # window, real capacity is computed from THEM alone - the
+    # beings' own real records are signal-price estimates that
+    # the forensic read showed disagreeing with the venue by
+    # ~$11 over 48h. Paper stats are unaffected.
+    _has_truth = any(r.get('real')
+                     and r.get('source') == 'exchange'
+                     for r in _rows)
+    for r in _rows:
+        if (_has_truth and r.get('real')
+                and r.get('source') != 'exchange'):
+            continue
         b = out.setdefault(r['being'], {
             'closes': 0, 'wins': 0, 'realized_pnl': 0.0, 'paper_closes': 0,
             'paper_pnl': 0.0})

@@ -111,6 +111,15 @@ def main():
                 pnl = float(r.get('pnl') or 0)
                 meta = r.get('meta') or {}
                 strat = meta.get('strat') or r.get('being', 'unknown')
+                # TRUTH ROUTING (2026-10-21): a being's own real
+                # record is an estimate; its exchange twin
+                # (source='exchange', written by the truth
+                # service from fill prices + fees) is the record
+                # the learners, the pair study and the brain are
+                # fed. Skip the estimate; the twin follows in
+                # the same stream.
+                if r.get('real') and r.get('source') != 'exchange':
+                    continue
                 try:
                     ol.reward_from_exit_safe(sym, pnl)
                     fed_learner += 1
