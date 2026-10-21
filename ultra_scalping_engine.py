@@ -780,9 +780,28 @@ class UltraScalpingEngine:
                 tn.set_leverage(raw, 10)
             except Exception:
                 pass
-            res = (tn.create_market_sell_open(raw, qty_str(qty))
-                   if _is_short else
-                   tn.create_market_buy(raw, qty_str(qty)))
+            # MAKER-FIRST ROUTING (2026-10-21): the exchange
+            # record showed ~$0.02/round-trip of spread + taker
+            # fees eating the fleet; the maker-first orchestrator
+            # was the only arm beating that friction. Post at the
+            # touch for a 6s fuse - a fill (or a standing partial)
+            # is the entry - else ONE market fallback.
+            res = None
+            try:
+                from testnet_client import maker_open
+                _mk = maker_open(tn, raw, _is_short, qty, fuse_s=6)
+            except Exception:
+                _mk = None
+            if _mk:
+                res = {'orderId': _mk['orderId']}
+                qty = _mk['filled_qty']
+                self.logger.info(
+                    f'REAL scalp maker fill {raw} qty {qty} '
+                    f'@ {_mk.get("avg_price")}')
+            else:
+                res = (tn.create_market_sell_open(raw, qty_str(qty))
+                       if _is_short else
+                       tn.create_market_buy(raw, qty_str(qty)))
             if isinstance(res, dict) and res.get('orderId'):
                 signal.real_qty = qty
                 signal.real_entry = float(price)

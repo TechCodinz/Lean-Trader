@@ -242,6 +242,21 @@ class RelayExecutionArm:
                 return 0.0
 
             before = _pos_size()
+            # Touch-priced close first (routing wave, 2026-10-21):
+            # rest a reduce-only limit at the touch to catch the
+            # depth flickers that cancel market closes on thin
+            # books; the market loop below remains the fallback
+            # and the shrink check still arbitrates truth.
+            try:
+                from testnet_client import smart_close
+                if smart_close(tn, raw, side == 'buy', qty,
+                               wait_s=20) \
+                        and _pos_size() < before * 0.01:
+                    logger.info(f'⚡ REAL CLOSE {raw} qty {qty} '
+                                f'(touch fill verified)')
+                    return True
+            except Exception as _sce:
+                logger.warning(f'smart close {raw}: {_sce}')
             res = None
             for _ in range(3):
                 if side == 'buy':

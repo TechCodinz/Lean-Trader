@@ -127,6 +127,144 @@ class TestnetClient:
         return lst[0] if lst else {}
 
 
+# ---- Execution routing (2026-10-21, Princewill: resolve the way
+# ---- they trade and route it properly). The forensic read of the
+# ---- exchange record showed ~$0.02 per round trip of spread +
+# ---- taker fees eating the fleet on $5-12 notionals, while the
+# ---- maker-first orchestrator was the only arm whose per-close
+# ---- expectancy (+$0.28) beat the friction. These two helpers
+# ---- give every being that shape through the shared client.
+
+def _tick_size(client, symbol):
+    cache = getattr(client, '_tick_cache', None)
+    if cache is None:
+        cache = client._tick_cache = {}
+    if symbol not in cache:
+        try:
+            ii = client._req('GET', '/v5/market/instruments-info',
+                             {'category': 'linear', 'symbol': symbol})
+            pf = ((ii.get('list') or [{}])[0]).get(
+                'priceFilter') or {}
+            cache[symbol] = float(pf.get('tickSize') or 0)
+        except Exception:
+            cache[symbol] = 0.0
+    return cache[symbol]
+
+
+def _fmt_tick(price, tick):
+    import math
+    if not tick:
+        return str(price)
+    p = round(price / tick) * tick
+    dec = max(0, -int(math.floor(math.log10(tick)))) \
+        if tick < 1 else 0
+    return f'{p:.{dec}f}'
+
+
+def maker_open(client, symbol, is_short, qty, fuse_s=6):
+    """Maker-first entry: post-only at the touch for a short
+    fuse. Returns {'orderId', 'filled_qty', 'avg_price'} on a
+    full or standing partial fill, else None (the caller falls
+    back to its market path). Never leaves a resting order."""
+    import time as _t
+    try:
+        tk = client._req('GET', '/v5/market/tickers',
+                         {'category': 'linear', 'symbol': symbol})
+        row = (tk.get('list') or [{}])[0]
+        bid = float(row.get('bid1Price') or 0)
+        ask = float(row.get('ask1Price') or 0)
+        if not bid or not ask:
+            return None
+        price = _fmt_tick(ask if is_short else bid,
+                          _tick_size(client, symbol))
+        res = client.create_limit_postonly(
+            symbol, 'Sell' if is_short else 'Buy', qty, price)
+        oid = (res or {}).get('orderId')
+        if not oid:
+            return None
+        deadline = _t.time() + fuse_s
+        filled, avg = 0.0, 0.0
+        while _t.time() < deadline:
+            _t.sleep(1.2)
+            st = client.order_status(symbol, oid)
+            filled = float(st.get('cumExecQty') or 0)
+            avg = float(st.get('avgPrice') or 0)
+            if st.get('orderStatus') in (
+                    'Filled', 'Cancelled', 'Rejected',
+                    'PartiallyFilledCanceled'):
+                break
+        try:
+            client.cancel_order(symbol, oid)
+        except Exception:
+            pass
+        _t.sleep(0.4)
+        try:
+            st = client.order_status(symbol, oid)
+            filled = float(st.get('cumExecQty') or filled)
+            avg = float(st.get('avgPrice') or avg)
+        except Exception:
+            pass
+        if filled > 0:
+            return {'orderId': oid, 'filled_qty': filled,
+                    'avg_price': avg, 'maker': True}
+        return None
+    except Exception:
+        return None
+
+
+def smart_close(client, symbol, is_long, qty, wait_s=25):
+    """Touch-priced reduce-only close: rests a limit at the
+    touch to catch the depth flickers that cancel market closes
+    on thin testnet books (the stale-book lesson). Returns True
+    when the limit fully closed the quantity; False when
+    unfilled or partial - the caller then falls back to its
+    market close for the remainder. Never leaves a resting
+    order behind."""
+    import time as _t
+    try:
+        tk = client._req('GET', '/v5/market/tickers',
+                         {'category': 'linear', 'symbol': symbol})
+        row = (tk.get('list') or [{}])[0]
+        bid = float(row.get('bid1Price') or 0)
+        ask = float(row.get('ask1Price') or 0)
+        last = float(row.get('lastPrice') or 0)
+        if is_long:
+            px, side = (bid or last), 'Sell'
+        else:
+            px, side = (ask or last), 'Buy'
+        if not px:
+            return False
+        res = client._req(
+            'POST', '/v5/order/create',
+            {'category': 'linear', 'symbol': symbol, 'side': side,
+             'orderType': 'Limit', 'qty': qty_str(qty),
+             'price': _fmt_tick(px, _tick_size(client, symbol)),
+             'timeInForce': 'GTC', 'reduceOnly': True})
+        oid = (res or {}).get('orderId')
+        if not oid:
+            return False
+        deadline = _t.time() + wait_s
+        while _t.time() < deadline:
+            _t.sleep(2)
+            st = client.order_status(symbol, oid)
+            if st.get('orderStatus') == 'Filled':
+                return True
+            if st.get('orderStatus') in ('Cancelled', 'Rejected'):
+                break
+        try:
+            client.cancel_order(symbol, oid)
+        except Exception:
+            pass
+        _t.sleep(0.4)
+        try:
+            st = client.order_status(symbol, oid)
+            return float(st.get('cumExecQty') or 0) >= float(qty)
+        except Exception:
+            return False
+    except Exception:
+        return False
+
+
 def ccxt_to_raw(sym):
     # 'BTC/USDT:USDT' -> 'BTCUSDT'; dated/odd symbols -> None (paper-only)
     if sym.endswith('/USDT:USDT'):
