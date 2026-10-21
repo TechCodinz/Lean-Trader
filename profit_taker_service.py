@@ -46,7 +46,16 @@ class RelayExchange:
         return f"{base}/USDT:USDT"
 
     def fetch_ticker(self, symbol):
-        return self.pub.fetch_ticker(symbol)
+        # TESTNET frame only: prices come from the relay's testnet tickers.
+        # The original adapter read PUBLIC MAINNET tickers here, so every
+        # PnL comparison mixed frames (phantom +/-20-40% swings) - the
+        # 2026-10-21 frame lesson, applied to the exit manager.
+        raw = self._to_raw(symbol)
+        r = self.tn._req('GET', '/v5/market/tickers',
+                         {'category': 'linear', 'symbol': raw})
+        lst = (r or {}).get('list') or []
+        last = float(lst[0]['lastPrice']) if lst else 0.0
+        return {'last': last, 'symbol': symbol}
 
     def fetch_positions(self):
         out = []
@@ -70,7 +79,7 @@ class RelayExchange:
     def create_market_buy_order(self, symbol, cost):
         # AutoProfitTaker passes quote cost for short closes.
         raw = self._to_raw(symbol)
-        price = float(self.pub.fetch_ticker(symbol)['last'])
+        price = float(self.fetch_ticker(symbol)['last'])
         qty = float(cost) / price if price else 0
         return self.tn.create_market_buy(raw, qty)
 
