@@ -338,7 +338,7 @@ class ExchangeRouter:
         return sorted(set(out))
 
     # ---------- data ----------
-    def fetch_ticker(self, symbol: str) -> Dict[str, Any]:
+    def _fetch_ticker_live(self, symbol: str) -> Dict[str, Any]:
         # If exchange failed to load markets previously, avoid calling into it
         if getattr(self, "_exchange_malformed", False):
             return {"last": 0.0}
@@ -358,7 +358,7 @@ class ExchangeRouter:
             print(f"[router] fetch_ticker {symbol} outer error: {_e}")
             return {}
 
-    def fetch_ohlcv(
+    def _fetch_ohlcv_live(
         self, symbol: str, timeframe: str = "1m", limit: int = 200
     ) -> List[List[float]]:
         # If exchange failed to load markets previously, avoid calling into it and return synthesized bars
@@ -525,6 +525,55 @@ class ExchangeRouter:
         print(f'[router] NO DATA for {symbol} {timeframe} '
               f'(fetch failed) - returning empty; no trade on missing data')
         return bars
+
+    # ---------- shared data cache (2026-10-21) ----------
+    # The fleet's throttle was data supply: every engine, station
+    # and sweep re-fetched the same candles/tickers live from a
+    # rate-limited edge - thousands of failed fetches an hour and
+    # stations starving on NO DATA. The router every engine reads
+    # through now serves short-TTL cached copies (candles 20s,
+    # tickers 5s). Only successful non-empty results are cached;
+    # failures stay honest and retry on the next sweep. Same idiom
+    # as the zoo's 20s exchange-mark cache.
+    def fetch_ohlcv(self, symbol: str, timeframe: str = "1m",
+                    limit: int = 200) -> List[List[float]]:
+        import threading as _th
+        _c = getattr(self, '_ohlcv_cache', None)
+        if _c is None:
+            _c = self._ohlcv_cache = {}
+            self._ohlcv_lock = _th.Lock()
+        _k = (symbol, timeframe, limit)
+        _now = time.time()
+        with self._ohlcv_lock:
+            _hit = _c.get(_k)
+            if _hit and _now - _hit[0] < 20:
+                return list(_hit[1])
+        _bars = self._fetch_ohlcv_live(symbol, timeframe, limit)
+        if _bars:
+            with self._ohlcv_lock:
+                if len(_c) > 5000:
+                    _c.clear()
+                _c[_k] = (_now, list(_bars))
+        return _bars
+
+    def fetch_ticker(self, symbol: str) -> Dict[str, Any]:
+        import threading as _th
+        _c = getattr(self, '_ticker_cache', None)
+        if _c is None:
+            _c = self._ticker_cache = {}
+            self._ticker_lock = _th.Lock()
+        _now = time.time()
+        with self._ticker_lock:
+            _hit = _c.get(symbol)
+            if _hit and _now - _hit[0] < 5:
+                return dict(_hit[1])
+        _t = self._fetch_ticker_live(symbol)
+        if _t:
+            with self._ticker_lock:
+                if len(_c) > 5000:
+                    _c.clear()
+                _c[symbol] = (_now, dict(_t))
+        return _t
 
     # ---------- simple account view ----------
     def account(self) -> Dict[str, Any]:
