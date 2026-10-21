@@ -602,14 +602,20 @@ class UltraScalpingEngine:
     # executors: live-ticker sizing, conflict guard, margin backoff,
     # allocation-governed slice/cap, ledger-recorded closes.
     def _real_open(self, signal) -> None:
-        # Continuous profitability allowance (Peters' design -
-        # replaces a hard M30 gate, which froze stale evidence):
-        # NO station is demoted. Each real open is allowed only
-        # while its timeframe's RECENT measured expectancy (last 40
-        # ledger closes for that timeframe) is not clearly negative.
-        # A cold station is simply not used for this trade; it keeps
-        # analyzing and learning, and re-enters by itself when its
-        # window turns profitable again.
+        # TF STUDY (2026-10-21, corrected to Princewill's law):
+        # a loss triggers STUDY, never a block. The restoration-era
+        # allowance judged each timeframe by its last-40 ledger
+        # closes and silently refused real opens below -0.005 -
+        # a gate, however soft, and one fed ~99% by paper closes
+        # whose booking semantics changed repeatedly across the
+        # restoration, so its windows contradict each other by era.
+        # It had M1 - the primary station, the only one with a
+        # positive REAL record - dark on paper noise. The study
+        # remains (per-TF expectancy measured and logged, feeding
+        # the same learning loop as everything else); the block
+        # is gone. Risk lives where the design put it: the tight
+        # stop, the 5-minute timeout, the slice, the allocator's
+        # mode.
         try:
             import time as _tt
             if _tt.time() - getattr(self, '_tf_allow_ts', 0) > 300:
@@ -623,18 +629,16 @@ class UltraScalpingEngine:
                             _r = _jj.loads(_ln)
                         except Exception:
                             continue
-                        if _r.get('being') == 'master':
+                        if _r.get('being') == 'master' and _r.get('real'):
                             _tf = (_r.get('meta') or {}).get('tf')
                             if _tf:
                                 _acc[_tf].append(float(_r.get('pnl') or 0))
-                self._tf_allow = {}
-                for _tf, _ps in _acc.items():
-                    _recent = _ps[-40:]
-                    self._tf_allow[_tf] = not (
-                        len(_recent) >= 25
-                        and sum(_recent) / len(_recent) < -0.005)
-            if not self._tf_allow.get(getattr(signal, 'timeframe', ''), True):
-                return
+                for _tf, _ps in sorted(_acc.items()):
+                    if _ps:
+                        self.logger.info(
+                            f'TF STUDY {_tf}: real n={len(_ps)} '
+                            f'exp {sum(_ps) / len(_ps):+.4f} '
+                            f'(study only - never a block)')
         except Exception:
             pass
         import time as _t
