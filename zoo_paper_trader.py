@@ -502,6 +502,13 @@ def reconcile_from_exchange():
         try:
             import json as _oj
             _orch_owned = set(_oj.load(open('/app/runtime/orchestrator_positions.json')).keys())
+            # The sniper owns its symbols too (registry added
+            # 2026-10-21) - the same protection: never adopt (and
+            # exit) another being's positions.
+            try:
+                _orch_owned |= set(_oj.load(open('/app/runtime/master_positions.json')).keys())
+            except Exception:
+                pass
         except Exception:
             pass
         live = {}

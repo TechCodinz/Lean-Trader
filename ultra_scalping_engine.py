@@ -402,6 +402,7 @@ class UltraScalpingEngine:
 
     async def _monitor_positions(self) -> None:
         """Monitor active scalping positions"""
+        self._rehydrate_real()
         while True:
             try:
                 current_time = time.time()
@@ -524,6 +525,8 @@ class UltraScalpingEngine:
             self.total_profit += profit
 
             # Remove from active positions
+            if getattr(signal, 'real_entry', 0):
+                self._reg_pop(signal.symbol.split('/')[0] + 'USDT')
             del self.active_positions[position_id]
 
             # Log result
@@ -710,6 +713,7 @@ class UltraScalpingEngine:
                 self.logger.info(
                     f"REAL scalp {'sell' if _is_short else 'buy'} {raw} qty {qty} @ {price} "
                     f"(strat {signal.strategy} conf {signal.confidence:.2f})")
+                self._reg_put(raw, signal)
             else:
                 self.logger.warning(f"real open rejected {raw}: {res}")
                 if isinstance(res, dict) and '110007' in str(res):
@@ -718,6 +722,87 @@ class UltraScalpingEngine:
             if '110007' in str(e):
                 self._real_backoff_until = _t.time() + 60
             self.logger.warning(f"real open {signal.symbol}: {e}")
+
+    _REG_PATH = '/app/runtime/master_positions.json'
+
+    def _reg_read(self):
+        try:
+            import json as _j
+            return _j.load(open(self._REG_PATH))
+        except Exception:
+            return {}
+
+    def _reg_write(self, reg):
+        try:
+            import json as _j
+            with open(self._REG_PATH, 'w') as _f:
+                _j.dump(reg, _f)
+        except Exception:
+            pass
+
+    def _reg_put(self, raw, signal):
+        reg = self._reg_read()
+        reg[raw] = {'qty': float(getattr(signal, 'real_qty', 0) or 0),
+                    'entry': float(getattr(signal, 'real_entry', 0) or 0),
+                    'tf': signal.timeframe,
+                    'strat': signal.strategy, 'ts': time.time()}
+        self._reg_write(reg)
+
+    def _reg_pop(self, raw):
+        reg = self._reg_read()
+        if raw in reg:
+            del reg[raw]
+            self._reg_write(reg)
+
+    def _rehydrate_real(self):
+        """Boot recovery (2026-10-21): real positions lived only
+        on in-memory signal objects - a restart orphaned live
+        scalps, the zoo adopted them into its own book, and
+        master booked ZERO real closes while its opens fired
+        (the real count froze at 171 across two restarts). The
+        registry persists them now; the exchange verifies them;
+        survivors re-enter the monitor with the design geometry
+        (10-pip target/stop around the exchange avgPrice, a
+        fresh 300s budget, TF/strategy restored from the
+        registry)."""
+        try:
+            reg = self._reg_read()
+            if not reg:
+                return
+            live = {}
+            for _p in self._tn_client().positions():
+                live[_p.get('symbol')] = _p
+            for raw, info in list(reg.items()):
+                _p = live.get(raw)
+                if not _p or float(_p.get('size') or 0) <= 0:
+                    del reg[raw]
+                    continue
+                entry = float(_p.get('avgPrice')
+                              or info.get('entry') or 0)
+                if entry <= 0:
+                    continue
+                _short = (_p.get('side') == 'Sell')
+                _sig = ScalpSignal(
+                    symbol=raw[:-4] + '/USDT',
+                    timeframe=info.get('tf') or 'M1',
+                    entry_price=entry,
+                    target_price=entry * (0.999 if _short else 1.001),
+                    stop_loss=entry * (1.001 if _short else 0.999),
+                    confidence=0.75, profit_pips=10.0,
+                    risk_reward=1.0, timestamp=time.time(),
+                    strategy=info.get('strat') or 'rehydrated')
+                _sig.real_qty = abs(float(_p.get('size') or 0))
+                _sig.real_entry = entry
+                _pid = (f'{_sig.symbol}_{_sig.timeframe}'
+                        f'_rehyd_{int(time.time())}')
+                self.active_positions[_pid] = _sig
+                self.logger.warning(
+                    f'REHYDRATED real scalp {raw} '
+                    f'qty {_sig.real_qty} @ {entry} '
+                    f'({_sig.timeframe}/{_sig.strategy})')
+            self._reg_write(reg)
+        except Exception as e:
+            self.logger.warning(f'rehydrate: {e}')
 
     def _real_close(self, signal, exit_price: float) -> bool:
         qty = getattr(signal, 'real_qty', None)
