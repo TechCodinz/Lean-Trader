@@ -241,6 +241,25 @@ def compute(tn):
     import being_ledger
     stats = being_ledger.capacity_summary(72)
     free = wallet_free(tn)
+    # TRUE capacity (2026-10-21): the exchange gates new opens
+    # on the account IM rate against totalWalletBalance - NOT on
+    # displayed equity, which counts ~$20 of spot bags the
+    # margin engine values at zero (they are not even in the
+    # collateral table). The fleet stacked IM to 0.69 of an
+    # $8.09 wallet believing a $29 phantom; past the ceiling the
+    # exchange refuses EVERY new open (110007) while closes
+    # still work. Read the rate: the allocator must budget
+    # against reality.
+    im_rate = None
+    wallet_bal = None
+    try:
+        _wb = tn._req('GET', '/v5/account/wallet-balance',
+                      {'accountType': 'UNIFIED'})
+        _a = (_wb.get('list') or [{}])[0]
+        im_rate = float(_a.get('accountIMRate') or 0)
+        wallet_bal = float(_a.get('totalWalletBalance') or 0)
+    except Exception:
+        pass
     regime = current_regime()
 
     scores = {}
@@ -298,6 +317,23 @@ def compute(tn):
             if b != top:
                 modes[b] = 'paper'
 
+    # Capacity override: at IM rate >= 0.65 the exchange refuses
+    # new opens outright; granting real mode only manufactures
+    # 110007 spam (and WAF pressure). Beings keep analyzing and
+    # learning on paper, and their real books keep exiting
+    # (closes reduce IM); the grant returns by itself as
+    # positions recycle and the rate falls. This is the
+    # allocator's own budget function - organisation by measured
+    # capacity - not a halt: nothing stops.
+    capacity_blocked = im_rate is not None and im_rate >= 0.65
+    if capacity_blocked:
+        logger.warning(
+            f'CAPACITY: IM rate {im_rate:.2f} of wallet '
+            f'${wallet_bal:.2f} - exchange refuses new opens; '
+            f'beings paper until positions recycle')
+        for b in BEINGS:
+            modes[b] = 'paper'
+
     beings = {
         'zoo': {
             'mode': modes['zoo'],
@@ -334,6 +370,10 @@ def compute(tn):
     return {
         'ts': time.time(),
         'wallet_free': free,
+        'im_rate': (round(im_rate, 4)
+                    if im_rate is not None else None),
+        'wallet_balance': wallet_bal,
+        'capacity_blocked': capacity_blocked,
         'regime': regime,
         'scores': {b: (round(scores[b], 4) if scores[b] is not None else None)
                    for b in BEINGS},

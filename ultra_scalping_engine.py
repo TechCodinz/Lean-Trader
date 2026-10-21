@@ -162,6 +162,34 @@ class UltraScalpingEngine:
                 (x for x in ticks if x.endswith('/USDT:USDT')),
                 key=lambda x: -(ticks[x].get('quoteVolume') or 0))
             top = [x.replace(':USDT', '') for x in ranked[:24]]
+            # Venue truth (2026-10-21): the ranked list came from
+            # MAINNET tickers and carried instruments the execution
+            # venue does not list - tokenized stocks (SOXL, SNDK,
+            # SKHYNIX), XAU, SPCX - whose candles the router then
+            # fabricated as SYNTHETIC BARS (37k servings in one
+            # log) while the real arm could never trade them.
+            # Intersect with the venue's own listed linear symbols
+            # (cached 1h); if the venue read fails, keep the
+            # ranked list rather than going blind.
+            # Venue truth from the disk spec table the real arm
+            # maintains (2026-10-21) - no fetches from the scan
+            # loop (WAF). No table yet: keep the ranked list.
+            try:
+                import json as _uj
+                _disk = _uj.load(open(
+                    '/app/runtime/venue_instruments.json'))
+                _listed = {k[:-4] for k in (_disk or {}).keys()
+                           if k.endswith('USDT')}
+                if _listed:
+                    _kept = [x for x in top
+                             if x.split('/')[0] in _listed]
+                    if _kept:
+                        top = _kept[:24]
+                    self.logger.info(
+                        f'UNIVERSE venue-kept {len(top)}: '
+                        f'{top[:8]}')
+            except Exception:
+                pass
             if top:
                 syms = top
         except Exception:
@@ -649,7 +677,10 @@ class UltraScalpingEngine:
         # branches are the engine's original shape; shorts open
         # through the sell-open arm and close buy-reduce.
         _is_short = signal.target_price < signal.entry_price
-        if getattr(self, '_real_backoff_until', 0) > _t.time():
+        _sb = getattr(self, '_sym_backoff', None)
+        if _sb is None:
+            _sb = self._sym_backoff = {}
+        if _sb.get(signal.symbol, 0) > _t.time():
             return
         try:
             import allocation as _alloc
@@ -673,23 +704,76 @@ class UltraScalpingEngine:
             for pos in tn.positions():
                 if pos.get('symbol') == raw and float(pos.get('positionValue') or 0) >= 1.0:
                     return  # conflict guard: exchange already holds it
-            price = self._pub.fetch_ticker(signal.symbol)['last'] \
-                if getattr(self, '_pub', None) else None
+            # Execution-frame sizing v2 (2026-10-21): quantities
+            # are validated against the venue's lot specs, but
+            # the specs are near-static and WAF-expensive to read
+            # per signal - the whole fleet egresses as one IP and
+            # clustered market-data reads draw 403s while quiet
+            # probes pass. So the specs live in a DISK cache
+            # (/app/runtime/venue_instruments.json) refreshed by a
+            # single budgeted full-list read (at most one attempt
+            # per 10 min process-wide), and the sizing price is
+            # the signal's own analysis price - entry truth
+            # re-anchors to the exchange avgPrice after the fill,
+            # as designed. ZERO venue reads in the common path.
+            # Unknown spec: quantize 3dp; the per-symbol backoff
+            # absorbs a venue rejection.
+            _specs = getattr(self, '_spec_mem', None)
+            if _specs is None:
+                _specs = self._spec_mem = {}
+                try:
+                    import json as _sj
+                    _disk = _sj.load(open(
+                        '/app/runtime/venue_instruments.json'))
+                    for _k, _v in (_disk or {}).items():
+                        _specs[_k] = (float(_v[0]), float(_v[1]))
+                    if _specs:
+                        self._listed = set(_specs.keys())
+                except Exception:
+                    pass
+            if (not _specs or _t.time() - getattr(
+                    self, '_spec_refresh_ts', 0) > 600):
+                self._spec_refresh_ts = _t.time()
+                try:
+                    _ii = tn._req(
+                        'GET', '/v5/market/instruments-info',
+                        {'category': 'linear', 'limit': 1000})
+                    _new = {}
+                    for _i in (_ii.get('list') or []):
+                        _lot = _i.get('lotSizeFilter') or {}
+                        if _i.get('symbol'):
+                            _new[_i['symbol']] = (
+                                float(_lot.get('minOrderQty') or 0),
+                                float(_lot.get('qtyStep') or 0))
+                    if _new:
+                        _specs.update(_new)
+                        self._listed = set(_new.keys())
+                        import json as _sj
+                        with open(
+                                '/app/runtime/venue_instruments'
+                                '.json', 'w') as _f:
+                            _sj.dump({k: list(v) for k, v
+                                      in _new.items()}, _f)
+                except Exception:
+                    pass
+            _listed = getattr(self, '_listed', None)
+            if _listed is not None and raw not in _listed:
+                return  # the venue does not list this symbol
+            _min_qty, _step = _specs.get(raw, (0.0, 0.0))
+            price = float(signal.entry_price or 0)
             if not price:
-                import ccxt as _ccxt
-                self._pub = _ccxt.bybit({'enableRateLimit': True})
-                price = float(self._pub.fetch_ticker(signal.symbol)['last'])
+                return
             slice_usd = float(a.get('slice_usd', 12.0))
             qty = slice_usd / float(price)
-            try:
-                mkt = self._pub.market(signal.symbol + ':USDT')
-                step = float(mkt['precision']['amount'])
-                qty = quantize(qty, step)
-            except Exception:
-                qty = round(qty, 3)
-            # A quantized qty of 0 (slice below the lot minimum, e.g.
-            # BTC at a $12 slice) or a sub-$10 notional is a clean
-            # skip - never fall back to the unquantized amount.
+            qty = quantize(qty, _step) if _step else round(qty, 3)
+            if _min_qty and qty < _min_qty:
+                if _min_qty * float(price) <= slice_usd * 1.6:
+                    qty = _min_qty  # bump to the venue minimum
+                else:
+                    self.logger.info(
+                        f'real open {raw}: venue min {_min_qty} x '
+                        f'{price} exceeds slice {slice_usd} - skip')
+                    return  # venue minimum exceeds the slice
             if not qty or qty <= 0 or qty * float(price) < 5.5:
                 return
             try:
@@ -716,11 +800,12 @@ class UltraScalpingEngine:
                 self._reg_put(raw, signal)
             else:
                 self.logger.warning(f"real open rejected {raw}: {res}")
-                if isinstance(res, dict) and '110007' in str(res):
-                    self._real_backoff_until = _t.time() + 60
+                self._sym_backoff[signal.symbol] = _t.time() + 120
         except Exception as e:
-            if '110007' in str(e):
-                self._real_backoff_until = _t.time() + 60
+            _sb2 = getattr(self, '_sym_backoff', None)
+            if _sb2 is None:
+                _sb2 = self._sym_backoff = {}
+            _sb2[signal.symbol] = _t.time() + 120
             self.logger.warning(f"real open {signal.symbol}: {e}")
 
     _REG_PATH = '/app/runtime/master_positions.json'
