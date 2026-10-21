@@ -233,9 +233,26 @@ class SmartRiskManager:
     def can_open_position(self, symbol: str, signal_type: str) -> tuple[bool, str]:
         """Check if we can open a new position"""
         
-        # Check daily loss limit
-        if self.daily_pnl < -self.max_daily_loss:
-            return False, f"Daily loss limit reached: {self.daily_pnl:.2%}"
+        # Check daily loss limit. UNITS (2026-10-21): daily_pnl is
+        # DOLLARS (close_position adds (exit-entry)*size) while
+        # max_daily_loss is a FRACTION of capital (design: 5% of the
+        # balance per day). The raw comparison halted the engine after
+        # a five-cent day and printed the dollar figure as a percent
+        # ('-38.54%' was -$0.3854). Convert through the wired
+        # balance_fn; without a balance the engine is unfunded and the
+        # legacy raw cap applies.
+        _bal = 0.0
+        try:
+            if self.balance_fn is not None:
+                _bal = float(self.balance_fn() or 0.0)
+        except Exception:
+            _bal = 0.0
+        _limit = self.max_daily_loss * _bal if _bal > 0 else self.max_daily_loss
+        if self.daily_pnl < -_limit:
+            _pct = (self.daily_pnl / _bal * 100.0) if _bal > 0 else 0.0
+            return False, (f"Daily loss limit reached: ${self.daily_pnl:.2f} "
+                           f"({_pct:.1f}% of balance, limit "
+                           f"{self.max_daily_loss:.0%})")
         
         # Check max positions (intelligent cap)
         _cap = self._dynamic_cap()

@@ -305,6 +305,22 @@ class UltraContinuousTradingOrchestrator:
             syms = ['BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'ADA/USDT',
                     'SOL/USDT']
         syms = syms[:top]
+        # Venue truth (2026-10-21, the sniper's #143 pattern): the
+        # scored universe carries names not listed on testnet at all
+        # (WLD) - the grower wedged for hours retrying a dead contract
+        # (110074) plus a zero-position close (110017) at ~1Hz, 4.7M
+        # log lines, zero production. Intersect with the on-disk
+        # testnet instrument table before scanning.
+        try:
+            import json as _jv
+            with open('/app/runtime/venue_instruments.json') as _vf:
+                _venue = _jv.load(_vf)
+            _kept = [x for x in syms
+                     if x.replace('/USDT', 'USDT').replace('/', '') in _venue]
+            if _kept:
+                syms = _kept
+        except Exception:
+            pass
         self._sym_cache = (_t.time(), syms)
         self.logger.info(f'CONT UNIVERSE ({timeframe}): {syms}')
         return syms
