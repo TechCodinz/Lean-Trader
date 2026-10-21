@@ -161,7 +161,7 @@ class UltraScalpingEngine:
             ranked = sorted(
                 (x for x in ticks if x.endswith('/USDT:USDT')),
                 key=lambda x: -(ticks[x].get('quoteVolume') or 0))
-            top = [x.replace(':USDT', '') for x in ranked[:12]]
+            top = [x.replace(':USDT', '') for x in ranked[:24]]
             if top:
                 syms = top
         except Exception:
@@ -638,8 +638,10 @@ class UltraScalpingEngine:
         except Exception:
             pass
         import time as _t
-        if signal.target_price <= signal.entry_price:
-            return  # long-only v1: short signals stay simulated
+        # Bidirectional (design): the monitor's long/short
+        # branches are the engine's original shape; shorts open
+        # through the sell-open arm and close buy-reduce.
+        _is_short = signal.target_price < signal.entry_price
         if getattr(self, '_real_backoff_until', 0) > _t.time():
             return
         try:
@@ -681,13 +683,15 @@ class UltraScalpingEngine:
             # A quantized qty of 0 (slice below the lot minimum, e.g.
             # BTC at a $12 slice) or a sub-$10 notional is a clean
             # skip - never fall back to the unquantized amount.
-            if not qty or qty <= 0 or qty * float(price) < 10.0:
+            if not qty or qty <= 0 or qty * float(price) < 5.5:
                 return
             try:
                 tn.set_leverage(raw, 10)
             except Exception:
                 pass
-            res = tn.create_market_buy(raw, qty_str(qty))
+            res = (tn.create_market_sell_open(raw, qty_str(qty))
+                   if _is_short else
+                   tn.create_market_buy(raw, qty_str(qty)))
             if isinstance(res, dict) and res.get('orderId'):
                 signal.real_qty = qty
                 signal.real_entry = float(price)
@@ -700,7 +704,7 @@ class UltraScalpingEngine:
                         break
                     time.sleep(1)
                 self.logger.info(
-                    f"REAL scalp buy {raw} qty {qty} @ {price} "
+                    f"REAL scalp {'sell' if _is_short else 'buy'} {raw} qty {qty} @ {price} "
                     f"(strat {signal.strategy} conf {signal.confidence:.2f})")
             else:
                 self.logger.warning(f"real open rejected {raw}: {res}")
@@ -740,8 +744,11 @@ class UltraScalpingEngine:
             upnl = float(pos.get('unrealisedPnl') or 0)
             _att[raw] = time.time()
             res = None
+            _close_fn = (tn.create_market_buy_reduce
+                         if (pos.get('side') == 'Sell')
+                         else tn.create_market_sell_reduce)
             for _ in range(3):
-                res = tn.create_market_sell_reduce(raw, qty_str(qty))
+                res = _close_fn(raw, qty_str(qty))
                 if isinstance(res, dict) and res.get('orderId'):
                     break
             if not (isinstance(res, dict) and res.get('orderId')):

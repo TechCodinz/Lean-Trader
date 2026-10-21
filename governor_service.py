@@ -316,8 +316,16 @@ def compute(tn):
         },
         'master': {
             'mode': modes['master'],
-            'slice_usd': round(max(10.0, min(30.0, 8 + weights['master'] * 22)), 2),
-            'max_concurrent': max(1, min(3, round(1 + weights['master'] * 2))),
+            # Re-assembly to the engine's own design (2026-10-21):
+            # UltraScalpingEngine.MAX_POSITIONS is 10 - concurrency
+            # is the scalper's structure, not a governor dial. The
+            # governor's evidence levers stay the mode (real/paper)
+            # and the slice; the old formula capped the fleet's
+            # fastest engine at 1-3 concurrent and a $10 slice
+            # that its own $10 minimum kept rejecting after lot
+            # quantization.
+            'slice_usd': round(max(12.0, min(40.0, 10 + weights['master'] * 30)), 2),
+            'max_concurrent': 10,
         },
         'orchestrator': {
             'mode': modes['orchestrator'],
