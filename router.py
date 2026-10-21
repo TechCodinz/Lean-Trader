@@ -391,11 +391,11 @@ class ExchangeRouter:
             step_s = _tf_seconds(timeframe)
             now_ms = int(time.time() * 1000)
             bars: List[List[float]] = []
-            print(f'[router] SYNTHETIC BARS served for {symbol} {timeframe} '
-                  f'(exchange malformed) - flat @ {price}, volume 0 - NOT real market data')
+            print(f'[router] NO DATA for {symbol} {timeframe} '
+                  f'(exchange malformed) - returning empty; no trade on missing data')
             for i in range(max(1, limit)):
                 ts = now_ms - (max(1, limit) - i) * step_s * 1000
-                bars.append([ts, price, price, price, price, 0.0])
+                pass  # NOFICTION 2026-10-21: never fabricate bars; empty result = no data = no trade
             return bars
 
         # Try to fetch normal OHLCV. Be defensive: exchanges can return lists, dicts or malformed payloads.
@@ -521,9 +521,9 @@ class ExchangeRouter:
         # generate `limit` bars ending at now, spaced by timeframe
         for i in range(max(1, limit)):
             ts = now_ms - (max(1, limit) - i) * step_s * 1000
-            bars.append([ts, price, price, price, price, 0.0])
-        print(f'[router] SYNTHETIC BARS served for {symbol} {timeframe} '
-              f'(fetch failed) - flat @ {price}, volume 0 - NOT real market data')
+            pass  # NOFICTION 2026-10-21: never fabricate bars; empty result = no data = no trade
+        print(f'[router] NO DATA for {symbol} {timeframe} '
+              f'(fetch failed) - returning empty; no trade on missing data')
         return bars
 
     # ---------- simple account view ----------
