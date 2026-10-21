@@ -922,7 +922,7 @@ class UltraScalpingEngine:
             _att = getattr(self, '_close_attempts', None)
             if _att is None:
                 _att = self._close_attempts = {}
-            if time.time() - _att.get(raw, 0) < 120:
+            if time.time() - _att.get(raw, 0) < 30:
                 return False
             pos = self._testnet_pos(raw)
             if not pos:
@@ -946,6 +946,39 @@ class UltraScalpingEngine:
             before = abs(float(pos.get('size') or 0))
             upnl = float(pos.get('unrealisedPnl') or 0)
             _att[raw] = time.time()
+            # Touch close first (2026-10-21): the routing wave's
+            # smart_close - the same helper the orchestrator arm
+            # uses. A reduce-only limit resting at the touch catches
+            # the depth flickers that plain market closes keep
+            # missing on these books (the real arm's median hold was
+            # ~16 minutes against 8-second paper scalps - exits, not
+            # entries, were the velocity killer). The market loop
+            # below stays as fallback; the shrink check stays judge.
+            try:
+                from testnet_client import smart_close
+                if smart_close(tn, raw, (pos.get('side') == 'Buy'),
+                               qty, wait_s=20):
+                    _chk = self._testnet_pos(raw)
+                    _left = abs(float((_chk or {}).get('size') or 0))
+                    if _left < before * 0.01:
+                        self.logger.info(
+                            f"REAL scalp close {raw} qty {qty} "
+                            f"pnl ${upnl:+.4f} (touch fill, exchange "
+                            f"uPnL verified)")
+                        try:
+                            import being_ledger
+                            being_ledger.record_close(
+                                'master', signal.symbol, upnl,
+                                real=True,
+                                meta={'strat': signal.strategy,
+                                      'engine': 'scalp',
+                                      'tf': signal.timeframe,
+                                      'exit': 'touch'})
+                        except Exception:
+                            pass
+                        return True
+            except Exception as _e:
+                self.logger.warning(f'smart close {raw}: {_e}')
             res = None
             _close_fn = (tn.create_market_buy_reduce
                          if (pos.get('side') == 'Sell')
