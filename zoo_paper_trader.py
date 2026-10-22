@@ -38,7 +38,8 @@ def tg(msg):
     # here. Operational messages (startup, reconcile, prune,
     # emergency) still send.
     if any(_k in msg for _k in ('PAPER', '\U0001f4c8 BUY', '\U0001f4c9 SELL',
-                                'PT SELL', 'PARTIAL', 'RUNNER')):
+                                'PT SELL', 'PARTIAL', 'RUNNER',
+                                'reconciled orphan', 'pruned ghost')):
         return
     try:
         tok=os.getenv("TELEGRAM_BOT_TOKEN",""); cid=os.getenv("TELEGRAM_CHAT_ID","")
@@ -156,9 +157,35 @@ def _partial_close(symbol, price, qty_sell, level):
                     pass
                 if _q <= 0:
                     return False
+                _xb = None
+                for _p0 in tn.positions():
+                    if (_p0.get('symbol') or '') == _rs:
+                        _xb = abs(float(_p0.get('size') or 0))
+                        break
                 tn.create_market_sell(_rs, _qty_str(_q))
+                # Verify the rung actually filled (2026-10-22): an
+                # accepted order on a thin book is routinely
+                # cancelled unfilled; booking on the response
+                # shrank the book while the exchange kept the
+                # position - reconcile re-adopted it and the
+                # adopt/close cycle (and its Telegrams) repeated.
+                _filled = False
+                if _xb is not None:
+                    for _ in range(3):
+                        time.sleep(2)
+                        _xa = None
+                        for _p1 in tn.positions():
+                            if (_p1.get('symbol') or '') == _rs:
+                                _xa = abs(float(_p1.get('size') or 0))
+                                break
+                        if _xa is not None and _xa <= _xb - _q * 0.99:
+                            _filled = True
+                            break
+                if not _filled:
+                    logger.warning(f"TESTNET PARTIAL SELL unfilled {symbol} - position unchanged; not booking")
+                    return False
                 qty_sell = _q
-                logger.info(f"TESTNET PARTIAL SELL {level} {symbol} ({_rs}) qty {_q} @ {price}")
+                logger.info(f"TESTNET PARTIAL SELL {level} {symbol} ({_rs}) qty {_q} @ {price} (verified)")
             except Exception as e:
                 logger.warning(f"testnet partial sell failed {symbol}: {e}")
                 return False
@@ -216,8 +243,33 @@ def _paper_close(symbol, side, size, price, reason):
         try:
             _rs = _ccxt_to_raw(symbol)
             if not _rs: raise Exception('unmapped symbol')
+            _xb = None
+            for _p0 in tn.positions():
+                if (_p0.get('symbol') or '') == _rs:
+                    _xb = abs(float(_p0.get('size') or 0))
+                    break
             tn.create_market_sell_reduce(_rs, _qty_str(pos['qty']))
-            logger.info(f"TESTNET PT SELL filled {symbol}")
+            # Verify the fill (2026-10-22): booking on the order
+            # response alone deleted positions the exchange still
+            # held; reconcile re-adopted them and the cycle (and
+            # its Telegrams) repeated for hours. The exchange
+            # position is the only proof of a close.
+            _gone = False
+            if _xb is not None:
+                for _ in range(3):
+                    time.sleep(2)
+                    _xa = 0.0
+                    for _p1 in tn.positions():
+                        if (_p1.get('symbol') or '') == _rs:
+                            _xa = abs(float(_p1.get('size') or 0))
+                            break
+                    if _xa < _xb * 0.01:
+                        _gone = True
+                        break
+            if not _gone:
+                logger.warning(f"TESTNET PT SELL unfilled {symbol} - position unchanged; keeping the book entry")
+                return {'ok': False, 'error': 'unfilled'}
+            logger.info(f"TESTNET PT SELL filled {symbol} (verified)")
         except Exception as e:
             logger.warning(f"testnet PT SELL failed {symbol}: {e}")
             return {'ok': False, 'error': str(e)}
