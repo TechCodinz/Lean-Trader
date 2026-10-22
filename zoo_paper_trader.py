@@ -29,6 +29,17 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 logger = logging.getLogger('ZOO')
 
 def tg(msg):
+    # Telegram carries REAL results only (Princewill, 2026-10-22):
+    # paper results are a frictionless-fill artifact, and the zoo's
+    # own estimated real closes double-report. The truth service is
+    # the single voice for real closes at exchange prices, so the
+    # zoo's trade announcements (paper buys/sells, PT sells,
+    # partials, runners, its estimated real closes) are dropped
+    # here. Operational messages (startup, reconcile, prune,
+    # emergency) still send.
+    if any(_k in msg for _k in ('PAPER', '\U0001f4c8 BUY', '\U0001f4c9 SELL',
+                                'PT SELL', 'PARTIAL', 'RUNNER')):
+        return
     try:
         tok=os.getenv("TELEGRAM_BOT_TOKEN",""); cid=os.getenv("TELEGRAM_CHAT_ID","")
         if tok and cid: requests.post(f"https://api.telegram.org/bot{tok}/sendMessage", json={"chat_id":cid,"text":msg}, timeout=5)
