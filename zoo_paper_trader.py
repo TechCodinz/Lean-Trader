@@ -39,7 +39,8 @@ def tg(msg):
     # emergency) still send.
     if any(_k in msg for _k in ('PAPER', '\U0001f4c8 BUY', '\U0001f4c9 SELL',
                                 'PT SELL', 'PARTIAL', 'RUNNER',
-                                'reconciled orphan', 'pruned ghost')):
+                                'reconciled orphan', 'pruned ghost',
+                                'TESTNET MODE', 'Zoo Trader LIVE')):
         return
     try:
         tok=os.getenv("TELEGRAM_BOT_TOKEN",""); cid=os.getenv("TELEGRAM_CHAT_ID","")

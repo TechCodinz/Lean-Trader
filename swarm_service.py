@@ -51,6 +51,11 @@ def _alloc(being, key, default):
 
 
 def tg(msg):
+    # Telegram carries REAL results only (Princewill, 2026-10-22):
+    # study announcements are learning telemetry, not results -
+    # they stay in the log and the pair-study record.
+    if 'STUDYING' in msg:
+        return
     tok = os.environ.get('TELEGRAM_BOT_TOKEN', '')
     cid = os.environ.get('TELEGRAM_CHAT_ID', '')
     if not tok or not cid:
