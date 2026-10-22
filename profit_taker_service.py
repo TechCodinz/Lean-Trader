@@ -74,6 +74,18 @@ class RelayExchange:
 
     def create_market_sell_order(self, symbol, size):
         raw = self._to_raw(symbol)
+        # Touch close first (2026-10-22): a reduce-only limit
+        # resting at the touch catches the depth flickers this
+        # service's market closes have missed for a day on the
+        # stale book - the funding rent. Same smart_close route
+        # the sniper and orchestrator arms use; market fallback.
+        try:
+            from testnet_client import smart_close
+            if smart_close(self.tn, raw, True, float(size), wait_s=30):
+                return {'id': 'touch', 'orderId': 'touch',
+                        'symbol': raw, 'filled': float(size)}
+        except Exception:
+            pass
         return self.tn.create_market_sell_reduce(raw, float(size))
 
     def create_market_buy_order(self, symbol, cost):
@@ -81,6 +93,14 @@ class RelayExchange:
         raw = self._to_raw(symbol)
         price = float(self.fetch_ticker(symbol)['last'])
         qty = float(cost) / price if price else 0
+        try:
+            from testnet_client import smart_close
+            if qty > 0 and smart_close(self.tn, raw, False, qty,
+                                       wait_s=30):
+                return {'id': 'touch', 'orderId': 'touch',
+                        'symbol': raw, 'filled': qty}
+        except Exception:
+            pass
         return self.tn.create_market_buy(raw, qty)
 
 

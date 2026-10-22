@@ -174,12 +174,14 @@ def _allocator_select(stats, free):
     mu = {}
     for b in BEINGS:
         st = stats.get(b) or {}
-        # Evidence discipline (Princewill's own demotion standard):
-        # under 30 closes there is no track record to select on -
-        # the being is an explorer with a small positive mu, never
-        # benched by an anecdote (one pre-restoration close of
-        # -$2.44 sat in 'continuous' history all day).
-        mu[b] = float(st.get('expectancy', 0.0)) if (st.get('closes') or 0) >= 30 else 0.001
+        # Explorer mu is for a being with NO record (0 closes).
+        # A being with closes HAS a record and is selected on it:
+        # the old <30 rule let an 0-for-18 record carry a
+        # fictional +0.001 and hold a real grant (2026-10-22
+        # audit). A single bad anecdote still cannot bench anyone
+        # by itself - it lands in the expectancy like any close,
+        # and the rehabilitation path below re-earns by paper form.
+        mu[b] = float(st.get('expectancy', 0.0)) if (st.get('closes') or 0) >= 1 else 0.001
     if not _ALLOC_OK:
         return None, mu
     try:
@@ -298,7 +300,11 @@ def compute(tn):
         # wide on four-tenths of a cent, 2026-10-20). Require a real
         # sample AND material negativity.
         exp = (stats.get(b) or {}).get('expectancy', 0.0)
-        demoted = (n >= 30 and exp <= -0.02)
+        # Deep-negative is a record at any sample size: the n>=30
+        # evidence rule was written for borderline readings
+        # (-$0.004 inside one standard error), not for -$0.10
+        # with zero wins - that being studies, at any n.
+        demoted = (n >= 30 and exp <= -0.02) or (n >= 1 and exp <= -0.03)
         # Rehabilitation by ADVANCEMENT (Peters' no-demotion rule):
         # a benched being keeps working on paper; if its CURRENT
         # paper form measures profitable over a real sample, it has
@@ -311,6 +317,24 @@ def compute(tn):
         if selected is not None:
             real = real and (b in selected)
         modes[b] = 'real' if real else 'paper'
+    # Probation (2026-10-22): real mode used to be the default -
+    # a being kept it unless proven bad at n>=30, so the grants
+    # sat with whoever lost slowest. Now a negative truth
+    # expectancy holds only a ranked probation grant: the top
+    # two such beings keep minimal real exposure (the fleet
+    # keeps generating truth); the rest study on paper and
+    # re-enter by rank. Positive expectancy earns the full
+    # grant as before; explorers with no record are untouched.
+    probation = set()
+    _cand = [b for b in BEINGS
+             if modes[b] == 'real'
+             and (stats.get(b) or {}).get('closes', 0) >= 1
+             and (stats.get(b) or {}).get('expectancy', 0.0) < 0]
+    _cand.sort(key=lambda b: -((stats.get(b) or {}).get('expectancy', 0.0)))
+    for _b in _cand[2:]:
+        modes[_b] = 'paper'
+    probation = set(_cand[:2])
+
     if 0 < free < 8 and selected is None:
         top = max(weights, key=weights.get)
         for b in BEINGS:
@@ -367,6 +391,15 @@ def compute(tn):
             'mode': modes['orchestrator'],
         },
     }
+    for _b in probation:
+        _bd = beings.get(_b) or {}
+        if 'slice_usd' in _bd:
+            _bd['slice_usd'] = min(_bd['slice_usd'], 12.0)
+        if 'max_concurrent' in _bd and _b != 'master':
+            _bd['max_concurrent'] = min(_bd['max_concurrent'], 2)
+        if _b == 'zoo':
+            _bd['real_cap'] = min(_bd.get('real_cap', 0), 1)
+        _bd['probation'] = True
     return {
         'ts': time.time(),
         'wallet_free': free,
