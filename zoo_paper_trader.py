@@ -588,24 +588,52 @@ def reconcile_from_exchange():
             elif abs(float(_cur.get('qty') or 0) - _size) > 1e-9:
                 logger.warning(f'RECONCILE qty {_sym}: book {_cur.get("qty")} -> exchange {_size}')
                 _cur['qty'] = _size
+        # Persist the reconciled book immediately (2026-10-22):
+        # saves otherwise fire only on closes, so adopted orphans
+        # lived in memory for hours while the state file - and
+        # every reader of it, including the fleet watch - still
+        # showed them unowned (the four-run orphan alert).
+        try:
+            save_state()
+        except Exception:
+            pass
     except Exception as e:
         logger.warning(f'reconcile failed: {e}')
 
 
 _EXCH_REAL_N = 99
 ENGINE_HOT = {}
+_ESTOP_BASELINE = None
+_ESTOP_ANNOUNCED = False
 
 while True:
     try:
-        _entries_blocked = emergency.check_conditions(cash, 100.0)
+        # Emergency brake (2026-10-22 repair): the loss check used
+        # to compare the paper account's LIFETIME realized cash
+        # against a hardcoded $100, so a restored balance of $87.56
+        # tripped it on the first cycle after the 05:45 restart and
+        # it could never unlatch (realized drift does not heal) -
+        # the zoo's entries, paper learning included, stayed halted
+        # while Telegram got the alert every cycle. The brake now
+        # measures a SESSION drawdown (baseline = balance at this
+        # process's first check; a >=10% slide from there is the
+        # black-swan event it exists for) and announces once when it
+        # latches and once when it clears.
+        if _ESTOP_BASELINE is None:
+            _ESTOP_BASELINE = cash
+        _entries_blocked = emergency.check_conditions(cash, _ESTOP_BASELINE)
         if _entries_blocked:
             logger.error("🚨 EMERGENCY - entries halted, exits still managed")
-            tg("🚨 EMERGENCY STOP - entries halted, exits still managed")
+            if not _ESTOP_ANNOUNCED:
+                _ESTOP_ANNOUNCED = True
+                tg("🚨 EMERGENCY STOP - entries halted, exits still managed")
         elif emergency.emergency_active:
-            # The latch used to hold forever (Peters: the stuck flag
-            # killed the 2025 run). Conditions cleared -> unlatch.
+            # Conditions cleared -> unlatch.
             emergency.reset()
             logger.info("✅ Emergency conditions cleared - entries resumed")
+            if _ESTOP_ANNOUNCED:
+                _ESTOP_ANNOUNCED = False
+                tg("✅ Emergency conditions cleared - entries resumed")
         reconcile_from_exchange()
         tickers = ex.fetch_tickers()
         cands = [(s,t['last']) for s,t in tickers.items() if '/USDT' in s and t.get('quoteVolume',0)>1000000 and t['last']]
