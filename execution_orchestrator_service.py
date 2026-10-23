@@ -326,6 +326,42 @@ class PriceAdapter:
 
 _PENDING_ATTR = {}
 
+# === TRUTH WIRE (2026-10-23, Princewill's order) =====================
+# Until now the router learned from this service's own book PnL at
+# close time - the book that claimed +$1.38 while the exchange
+# recorded -$6.37. Book closes now only STASH their attribution;
+# the router is taught exclusively by truth_teaching_loop() from
+# the truth service's exchange records (fills + fees), matched by
+# symbol and close time. One reward source: the exchange.
+_PENDING_TRUTH = {}  # symbol -> [prob, votes, tf, side, book_close_ts]
+_PENDING_FILE = '/app/runtime/pending_truth_attr.json'
+_TEACH_STATE = '/app/runtime/truth_teach_state.json'
+
+
+def _save_pendings():
+    import json as _j, os as _o
+    try:
+        _tmp = _PENDING_FILE + '.tmp'
+        with open(_tmp, 'w') as f:
+            _j.dump(_PENDING_TRUTH, f)
+        _o.replace(_tmp, _PENDING_FILE)
+    except Exception:
+        pass
+
+
+def _load_pendings():
+    import json as _j
+    try:
+        with open(_PENDING_FILE) as f:
+            for k, v in (_j.load(f) or {}).items():
+                if isinstance(v, list) and len(v) == 5:
+                    _PENDING_TRUTH[k] = v
+    except Exception:
+        pass
+
+
+_load_pendings()
+
 class BusHub:
     """The orchestrator's data hub: alert queue in, trade records
     out to the capacity ledger + Telegram."""
@@ -344,23 +380,20 @@ class BusHub:
                     meta={'reason': record.get('reason'),
                           'strat': 'alpha_router'})
                 try:
+                    import time as _time
                     _key = str(record.get('symbol') or '').replace(':USDT', '')
                     _attr = _PENDING_ATTR.pop(_key, None)
                     if _attr:
-                        from alpha_engines import AlphaRouter
-                        _r = AlphaRouter()
                         _prob, _votes, _tf, _side = _attr
-                        _conv = _prob if _side == 'buy' else 1.0 - _prob
-                        _pnl = float(record.get('pnl') or 0.0)
-                        _r.note_outcome(_conv, _pnl)
-                        for _sn, _sv in _votes.items():
-                            _r.update_reliability(
-                                _key, _tf, _sn,
-                                (1.0 if _pnl > 0 else -1.0)
-                                * min(1.0, abs(_sv)))
-                        logger.info(f'ATTRIBUTION: {_key} close '
-                                    f'${_pnl:+.2f} taught the router '
-                                    f'({_tf}, conv {_conv:.2f})')
+                        _PENDING_TRUTH[_key] = [
+                            float(_prob), dict(_votes or {}), _tf,
+                            _side, _time.time()]
+                        _save_pendings()
+                        logger.info(
+                            f'TRUTH-WAIT: {_key} book close '
+                            f'${float(record.get("pnl") or 0.0):+.2f} '
+                            f'stashed - the router learns only when '
+                            f'the exchange record lands')
                 except Exception:
                     pass
                 tg(f"⚡ Orchestrator close {record.get('symbol')} "
@@ -409,7 +442,7 @@ async def decision_feeder(hub):
 async def alpha_loop(orchestrator, hub, bus_hub):
     """Feed the orchestrator the way the design intends: the alpha
     engines return SCORES; AlphaRouter fuses them (with the
-    reliability weights the zoo's closes keep teaching it - fresh
+    reliability weights exchange-truth closes keep teaching it - fresh
     instance each cycle reads the shared memo). Router buy verdicts
     enter the alert queue, so the orchestrator's own gates (risk
     manager, Kelly sizing) decide execution. 1h frames match the
@@ -713,6 +746,107 @@ async def exchange_sync_loop(orchestrator, arm):
         await asyncio.sleep(180)
 
 
+
+async def truth_teaching_loop():
+    """Teach AlphaRouter from EXCHANGE truth (truth wire, 2026-10-23).
+
+    Scans the being ledger's source='exchange' records for this
+    being via a persisted byte cursor, matches each to the book
+    close that stashed its attribution in _PENDING_TRUTH (same
+    symbol, nearest time, +-900s), and teaches the router with the
+    EXCHANGE pnl - fills and fees included. Unmatched pendings
+    expire after 24h (the truth service attributes some closes to
+    'fleet'; those teach nothing, by design)."""
+    import json as _j, os as _o, time as _t
+    ledger_path = '/app/runtime/being_ledger.jsonl'
+    offset = None
+    try:
+        with open(_TEACH_STATE) as f:
+            offset = int((_j.load(f) or {}).get('offset'))
+    except Exception:
+        offset = None
+    if offset is None:
+        try:
+            offset = _o.path.getsize(ledger_path)
+        except Exception:
+            offset = 0
+    logger.info(f'truth wire: teaching loop live (ledger cursor {offset})')
+    while True:
+        try:
+            await asyncio.sleep(45)
+            try:
+                size = _o.path.getsize(ledger_path)
+            except Exception:
+                continue
+            if size < offset:
+                offset = 0  # ledger rotated/truncated: rescan
+            if size == offset:
+                continue
+            rows = []
+            with open(ledger_path) as f:
+                f.seek(offset)
+                chunk = f.read()
+                cut = chunk.rfind('\n')
+                if cut < 0:
+                    continue
+                chunk = chunk[:cut + 1]
+                offset += len(chunk.encode())
+                for line in chunk.splitlines():
+                    try:
+                        rows.append(_j.loads(line))
+                    except Exception:
+                        pass
+            taught = 0
+            for row in rows:
+                if row.get('source') != 'exchange':
+                    continue
+                if row.get('being') != 'orchestrator':
+                    continue
+                sym = str(row.get('symbol') or '')
+                ts = float(row.get('ts') or 0)
+                pnl = float(row.get('pnl') or 0.0)
+                best = None
+                for k, v in list(_PENDING_TRUTH.items()):
+                    if k == sym and abs(ts - float(v[4])) <= 900:
+                        if best is None or abs(ts - float(v[4])) < \
+                                abs(ts - float(_PENDING_TRUTH[best][4])):
+                            best = k
+                if best is None:
+                    continue
+                _prob, _votes, _tf, _side, _cts = _PENDING_TRUTH.pop(best)
+                from alpha_engines import AlphaRouter
+                _r = AlphaRouter()
+                _conv = _prob if _side == 'buy' else 1.0 - _prob
+                _r.note_outcome(_conv, pnl)
+                for _sn, _sv in (_votes or {}).items():
+                    _r.update_reliability(
+                        best, _tf, _sn,
+                        (1.0 if pnl > 0 else -1.0)
+                        * min(1.0, abs(float(_sv))))
+                taught += 1
+                logger.info(f'TRUTH-LEARN: {best} exchange ${pnl:+.2f} '
+                            f'taught the router ({_tf}, conv {_conv:.2f})')
+            now = _t.time()
+            stale = [k for k, v in _PENDING_TRUTH.items()
+                     if now - float(v[4]) > 86400]
+            for k in stale:
+                _PENDING_TRUTH.pop(k, None)
+                logger.info(f'TRUTH-EXPIRE: {k} pending attribution '
+                            f'never matched an exchange record')
+            if taught or stale:
+                _save_pendings()
+            try:
+                _tmp = _TEACH_STATE + '.tmp'
+                with open(_tmp, 'w') as f:
+                    _j.dump({'offset': offset}, f)
+                _o.replace(_tmp, _TEACH_STATE)
+            except Exception:
+                pass
+        except Exception as e:
+            logger.warning(f'truth_teaching_loop: {e}')
+            await asyncio.sleep(30)
+
+
 async def main():
     from data_hub import MarketDataHub
     from EXECUTION_ORCHESTRATOR import ExecutionOrchestrator
@@ -745,6 +879,7 @@ async def main():
         alpha_loop(orchestrator, hub, bus_hub),
         stats_loop(orchestrator, arm),
         exchange_sync_loop(orchestrator, arm),
+        truth_teaching_loop(),
     )
 
 
