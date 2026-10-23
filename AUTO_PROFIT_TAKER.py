@@ -13,6 +13,17 @@ from datetime import datetime, timedelta
 logger = logging.getLogger(__name__)
 
 
+def _own_base(sym):
+    """Canonical base asset for ownership matching across the
+    fleet's symbol dialects ('KASUSDT', 'KAS/USDT' and
+    'KAS/USDT:USDT' all name the same perp)."""
+    s = str(sym or '').upper()
+    for suf in (':USDT', '/USDT', 'USDT'):
+        if s.endswith(suf):
+            s = s[:-len(suf)]
+    return s.split('/')[0]
+
+
 class AutoProfitTaker:
     """
     Monitors open positions and closes them when profit targets hit
@@ -32,6 +43,7 @@ class AutoProfitTaker:
         # Runner symbols (ladder's final slice riding the trailer):
         # never target-close these - the trailing stop owns them.
         self.exempt = set()
+        self._owned_bases = set()
         
         # Profit taking settings
         self.profit_targets = {
@@ -85,6 +97,8 @@ class AutoProfitTaker:
         for symbol in list(self.open_positions.keys()):
             try:
                 if symbol in getattr(self, 'exempt', set()):
+                    continue
+                if _own_base(symbol) in getattr(self, '_owned_bases', set()):
                     continue
                 position = self.open_positions[symbol]
                 
@@ -179,6 +193,35 @@ class AutoProfitTaker:
         
         return closed_positions
     
+    def _refresh_owned(self):
+        """Ownership wire (2026-10-23): symbols registered to a
+        living owner being belong to that owner's exit logic, not
+        to this fleet exit manager. The registries the fleet
+        already keeps define ownership; refreshed every sync.
+        Everything else on the exchange is an orphan - ours."""
+        import json as _j
+        owned = set()
+        for path in ('/app/runtime/orchestrator_positions.json',
+                     '/app/runtime/master_positions.json'):
+            try:
+                with open(path) as f:
+                    data = _j.load(f) or {}
+                if isinstance(data, dict):
+                    for k in data.keys():
+                        owned.add(_own_base(k))
+            except Exception:
+                pass
+        try:
+            with open('/app/runtime/continuous_sessions.json') as f:
+                data = _j.load(f) or {}
+            if isinstance(data, dict):
+                for k in data.keys():
+                    owned.add(_own_base(str(k).split('_')[0]))
+        except Exception:
+            pass
+        self._owned_bases = owned
+        return owned
+
     async def sync_from_exchange(self):
         """Adopt live exchange positions not yet tracked.
 
@@ -187,6 +230,7 @@ class AutoProfitTaker:
         their real exchange entry price. Returns count adopted.
         """
         adopted = 0
+        self._refresh_owned()
         try:
             positions = await asyncio.to_thread(self.exchange.fetch_positions)
         except Exception as e:
@@ -199,6 +243,8 @@ class AutoProfitTaker:
                     continue
                 symbol = p.get('symbol')
                 if not symbol or symbol in self.open_positions:
+                    continue
+                if _own_base(symbol) in self._owned_bases:
                     continue
                 entry = float(p.get('entryPrice') or 0)
                 if entry <= 0:
