@@ -456,7 +456,20 @@ class UltraScalpingEngine:
                             if _hit is not None:
                                 await self._close_scalp_position(
                                     position_id, signal, _mark, _hit)
-                            elif current_time - signal.timestamp > 300:
+                            elif current_time - signal.timestamp > 3600:
+                                # REAL-BRANCH CLOCK (2026-10-23,
+                                # Princewill: get it resolved): was
+                                # 300s, inherited from the engine's
+                                # paper scalp convention. It closed
+                                # 14 of the first 15 real probation
+                                # positions as fee-scale scratches
+                                # (~-$0.02 each; closes landed
+                                # exactly 300s apart) before the
+                                # 25bp target / 50bp stop could ever
+                                # trigger. Real positions now get
+                                # the fleet-standard 1h backstop so
+                                # target/stop decide exits; the
+                                # paper branch keeps its 300s.
                                 await self._close_scalp_position(
                                     position_id, signal, _mark, False)
                             continue
