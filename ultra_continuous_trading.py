@@ -63,7 +63,13 @@ class ContinuousTradingConfig:
 
     # Execution configuration
     execution_delay: float = 0.1
-    position_timeout: float = 300.0
+    # RECONCILED (2026-10-23): this config's own exit geometry is
+    # +2.0% take-profit / -1.5% stop (_should_close_position), but
+    # a 300s timeout closed nearly every session before either
+    # could trigger - 19 sessions, 0 wins, all timeout scratches.
+    # The clock now matches the geometry (1h, the fleet's standard
+    # horizon) so the designed target/stop decide exits.
+    position_timeout: float = 3600.0
     profit_taking_threshold: float = 0.02
 
     def __post_init__(self):
