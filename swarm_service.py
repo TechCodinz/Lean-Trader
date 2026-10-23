@@ -94,6 +94,28 @@ class SwarmExecutor:
             return None
         if _alloc('swarm', 'mode', 'real') != 'real':
             return None
+        # STUDY GATE (2026-10-23): study continues, capital does
+        # not follow known losers. A pair with a real record in
+        # pair_study (>=10 exchange trades) that is net-negative
+        # gets no real opens; it stays in the study rotation until
+        # its record earns capital back. Unrecorded pairs may
+        # still probe - exploration is the swarm's job.
+        try:
+            import json as _j
+            with open('/app/runtime/pair_study.json') as f:
+                _rec = (_j.load(f) or {}).get(sym) or {}
+            if int(_rec.get('trades') or 0) >= 10 and \
+                    float(_rec.get('total_pnl') or 0) < 0:
+                if time.time() - getattr(self, '_gate_log_ts', 0) > 300:
+                    self._gate_log_ts = time.time()
+                    logger.info(
+                        f'swarm: {sym} study record net '
+                        f'{float(_rec.get("total_pnl")):+.2f} over '
+                        f'{int(_rec.get("trades"))} trades - real open '
+                        f'held, study continues')
+                return None
+        except Exception:
+            pass
         if len(self.positions) >= _alloc('swarm', 'max_concurrent', MAX_CONCURRENT):
             if time.time() - getattr(self, '_cap_log_ts', 0) > 60:
                 self._cap_log_ts = time.time()
