@@ -170,6 +170,31 @@ class SwarmExecutor:
             else:
                 logger.warning(f'swarm BUY failed {sym}: {e}')
             return None
+        # FILL VERIFICATION (2026-10-23): an order's acceptance
+        # is not a fill on these testnet books. At 12:40 the MERL
+        # and ATH market buys evaporated unfilled, were booked
+        # anyway, and wedged capacity at 2/2 phantoms for the
+        # life of the process (558 failed phantom closes, zero
+        # real opens after). Same lesson as the zoo's
+        # fill-verification fix (8d2e1f31f): book only what the
+        # exchange verifiably holds, at the size it holds.
+        _held = 0.0
+        for _try in range(4):
+            try:
+                _poss = await asyncio.to_thread(self.tn.positions)
+                for _p in _poss or []:
+                    if _p.get('symbol') == raw:
+                        _held = abs(float(_p.get('size') or 0))
+                if _held > 0:
+                    break
+            except Exception:
+                pass
+            await asyncio.sleep(1.5)
+        if _held <= 0:
+            logger.info(f'swarm: {sym} open unverified on the '
+                        f'exchange (order unfilled) - not booked')
+            return None
+        qty = min(qty, _held)
         self.positions[raw] = {'qty': qty, 'entry': price, 'ts': time.time(), 'symbol': sym}
         logger.info(f'SWARM REAL BUY {sym} qty {qty} @ {price:.4f} conf {signal.confidence:.2f}')
         tg(f'SWARM BUY {sym} qty {qty} @ ${price:.4f} (conf {signal.confidence:.2f})')
@@ -193,6 +218,26 @@ class SwarmExecutor:
             await asyncio.to_thread(self.tn.create_market_sell_reduce, raw, qty_str(qty))
         except Exception as e:
             logger.warning(f'swarm SELL failed {pos["symbol"]}: {e}')
+            # PHANTOM HEALING (2026-10-23): if the exchange holds
+            # no position for this symbol, the book entry is a
+            # phantom (an unfilled open booked in error, or the
+            # position was closed by another hand) - keeping it
+            # wedges capacity forever. Clear it and book nothing;
+            # the truth service owns the real record. If the
+            # exchange still holds the position the failure is
+            # transient - keep the entry, retry next sweep.
+            try:
+                _poss = await asyncio.to_thread(self.tn.positions)
+                _held = any(_p.get('symbol') == raw and
+                            abs(float(_p.get('size') or 0)) > 0
+                            for _p in _poss or [])
+            except Exception:
+                _held = True
+            if not _held:
+                del self.positions[raw]
+                logger.info(f'swarm: {pos["symbol"]} not held on '
+                            f'the exchange - phantom book entry '
+                            f'cleared, nothing booked')
             return False
         del self.positions[raw]
         try:
