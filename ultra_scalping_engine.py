@@ -70,9 +70,17 @@ class UltraScalpingEngine:
         self.brain = Brain()
 
         # Scalping configuration
-        self.MICRO_PIP_TARGET = 0.5  # 0.5 pip minimum target
-        self.MAX_PIP_TARGET = 2.0  # 2 pip maximum target
-        self.TIGHT_STOP_LOSS = 1.0  # 1 pip stop loss
+        # DENOMINATION FIX (2026-10-23, Princewill's go-ahead):
+        # the design's ratios are unchanged (min : max : stop =
+        # 0.5 : 2 : 1) but a 'pip' in this code is 1bp (targets are
+        # price * pips/10000) while a Bybit round trip costs ~4bp
+        # maker / ~11bp taker - at 0.5-2bp every target hit was a
+        # net loss after fees, by arithmetic. Re-denominated x50
+        # in the same ratios: 25bp / 100bp / 50bp, clearing the
+        # venue cost floor with margin.
+        self.MICRO_PIP_TARGET = 25.0  # 25bp minimum target
+        self.MAX_PIP_TARGET = 100.0  # 100bp maximum target
+        self.TIGHT_STOP_LOSS = 50.0  # 50bp stop loss
         self.MIN_CONFIDENCE = 0.75  # 75% minimum confidence
         self.MAX_POSITIONS = 10  # Maximum simultaneous positions
 
