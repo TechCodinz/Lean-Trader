@@ -374,16 +374,22 @@ class BusHub:
         try:
             if record.get('status') == 'closed':
                 import being_ledger
+                try:
+                    import allocation as _alloc_mod
+                    _real = (_alloc_mod.get('orchestrator').get(
+                        'mode', 'real') == 'real')
+                except Exception:
+                    _real = True
                 being_ledger.record_close(
                     'orchestrator', record.get('symbol', '?'),
-                    float(record.get('pnl') or 0.0), real=True,
+                    float(record.get('pnl') or 0.0), real=_real,
                     meta={'reason': record.get('reason'),
                           'strat': 'alpha_router'})
                 try:
                     import time as _time
                     _key = str(record.get('symbol') or '').replace(':USDT', '')
                     _attr = _PENDING_ATTR.pop(_key, None)
-                    if _attr:
+                    if _attr and _real:
                         _prob, _votes, _tf, _side = _attr
                         _PENDING_TRUTH[_key] = [
                             float(_prob), dict(_votes or {}), _tf,
@@ -396,9 +402,10 @@ class BusHub:
                             f'the exchange record lands')
                 except Exception:
                     pass
-                tg(f"⚡ Orchestrator close {record.get('symbol')} "
-                   f"${float(record.get('pnl') or 0.0):+.2f} "
-                   f"({record.get('reason')})")
+                if _real:
+                    tg(f"⚡ Orchestrator close {record.get('symbol')} "
+                       f"${float(record.get('pnl') or 0.0):+.2f} "
+                       f"({record.get('reason')})")
             else:
                 logger.info(f"trade opened: {record.get('symbol')} "
                             f"@ {record.get('entry_price')}")
@@ -646,9 +653,35 @@ async def exchange_sync_loop(orchestrator, arm):
                                         pos.get('side') or 'Buy',
                                         float(pos.get('avgPrice') or 0))
             rm = orchestrator.risk_manager
+            _master_claims = set()
+            _own_claims = set()
+            try:
+                _mp = '/app/runtime/master_positions.json'
+                if _o.path.exists(_mp):
+                    _master_claims = set(_j.load(open(_mp)).keys())
+                _op = '/app/runtime/orchestrator_positions.json'
+                if _o.path.exists(_op):
+                    _own_claims = set(_j.load(open(_op)).keys())
+            except Exception:
+                pass
             for sym in list(rm.open_positions.keys()):
                 raw = ccxt_to_raw(sym)
                 have = truth.get(raw) if raw else None
+                if raw and raw in _master_claims:
+                    del rm.open_positions[sym]
+                    logger.warning(f'EXCHANGE SYNC: released foreign '
+                                   f'{sym} (claimed by master - not '
+                                   f'the orchestrator\'s position)')
+                    try:
+                        rp = '/app/runtime/orchestrator_positions.json'
+                        reg = _j.load(open(rp)) if _o.path.exists(rp) else {}
+                        if raw in reg:
+                            del reg[raw]
+                            with open(rp, 'w') as f:
+                                _j.dump(reg, f)
+                    except Exception:
+                        pass
+                    continue
                 if not have or have[1] < 1.0:
                     del rm.open_positions[sym]
                     logger.warning(f'EXCHANGE SYNC: dropped phantom {sym} '
@@ -663,6 +696,8 @@ async def exchange_sync_loop(orchestrator, arm):
                                 _j.dump(reg, f)
                     except Exception:
                         pass
+                elif raw not in _own_claims:
+                    pass
                 else:
                     cur = float(rm.open_positions[sym].get('size') or 0)
                     if cur and abs(have[0] - cur) / cur > 0.05:
@@ -695,14 +730,16 @@ async def exchange_sync_loop(orchestrator, arm):
                     r2 = ccxt_to_raw(s2)
                     if r2:
                         tracked_raw[r2] = s2
-                for raw, have in truth.items():
-                    if have[1] >= 3.0 and have[2] == 'Sell' \
-                            and raw not in tracked_raw:
-                        sym = raw[:-4] + '/USDT:USDT'
-                        rm.record_position(sym, 'sell', have[0], have[3])
-                        tracked_raw[raw] = sym
-                        logger.warning(f'EXCHANGE SYNC: adopted orphan '
-                                       f'short {sym} size {have[0]} @ {have[3]}')
+                # Orphan-short adoption REMOVED (2026-10-23): its
+                # premise - 'the orchestrator is the fleet's only
+                # short source' - died when the master began
+                # shorting. The rule imported the master's live
+                # shorts (SOL/HYPE/XRP/DOGE/NEAR) into this book,
+                # double-claimed them in the registry, filled the
+                # position cap with foreign positions and blocked
+                # every open. The orchestrator's own shorts are
+                # tracked at open and claimed by the section below;
+                # nothing needs adopting.
                 for raw, s2 in tracked_raw.items():
                     if raw not in reg:
                         _pos = rm.open_positions.get(s2) or {}
