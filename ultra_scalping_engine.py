@@ -439,7 +439,21 @@ class UltraScalpingEngine:
     async def _monitor_positions(self) -> None:
         """Monitor active scalping positions"""
         self._rehydrate_real()
+        _last_recon = time.time()
         while True:
+            try:
+                # RECONCILE (2026-10-24): rehydrate ran only at
+                # boot, so a real position lost from the in-memory
+                # book mid-run was never re-tracked - the registry
+                # and the exchange still held it while the monitor
+                # forgot it. Re-run every 60s; the already-tracked
+                # guard inside makes it a no-op for healthy books
+                # in every mode (a paper book has no registry).
+                if time.time() - _last_recon > 60:
+                    _last_recon = time.time()
+                    self._rehydrate_real()
+            except Exception:
+                pass
             try:
                 current_time = time.time()
 
@@ -902,19 +916,40 @@ class UltraScalpingEngine:
                 if not _p or float(_p.get('size') or 0) <= 0:
                     del reg[raw]
                     continue
+                # Already tracked in this process: never spawn a
+                # duplicate tracker for the same real position.
+                if any(getattr(_s, 'real_qty', None)
+                       and _s.symbol.split('/')[0] + 'USDT' == raw
+                       for _s in self.active_positions.values()):
+                    continue
                 entry = float(_p.get('avgPrice')
                               or info.get('entry') or 0)
                 if entry <= 0:
                     continue
                 _short = (_p.get('side') == 'Sell')
+                # Geometry: the design's own fractions (25bp
+                # target / 50bp stop since the 2026-10-23
+                # denomination fix) around the EXCHANGE entry -
+                # the old hardcoded 10bp target sat inside the
+                # round-trip fee, so a 'winning' rehydrated trade
+                # still booked a loss.
+                _tgt_f = float(getattr(self, 'MICRO_PIP_TARGET',
+                                       25.0)) / 10000.0
+                _stp_f = float(getattr(self, 'TIGHT_STOP_LOSS',
+                                       50.0)) / 10000.0
                 _sig = ScalpSignal(
                     symbol=raw[:-4] + '/USDT',
                     timeframe=info.get('tf') or 'M1',
                     entry_price=entry,
-                    target_price=entry * (0.999 if _short else 1.001),
-                    stop_loss=entry * (1.001 if _short else 0.999),
-                    confidence=0.75, profit_pips=10.0,
-                    risk_reward=1.0, timestamp=time.time(),
+                    target_price=entry * (1 - _tgt_f if _short
+                                          else 1 + _tgt_f),
+                    stop_loss=entry * (1 + _stp_f if _short
+                                       else 1 - _stp_f),
+                    confidence=0.75,
+                    profit_pips=float(getattr(self, 'MICRO_PIP_TARGET',
+                                              25.0)),
+                    risk_reward=(_tgt_f / _stp_f) if _stp_f else 1.0,
+                    timestamp=time.time(),
                     strategy=info.get('strat') or 'rehydrated')
                 _sig.real_qty = abs(float(_p.get('size') or 0))
                 _sig.real_entry = entry
@@ -1047,20 +1082,54 @@ class UltraScalpingEngine:
                 # Check daily loss limits
                 if self.daily_profit < -50:  # $50 daily loss limit
                     self.logger.warning("🚨 Daily loss limit reached, stopping scalping")
-                    # Stop all active positions
-                    for position_id in list(self.active_positions.keys()):
-                        del self.active_positions[position_id]
+                    # Stop all active positions. REAL positions are
+                    # closed through the verified real close - never
+                    # bare-deleted: a bare del orphans the exchange
+                    # position (it stays open and untracked while
+                    # the registry keeps the profit taker away).
+                    # That is how the master's 2026-10-23 real book
+                    # was orphaned within minutes of opening.
+                    for position_id, _sig in list(self.active_positions.items()):
+                        if getattr(_sig, 'real_qty', None):
+                            _pos = self._testnet_pos(
+                                _sig.symbol.split('/')[0] + 'USDT')
+                            _mark = float((_pos or {}).get('markPrice') or 0)
+                            await self._close_scalp_position(
+                                position_id, _sig,
+                                _mark or _sig.entry_price, False)
+                        else:
+                            del self.active_positions[position_id]
 
                 # Check position limits
                 if len(self.active_positions) > self.MAX_POSITIONS:
                     self.logger.warning(
                         f"🚨 Too many positions ({len(self.active_positions)}), closing oldest"
                     )
-                    # Close oldest position
-                    oldest_position = min(
-                        self.active_positions.items(), key=lambda x: x[1].timestamp
-                    )
-                    del self.active_positions[oldest_position[0]]
+                    # Evict the oldest PAPER position. A real
+                    # position is never evicted by deletion - if
+                    # only real positions remain, the oldest is
+                    # closed through the verified real close (and
+                    # stays tracked if that close cannot fill).
+                    _paper = [(pid, sg) for pid, sg
+                              in self.active_positions.items()
+                              if not getattr(sg, 'real_qty', None)]
+                    if _paper:
+                        _oldest = min(_paper, key=lambda x: x[1].timestamp)
+                        self.logger.warning(
+                            f'risk eviction (paper): {_oldest[0]}')
+                        del self.active_positions[_oldest[0]]
+                    else:
+                        _oldest = min(
+                            self.active_positions.items(),
+                            key=lambda x: x[1].timestamp)
+                        _pos = self._testnet_pos(
+                            _oldest[1].symbol.split('/')[0] + 'USDT')
+                        _mark = float((_pos or {}).get('markPrice') or 0)
+                        self.logger.warning(
+                            f'risk eviction (real close): {_oldest[0]}')
+                        await self._close_scalp_position(
+                            _oldest[0], _oldest[1],
+                            _mark or _oldest[1].entry_price, False)
 
                 await asyncio.sleep(10)  # Check every 10 seconds
 

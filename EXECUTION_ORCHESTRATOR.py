@@ -556,6 +556,16 @@ class ExecutionOrchestrator:
                     size=amount,
                     entry_price=_entry
                 )
+                if (isinstance(execution_result, dict)
+                        and execution_result.get('simulated')):
+                    # Governor-paper fill: this position lives
+                    # only in this book. Flag it so the close path
+                    # books it internally instead of asking the
+                    # arm to close a position the exchange has
+                    # never seen.
+                    _rec = self.risk_manager.open_positions.get(symbol)
+                    if _rec is not None:
+                        _rec['paper'] = True
                 
                 # Record in ledger
                 trade_record = {
@@ -728,6 +738,7 @@ class ExecutionOrchestrator:
             _arm = (self.engines or {}).get('real_profit')
             _pos = self.risk_manager.open_positions.get(symbol)
             if (_arm is not None and _pos is not None
+                    and not _pos.get('paper')
                     and hasattr(_arm, 'close_position')):
                 if not _arm.close_position(symbol, _pos.get('size', 0),
                                            _pos.get('side', 'buy')):

@@ -95,8 +95,20 @@ class RelayExecutionArm:
         if signal not in ('BUY', 'SELL'):
             return None
         if self._mode() != 'real':
-            logger.info(f'governor paper mode - not executing {symbol}')
-            return None
+            # Governor paper mode: return a simulated fill so the
+            # engine trades its own book. The 2025 design always
+            # had an internal book; refusing outright meant the
+            # being produced no paper record at all, and the
+            # governor's rehabilitation-by-advancement had nothing
+            # to measure. The engine flags the position paper; its
+            # closes book as paper (allocation-mode truth). In
+            # real mode (testnet or mainnet arm) nothing changes.
+            logger.info(f'governor paper mode - simulated fill {symbol}')
+            return {'symbol': symbol, 'side': signal,
+                    'amount': float(amount) if amount else 0.0,
+                    'price': float(price),
+                    'fill_price': float(price),
+                    'simulated': True}
         if time.time() < self._backoff_until:
             return None
         raw = symbol.split('/')[0] + 'USDT'
@@ -664,9 +676,39 @@ async def exchange_sync_loop(orchestrator, arm):
                     _own_claims = set(_j.load(open(_op)).keys())
             except Exception:
                 pass
+            # Resume own positions (2026-10-24): the risk book is
+            # in-memory, so a restart empties it while the registry
+            # and the exchange still hold this being's positions -
+            # unmonitored, and invisible to the position cap. The
+            # removed orphan-adoption rule used to mask this by
+            # re-importing every short in sight. Resume ONLY
+            # registry-claimed symbols the exchange still holds.
+            try:
+                _tracked = set()
+                for _s2 in rm.open_positions.keys():
+                    _r2 = ccxt_to_raw(_s2)
+                    if _r2:
+                        _tracked.add(_r2)
+                for _raw in _own_claims:
+                    _have = truth.get(_raw)
+                    if _have and _have[1] >= 1.0 \
+                            and _raw not in _tracked:
+                        _sym = _raw[:-4] + '/USDT:USDT'
+                        rm.record_position(
+                            _sym,
+                            'buy' if _have[2] == 'Buy' else 'sell',
+                            _have[0], _have[3])
+                        logger.warning(
+                            f'EXCHANGE SYNC: resumed own {_sym} '
+                            f'size {_have[0]} @ {_have[3]} '
+                            f'(registry claim; book was empty)')
+            except Exception as _e:
+                logger.warning(f'exchange sync resume: {_e}')
             for sym in list(rm.open_positions.keys()):
                 raw = ccxt_to_raw(sym)
                 have = truth.get(raw) if raw else None
+                if (rm.open_positions.get(sym) or {}).get('paper'):
+                    continue
                 if raw and raw in _master_claims:
                     del rm.open_positions[sym]
                     logger.warning(f'EXCHANGE SYNC: released foreign '
@@ -727,6 +769,8 @@ async def exchange_sync_loop(orchestrator, arm):
                 dirty = False
                 tracked_raw = {}
                 for s2 in list(rm.open_positions.keys()):
+                    if (rm.open_positions.get(s2) or {}).get('paper'):
+                        continue
                     r2 = ccxt_to_raw(s2)
                     if r2:
                         tracked_raw[r2] = s2
@@ -762,6 +806,8 @@ async def exchange_sync_loop(orchestrator, arm):
                     reg = _j.load(open(rp))
                     tracked_raw = set()
                     for s2 in rm.open_positions.keys():
+                        if (rm.open_positions.get(s2) or {}).get('paper'):
+                            continue
                         r2 = ccxt_to_raw(s2)
                         if r2:
                             tracked_raw.add(r2)
