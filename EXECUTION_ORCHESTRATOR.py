@@ -715,21 +715,55 @@ class ExecutionOrchestrator:
                 else:
                     pnl_pct = (entry_price - current_price) / entry_price
                 
+                # PERSISTENCE GUARD (2026-10-24, Princewill's
+                # directive): a single price print never closes a
+                # position. On thin/stub books one flicker print
+                # can sit far from the mark for a second and
+                # vanish - the 2026-10-24 JCT stop banked -$10.91
+                # off exactly that. A breach (stop OR target - a
+                # phantom target would book a fake paper win) must
+                # appear on two consecutive monitor passes; a move
+                # that persists is real and still exits.
+                _seen = getattr(self, '_breach_seen', None)
+                if _seen is None:
+                    _seen = self._breach_seen = {}
                 # Check stop loss (1% loss)
                 if pnl_pct < -0.01:
+                    if _seen.get(symbol) != 'stop_loss':
+                        _seen[symbol] = 'stop_loss'
+                        logger.warning(
+                            f"⚠️ Stop breach seen once: {symbol} "
+                            f"({pnl_pct:.2%}) - awaiting a "
+                            f"confirming print, not closing")
+                        continue
                     logger.warning(f"🛑 Stop loss triggered: {symbol} ({pnl_pct:.2%})")
                     await self.close_position(symbol, current_price, 'stop_loss')
-                
+
                 # Check take profit (2% profit)
                 elif pnl_pct > 0.02:
+                    if _seen.get(symbol) != 'take_profit':
+                        _seen[symbol] = 'take_profit'
+                        logger.info(
+                            f"⚠️ Target breach seen once: {symbol} "
+                            f"({pnl_pct:.2%}) - awaiting a "
+                            f"confirming print, not closing")
+                        continue
                     logger.info(f"🎯 Take profit triggered: {symbol} ({pnl_pct:.2%})")
                     await self.close_position(symbol, current_price, 'take_profit')
+
+                else:
+                    # Back inside the band: any earlier single
+                    # print is forgotten.
+                    _seen.pop(symbol, None)
                 
             except Exception as e:
                 logger.debug(f"Position monitoring error for {symbol}: {e}")
     
     async def close_position(self, symbol: str, exit_price: float, reason: str):
         """Close position and record result"""
+        _bs = getattr(self, '_breach_seen', None)
+        if _bs is not None:
+            _bs.pop(symbol, None)
 
         try:
             # Real close first (relay arm, 2026-10-19): if the arm
