@@ -278,6 +278,65 @@ class UltraScalpingEngine:
                 signals = [s for s in signals
                            if (s.target_price > s.entry_price) == selected_side]
 
+            # MEASUREMENT OVERLAYS (2026-10-25, Princewill's
+            # directive): tag every signal with the market REGIME
+            # (FractalRegime Hurst voter, hurst_fractal_regime.py)
+            # and the VOLUME-PROFILE distance to the point of
+            # control (VolumeProfileAnalyzer, critical_features_
+            # addon) from this scan's own candles. Record-only:
+            # nothing in the trade path reads them; the paper close
+            # meta carries them so expectancy can be split by regime
+            # and VP position. Cached 60s per (symbol, timeframe).
+            # The SMART_SCALPING_ENGINE confluence analyzer was
+            # probe-verified a STUB on 2026-10-25 (identical outputs
+            # for opposite inputs) and is deliberately NOT wired.
+            if signals:
+                try:
+                    _key = (symbol, timeframe)
+                    _now = time.time()
+                    _cache = getattr(self, '_overlay_cache', None)
+                    if _cache is None:
+                        self._overlay_cache = {}
+                        _cache = self._overlay_cache
+                    _hit = _cache.get(_key)
+                    if _hit is None or _now - _hit[0] > 60:
+                        _regime = _hurst = _vp = None
+                        _closes = price_data.get('prices') or []
+                        if len(_closes) >= 50:
+                            from hurst_fractal_regime import (
+                                FractalRegime as _FR)
+                            import pandas as _pd
+                            _r = _FR().compute(
+                                _pd.DataFrame({'close': _closes}))
+                            _hurst = round(
+                                float(_r['features']['hurst']), 3)
+                            _regime = ('trending' if _hurst > 0.55 else
+                                       'reverting' if _hurst < 0.45
+                                       else 'neutral')
+                        _candles = price_data.get('candles') or []
+                        if len(_candles) >= 100:
+                            import pandas as _pd
+                            from critical_features_addon import (
+                                VolumeProfileAnalyzer as _VPA)
+                            _df = _pd.DataFrame(
+                                [(_c[2], _c[3],
+                                  _c[5] if len(_c) > 5 else 0)
+                                 for _c in _candles],
+                                columns=['high', 'low', 'volume'])
+                            _v = _VPA().analyze(_df)
+                            if _v.get('poc'):
+                                _vp = round(
+                                    (current_price - _v['poc'])
+                                    / _v['poc'] * 10000, 1)
+                        _hit = (_now, _regime, _hurst, _vp)
+                        _cache[_key] = _hit
+                    for _s in signals:
+                        _s._regime = _hit[1]
+                        _s._hurst = _hit[2]
+                        _s._vp_poc_bp = _hit[3]
+                except Exception:
+                    pass
+
         except Exception as e:
             self.logger.error(f"Error analyzing scalp opportunities: {e}")
 
@@ -689,6 +748,9 @@ class UltraScalpingEngine:
                               'entry_ts': signal.timestamp,
                               'signal_id': position_id,
                               'exit_reason': getattr(signal, '_exit_reason', None),
+                              'regime': getattr(signal, '_regime', None),
+                              'hurst': getattr(signal, '_hurst', None),
+                              'vp_poc_bp': getattr(signal, '_vp_poc_bp', None),
                               'tf': signal.timeframe,
                               'pips': round(profit_pips, 2)})
                 except Exception:
