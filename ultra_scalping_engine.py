@@ -578,6 +578,12 @@ class UltraScalpingEngine:
                     _bl.record_close(
                         'master', signal.symbol, profit * _qty, real=False,
                         meta={'strat': 'scalping_engine',
+                              'detector': signal.strategy,
+                              'side': ('long' if signal.target_price >
+                                       signal.entry_price else 'short'),
+                              'confidence': signal.confidence,
+                              'entry_ts': signal.timestamp,
+                              'signal_id': position_id,
                               'tf': signal.timeframe,
                               'pips': round(profit_pips, 2)})
                 except Exception:
