@@ -529,33 +529,96 @@ class UltraScalpingEngine:
                     if current_price <= 0:
                         continue
 
-                    # Check target hit
-                    if signal.target_price > signal.entry_price:  # Long position
-                        if current_price >= signal.target_price:
+                    # RUNNER TRAILING (2026-10-25, Princewill's
+                    # directive): a paper position that reaches its
+                    # target no longer closes on the spot - the target
+                    # ARMS a trailing runner on the codebase's
+                    # existing TrailingStopManager
+                    # (critical_features_addon). The floor starts at
+                    # breakeven and trails the peak by the target
+                    # distance - the zoo's 2025 runner design
+                    # (ladder TP3 arm) ported to the master. Shorts
+                    # feed inverted prices so the one manager serves
+                    # both sides. Losers still stop out immediately;
+                    # unarmed positions keep the 300s timeout; armed
+                    # runners get the fleet's 3600s backstop. If the
+                    # addon cannot import, fall back to the legacy
+                    # close-at-target so the monitor never breaks.
+                    _is_long = signal.target_price > signal.entry_price
+                    if getattr(signal, '_runner_armed', False):
+                        _mgr = signal._trail_mgr
+                        _feed = (current_price if _is_long
+                                 else 1.0 / current_price)
+                        _fent = (signal.entry_price if _is_long
+                                 else 1.0 / signal.entry_price)
+                        _stop = _mgr.update(signal.symbol, _feed,
+                                            _fent, _fent)
+                        _floor = _stop if _is_long else 1.0 / _stop
+                        _floor = (max(_floor, signal.entry_price)
+                                  if _is_long
+                                  else min(_floor, signal.entry_price))
+                        _breach = (current_price <= _floor if _is_long
+                                   else current_price >= _floor)
+                        _stopped = (current_price <= signal.stop_loss
+                                    if _is_long
+                                    else current_price >= signal.stop_loss)
+                        if _breach or _stopped:
+                            signal._exit_reason = ('trail' if _breach
+                                                   else 'stop')
                             await self._close_scalp_position(
-                                position_id, signal, current_price, True
-                            )
+                                position_id, signal, current_price,
+                                (current_price >= signal.entry_price)
+                                if _is_long else
+                                (current_price <= signal.entry_price))
+                    elif _is_long:  # Long position, not yet armed
+                        if current_price >= signal.target_price:
+                            try:
+                                from critical_features_addon import (
+                                    TrailingStopManager as _TSM)
+                                signal._trail_mgr = _TSM(
+                                    self.MICRO_PIP_TARGET / 10000)
+                                signal._runner_armed = True
+                            except Exception:
+                                signal._exit_reason = 'target'
+                                await self._close_scalp_position(
+                                    position_id, signal,
+                                    current_price, True)
                         elif current_price <= signal.stop_loss:
+                            signal._exit_reason = 'stop'
                             await self._close_scalp_position(
                                 position_id, signal, current_price, False
                             )
-                    else:  # Short position
+                    else:  # Short position, not yet armed
                         if current_price <= signal.target_price:
-                            await self._close_scalp_position(
-                                position_id, signal, current_price, True
-                            )
+                            try:
+                                from critical_features_addon import (
+                                    TrailingStopManager as _TSM)
+                                signal._trail_mgr = _TSM(
+                                    self.MICRO_PIP_TARGET / 10000)
+                                signal._runner_armed = True
+                            except Exception:
+                                signal._exit_reason = 'target'
+                                await self._close_scalp_position(
+                                    position_id, signal,
+                                    current_price, True)
                         elif current_price >= signal.stop_loss:
+                            signal._exit_reason = 'stop'
                             await self._close_scalp_position(
                                 position_id, signal, current_price, False
                             )
 
-                    # Check timeout (max 5 minutes for scalping) -
-                    # only if the position is still open: a target/stop
-                    # close above already removed it, and closing again
-                    # would book the same trade twice (duplicate-close
-                    # bug, found by Kimi review, fixed 2026-10-25).
+                    # Check timeout - only if the position is still
+                    # open: a close above already removed it, and
+                    # closing again would book the same trade twice
+                    # (duplicate-close bug, fixed 2026-10-25). Unarmed
+                    # positions keep 300s; armed runners get the
+                    # fleet's 3600s backstop.
+                    _limit = (3600 if getattr(signal, '_runner_armed',
+                                              False) else 300)
                     if (position_id in self.active_positions
-                            and current_time - signal.timestamp > 300):
+                            and current_time - signal.timestamp > _limit):
+                        signal._exit_reason = ('trail_timeout' if _limit
+                                               == 3600 else 'timeout')
                         await self._close_scalp_position(position_id, signal, current_price, False)
 
                 await asyncio.sleep(1)  # Check every second
@@ -625,6 +688,7 @@ class UltraScalpingEngine:
                               'confidence': signal.confidence,
                               'entry_ts': signal.timestamp,
                               'signal_id': position_id,
+                              'exit_reason': getattr(signal, '_exit_reason', None),
                               'tf': signal.timeframe,
                               'pips': round(profit_pips, 2)})
                 except Exception:
