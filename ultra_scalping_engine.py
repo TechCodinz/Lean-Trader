@@ -549,8 +549,13 @@ class UltraScalpingEngine:
                                 position_id, signal, current_price, False
                             )
 
-                    # Check timeout (max 5 minutes for scalping)
-                    if current_time - signal.timestamp > 300:  # 5 minutes
+                    # Check timeout (max 5 minutes for scalping) -
+                    # only if the position is still open: a target/stop
+                    # close above already removed it, and closing again
+                    # would book the same trade twice (duplicate-close
+                    # bug, found by Kimi review, fixed 2026-10-25).
+                    if (position_id in self.active_positions
+                            and current_time - signal.timestamp > 300):
                         await self._close_scalp_position(position_id, signal, current_price, False)
 
                 await asyncio.sleep(1)  # Check every second
