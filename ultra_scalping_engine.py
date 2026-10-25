@@ -244,8 +244,17 @@ class UltraScalpingEngine:
             if current_price <= 0:
                 return signals
 
+            # Signal-math experiments are paper-only until their ledger
+            # measurements are validated; real keeps the legacy path.
+            try:
+                import allocation as _alloc
+                paper = _alloc.get('master').get('mode') == 'paper'
+            except Exception:
+                paper = False
+
             # Micro momentum scalping
-            momentum_signal = await self._detect_micro_momentum(symbol, timeframe, price_data)
+            momentum_signal = await self._detect_micro_momentum(
+                symbol, timeframe, price_data, paper=paper)
             if momentum_signal:
                 signals.append(momentum_signal)
 
@@ -255,9 +264,19 @@ class UltraScalpingEngine:
                 signals.append(spread_signal)
 
             # Volatility scalping
-            volatility_signal = await self._detect_volatility_scalp(symbol, timeframe, price_data)
+            volatility_signal = await self._detect_volatility_scalp(
+                symbol, timeframe, price_data, paper=paper)
             if volatility_signal:
                 signals.append(volatility_signal)
+
+            # Do not open opposing paper positions from one market snapshot.
+            # Keep every detector on the highest-confidence signal's side.
+            sides = {s.target_price > s.entry_price for s in signals}
+            if paper and len(sides) > 1:
+                selected = max(signals, key=lambda s: s.confidence)
+                selected_side = selected.target_price > selected.entry_price
+                signals = [s for s in signals
+                           if (s.target_price > s.entry_price) == selected_side]
 
         except Exception as e:
             self.logger.error(f"Error analyzing scalp opportunities: {e}")
@@ -265,7 +284,8 @@ class UltraScalpingEngine:
         return signals
 
     async def _detect_micro_momentum(
-        self, symbol: str, timeframe: str, price_data: Dict[str, Any]
+        self, symbol: str, timeframe: str, price_data: Dict[str, Any],
+        paper: bool = False
     ) -> Optional[ScalpSignal]:
         """Detect micro momentum for scalping"""
         try:
@@ -287,12 +307,18 @@ class UltraScalpingEngine:
                     # Bullish momentum - buy scalp
                     target_price = current_price * (1 + self.MICRO_PIP_TARGET / 10000)
                     stop_loss = current_price * (1 - self.TIGHT_STOP_LOSS / 10000)
-                    confidence = min(0.95, abs(momentum) * 1000)
                 else:
                     # Bearish momentum - sell scalp
                     target_price = current_price * (1 - self.MICRO_PIP_TARGET / 10000)
                     stop_loss = current_price * (1 + self.TIGHT_STOP_LOSS / 10000)
-                    confidence = min(0.95, abs(momentum) * 1000)
+
+                confidence = abs(momentum) * 1000
+                if paper and confidence >= self.MIN_CONFIDENCE:
+                    # Preserve the entry cutoff but keep qualifying scores
+                    # strictly ordered instead of collapsing them at the cap.
+                    confidence = 0.95 - (0.95 - self.MIN_CONFIDENCE) / (
+                        1 + confidence - self.MIN_CONFIDENCE)
+                confidence = min(0.95, confidence)
 
                 if confidence >= self.MIN_CONFIDENCE:
                     return ScalpSignal(
@@ -355,7 +381,8 @@ class UltraScalpingEngine:
         return None
 
     async def _detect_volatility_scalp(
-        self, symbol: str, timeframe: str, price_data: Dict[str, Any]
+        self, symbol: str, timeframe: str, price_data: Dict[str, Any],
+        paper: bool = False
     ) -> Optional[ScalpSignal]:
         """Detect volatility scalping opportunities"""
         try:
@@ -368,7 +395,12 @@ class UltraScalpingEngine:
             returns = [
                 recent_prices[i] / recent_prices[i - 1] - 1 for i in range(1, len(recent_prices))
             ]
-            volatility = np.std(returns) * np.sqrt(252)  # Annualized volatility
+            if paper:
+                # Crypto candles annualize by their actual frame, 365 days/year.
+                minutes = int(timeframe[1:])  # Master frames are M1/M5/M15/M30.
+                volatility = np.std(returns) * np.sqrt(365 * 24 * 60 / minutes)
+            else:
+                volatility = np.std(returns) * np.sqrt(252)  # Legacy real path
 
             # Check if volatility is suitable for scalping
             if 0.1 < volatility < 0.5:  # 10-50% volatility range
@@ -387,7 +419,11 @@ class UltraScalpingEngine:
                         target_price = current_price * (1 - self.MICRO_PIP_TARGET / 10000)
                         stop_loss = current_price * (1 + self.TIGHT_STOP_LOSS / 10000)
 
-                    confidence = min(0.90, abs(short_trend) * 200)
+                    confidence = abs(short_trend) * 200
+                    if paper and confidence >= self.MIN_CONFIDENCE:
+                        confidence = 0.90 - (0.90 - self.MIN_CONFIDENCE) / (
+                            1 + confidence - self.MIN_CONFIDENCE)
+                    confidence = min(0.90, confidence)
 
                     if confidence >= self.MIN_CONFIDENCE:
                         return ScalpSignal(
