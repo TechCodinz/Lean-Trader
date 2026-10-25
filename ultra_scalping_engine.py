@@ -301,33 +301,47 @@ class UltraScalpingEngine:
                     _hit = _cache.get(_key)
                     if _hit is None or _now - _hit[0] > 60:
                         _regime = _hurst = _vp = None
-                        _closes = price_data.get('prices') or []
-                        if len(_closes) >= 50:
-                            from hurst_fractal_regime import (
-                                FractalRegime as _FR)
-                            import pandas as _pd
-                            _r = _FR().compute(
-                                _pd.DataFrame({'close': _closes}))
-                            _hurst = round(
-                                float(_r['features']['hurst']), 3)
-                            _regime = ('trending' if _hurst > 0.55 else
-                                       'reverting' if _hurst < 0.45
-                                       else 'neutral')
-                        _candles = price_data.get('candles') or []
-                        if len(_candles) >= 100:
-                            import pandas as _pd
-                            from critical_features_addon import (
-                                VolumeProfileAnalyzer as _VPA)
-                            _df = _pd.DataFrame(
-                                [(_c[2], _c[3],
-                                  _c[5] if len(_c) > 5 else 0)
-                                 for _c in _candles],
-                                columns=['high', 'low', 'volume'])
-                            _v = _VPA().analyze(_df)
-                            if _v.get('poc'):
-                                _vp = round(
-                                    (current_price - _v['poc'])
-                                    / _v['poc'] * 10000, 1)
+                        # Isolated per-overlay try blocks: one
+                        # overlay's failure must never eat the other
+                        # (v1 shared one try and a missing 'close'
+                        # column for the VP analyzer silently killed
+                        # both tags - found live 2026-10-25).
+                        try:
+                            _closes = price_data.get('prices') or []
+                            if len(_closes) >= 50:
+                                from hurst_fractal_regime import (
+                                    FractalRegime as _FR)
+                                import pandas as _pd
+                                _r = _FR().compute(
+                                    _pd.DataFrame({'close': _closes}))
+                                _hurst = round(
+                                    float(_r['features']['hurst']), 3)
+                                _regime = ('trending' if _hurst > 0.55
+                                           else 'reverting'
+                                           if _hurst < 0.45
+                                           else 'neutral')
+                        except Exception:
+                            _regime = _hurst = None
+                        try:
+                            _candles = price_data.get('candles') or []
+                            if len(_candles) >= 100:
+                                import pandas as _pd
+                                from critical_features_addon import (
+                                    VolumeProfileAnalyzer as _VPA)
+                                _df = _pd.DataFrame(
+                                    [(_c[2], _c[3],
+                                      _c[5] if len(_c) > 5 else 0,
+                                      _c[4])
+                                     for _c in _candles],
+                                    columns=['high', 'low', 'volume',
+                                             'close'])
+                                _v = _VPA().analyze(_df)
+                                if _v.get('poc'):
+                                    _vp = round(
+                                        (current_price - _v['poc'])
+                                        / _v['poc'] * 10000, 1)
+                        except Exception:
+                            _vp = None
                         _hit = (_now, _regime, _hurst, _vp)
                         _cache[_key] = _hit
                     for _s in signals:
