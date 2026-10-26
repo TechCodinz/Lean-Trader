@@ -123,13 +123,48 @@ class MultiTimeframeAnalyzer:
         - Support/Resistance
         """
         
-        # Simplified analysis (would use real TA in production)
+        # Real TA (repaired 2026-10-26, Princewill's directive -
+        # this block was a hardcoded stub: ema 0.0/0.0, rsi 50.0,
+        # volume_ratio 1.0, trend_strength 0.5, so every input
+        # produced the same SELL/1.0 signal regardless of market).
+        closes = [float(c[4]) for c in ohlcv if len(c) > 4]
+        volumes = [float(c[5]) if len(c) > 5 else 0.0 for c in ohlcv]
+        if len(closes) < 25:
+            signal = TimeframeSignal(
+                timeframe=timeframe, direction='NEUTRAL',
+                strength=0.0,
+                indicators={'ema_fast': 0.0, 'ema_slow': 0.0,
+                            'rsi': 50.0, 'volume_ratio': 0.0,
+                            'trend_strength': 0.0},
+                timestamp=datetime.now())
+            self.signals_cache[symbol][timeframe] = signal
+            return signal
+
+        def _ema(vals, period):
+            k = 2.0 / (period + 1)
+            e = sum(vals[:period]) / period
+            for v in vals[period:]:
+                e = v * k + e * (1 - k)
+            return e
+
+        ema_fast = _ema(closes, 9)
+        ema_slow = _ema(closes, 21)
+        _ch = [closes[i] - closes[i - 1] for i in range(1, len(closes))]
+        _last = _ch[-14:]
+        _gains = sum(c for c in _last if c > 0) / 14
+        _losses = -sum(c for c in _last if c < 0) / 14
+        rsi = (100.0 if _losses == 0
+               else 100 - 100 / (1 + _gains / _losses))
+        _vb = volumes[-21:-1]
+        volume_ratio = (volumes[-1] / (sum(_vb) / len(_vb))
+                        if _vb and sum(_vb) > 0 else 1.0)
+        _sep_bp = abs(ema_fast - ema_slow) / closes[-1] * 10000
         indicators = {
-            'ema_fast': 0.0,
-            'ema_slow': 0.0,
-            'rsi': 50.0,
-            'volume_ratio': 1.0,
-            'trend_strength': 0.5
+            'ema_fast': ema_fast,
+            'ema_slow': ema_slow,
+            'rsi': rsi,
+            'volume_ratio': volume_ratio,
+            'trend_strength': min(1.0, _sep_bp / 50.0),
         }
         
         # Determine direction based on indicators

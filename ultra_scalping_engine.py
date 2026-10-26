@@ -289,7 +289,10 @@ class UltraScalpingEngine:
             # and VP position. Cached 60s per (symbol, timeframe).
             # The SMART_SCALPING_ENGINE confluence analyzer was
             # probe-verified a STUB on 2026-10-25 (identical outputs
-            # for opposite inputs) and is deliberately NOT wired.
+            # for opposite inputs), repaired with real TA on
+            # 2026-10-26 at Princewill's directive, re-probed, and
+            # wired below as a third overlay (verdict + agreement
+            # with the signal's own side).
             if signals:
                 try:
                     _key = (symbol, timeframe)
@@ -342,12 +345,51 @@ class UltraScalpingEngine:
                                         / _v['poc'] * 10000, 1)
                         except Exception:
                             _vp = None
-                        _hit = (_now, _regime, _hurst, _vp)
+                        _conf = (None, None, None)
+                        try:
+                            _mtf = getattr(self, '_mtf_analyzer',
+                                           None)
+                            if _mtf is None:
+                                from SMART_SCALPING_ENGINE import (
+                                    MultiTimeframeAnalyzer as _MTA)
+                                self._mtf_analyzer = _MTA()
+                                _mtf = self._mtf_analyzer
+                            _tfmap = {'M5': '5m', 'M15': '15m',
+                                      'H1': '1h'}
+                            for _tf in ('M5', 'M15', 'H1'):
+                                if _tf == timeframe:
+                                    _cd = (price_data.get('candles')
+                                           or [])
+                                else:
+                                    _pd2 = await (
+                                        self.ultra_core
+                                        .get_market_data(symbol,
+                                                         _tf))
+                                    _cd = ((_pd2 or {})
+                                           .get('candles') or [])
+                                if len(_cd) >= 25:
+                                    _mtf.analyze_timeframe(
+                                        symbol, _tfmap[_tf], _cd)
+                            _has, _dir, _str = (
+                                _mtf.check_confluence(symbol))
+                            _conf = (_has, _dir,
+                                     round(float(_str), 3))
+                        except Exception:
+                            _conf = (None, None, None)
+                        _hit = (_now, _regime, _hurst, _vp,
+                                _conf[0], _conf[1], _conf[2])
                         _cache[_key] = _hit
                     for _s in signals:
                         _s._regime = _hit[1]
                         _s._hurst = _hit[2]
                         _s._vp_poc_bp = _hit[3]
+                        _s._confluence = _hit[4]
+                        _s._conf_dir = _hit[5]
+                        _s._conf_strength = _hit[6]
+                        _s._conf_agree = (
+                            bool(_hit[4]) and _hit[5] == (
+                                'BUY' if _s.target_price
+                                > _s.entry_price else 'SELL'))
                 except Exception:
                     pass
 
@@ -765,6 +807,10 @@ class UltraScalpingEngine:
                               'regime': getattr(signal, '_regime', None),
                               'hurst': getattr(signal, '_hurst', None),
                               'vp_poc_bp': getattr(signal, '_vp_poc_bp', None),
+                              'confluence': getattr(signal, '_confluence', None),
+                              'conf_dir': getattr(signal, '_conf_dir', None),
+                              'conf_strength': getattr(signal, '_conf_strength', None),
+                              'conf_agree': getattr(signal, '_conf_agree', None),
                               'tf': signal.timeframe,
                               'pips': round(profit_pips, 2)})
                 except Exception:
