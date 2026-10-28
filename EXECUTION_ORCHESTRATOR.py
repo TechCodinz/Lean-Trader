@@ -715,6 +715,25 @@ class ExecutionOrchestrator:
                 else:
                     pnl_pct = (entry_price - current_price) / entry_price
                 
+                # RUNNER SERVICING (2026-10-28, Princewill: wire
+                # them all): an armed runner is owned by its
+                # trailing stop, not the fixed band. Feed space
+                # mirrors shorts so the one manager serves both.
+                _runners = getattr(self, '_runners', None)
+                if _runners and symbol in _runners:
+                    _mgr = _runners[symbol]
+                    _feed = current_price if side == 'buy' else (2.0 * entry_price - current_price)
+                    _stop = _mgr.update(symbol, _feed, entry_price, entry_price)
+                    if _stop is not None and _feed <= _stop:
+                        logger.info(f"🏃 Runner trail exit: {symbol} ({pnl_pct:.2%})")
+                        _runners.pop(symbol, None)
+                        try:
+                            _mgr.clear(symbol)
+                        except Exception:
+                            pass
+                        await self.close_position(symbol, current_price, 'trail_stop')
+                    continue
+
                 # PERSISTENCE GUARD (2026-10-24, Princewill's
                 # directive): a single price print never closes a
                 # position. On thin/stub books one flicker print
@@ -749,7 +768,27 @@ class ExecutionOrchestrator:
                             f"confirming print, not closing")
                         continue
                     logger.info(f"🎯 Take profit triggered: {symbol} ({pnl_pct:.2%})")
-                    await self.close_position(symbol, current_price, 'take_profit')
+                    # RUNNER ARM (2026-10-28): bank nothing flat -
+                    # arm the built TrailingStopManager with a
+                    # breakeven floor; the position rides until the
+                    # trailed breach. Fallback: legacy close.
+                    _runners = getattr(self, '_runners', None)
+                    if _runners is None:
+                        _runners = self._runners = {}
+                    if symbol not in _runners:
+                        try:
+                            from critical_features_addon import TrailingStopManager as _TSM
+                            _mgr = _TSM(trail_percent=0.02)
+                            _feed0 = current_price if side == 'buy' else (2.0 * entry_price - current_price)
+                            _mgr.update(symbol, _feed0, entry_price, entry_price)
+                            _mgr.stop_losses[symbol] = max(
+                                _mgr.stop_losses.get(symbol, 0), entry_price)
+                            _runners[symbol] = _mgr
+                            logger.info(f"🏃 RUNNER armed {symbol}: target confirmed, trails from breakeven")
+                        except Exception:
+                            await self.close_position(symbol, current_price, 'take_profit')
+                    else:
+                        await self.close_position(symbol, current_price, 'take_profit')
 
                 else:
                     # Back inside the band: any earlier single
@@ -760,6 +799,8 @@ class ExecutionOrchestrator:
                 logger.debug(f"Position monitoring error for {symbol}: {e}")
     
     async def close_position(self, symbol: str, exit_price: float, reason: str):
+        if getattr(self, '_runners', None):
+            self._runners.pop(symbol, None)
         """Close position and record result"""
         _bs = getattr(self, '_breach_seen', None)
         if _bs is not None:
