@@ -44,6 +44,24 @@ class AutoProfitTaker:
         # never target-close these - the trailing stop owns them.
         self.exempt = set()
         self._owned_bases = set()
+        # Intelligent exits (wired 2026-10-28): the fleet's built
+        # ladder + runner system from critical_features_addon -
+        # partial take-profit rungs bank profit as it appears, TP3
+        # arms a runner whose final slice rides a breakeven-floored
+        # trailing stop (the pattern the zoo ran; its `exempt` set
+        # above exists for exactly this). Fail-soft: if the addon
+        # cannot import, the fixed table below runs alone as before.
+        try:
+            from critical_features_addon import (TrailingStopManager,
+                                                 PartialTPManager)
+            self.partial = PartialTPManager()
+            self.trailer = TrailingStopManager(trail_percent=0.02)
+            self.trailer_inv = TrailingStopManager(trail_percent=0.02)
+        except Exception:
+            self.partial = None
+            self.trailer = None
+            self.trailer_inv = None
+        self.runners = set()
         
         # Profit taking settings
         self.profit_targets = {
@@ -78,6 +96,11 @@ class AutoProfitTaker:
             'opened_at': datetime.now(),
             'profit_target': self.profit_targets.get(strategy, self.profit_targets['normal'])
         }
+        if getattr(self, 'partial', None) is not None:
+            try:
+                self.partial.add_position(symbol, entry_price, size)
+            except Exception:
+                pass
         
         logger.info(f"📝 Position registered: {symbol} {side}")
         logger.info(f"   Entry: ${entry_price:.4f}")
@@ -96,8 +119,6 @@ class AutoProfitTaker:
         
         for symbol in list(self.open_positions.keys()):
             try:
-                if symbol in getattr(self, 'exempt', set()):
-                    continue
                 if _own_base(symbol) in getattr(self, '_owned_bases', set()):
                     continue
                 position = self.open_positions[symbol]
@@ -105,6 +126,53 @@ class AutoProfitTaker:
                 # Get current price
                 ticker = await asyncio.to_thread(self.exchange.fetch_ticker, symbol)
                 current_price = ticker['last']
+                if not current_price:
+                    continue
+                _entry = position['entry_price']
+                _is_long = position['side'].lower() == 'buy'
+                # Mirrored feed for shorts so the long-built ladder
+                # and trailer read profit in the right direction.
+                _feed = current_price if _is_long else (2.0 * _entry - current_price)
+                _trailer = None
+                if getattr(self, 'partial', None) is not None:
+                    _trailer = self.trailer if _is_long else self.trailer_inv
+                _pnl_feed = (_feed - _entry) / _entry if _entry else 0.0
+
+                if symbol in getattr(self, 'runners', set()):
+                    # Runner: the trailing stop owns the final slice.
+                    if _trailer is not None:
+                        _trailer.update(symbol, _feed, _entry, _entry * 0.98)
+                        _stop = _trailer.get_stop(symbol)
+                        if _stop is not None and _feed <= _stop:
+                            _size = position['size']
+                            if getattr(self, 'close_handler', None) is not None:
+                                self.close_handler(symbol, position['side'], _size, current_price, 'RUNNER TRAIL STOP')
+                            elif _is_long:
+                                await asyncio.to_thread(self.exchange.create_market_sell_order, symbol, _size)
+                            else:
+                                await asyncio.to_thread(self.exchange.create_market_buy_order, symbol, current_price * _size)
+                            _rpnl = _size * _entry * _pnl_feed
+                            self.total_closed += 1
+                            self.total_profit += _rpnl
+                            if _rpnl > 0:
+                                self.winning_closes += 1
+                            closed_positions.append({
+                                'symbol': symbol, 'side': position['side'],
+                                'entry_price': _entry, 'exit_price': current_price,
+                                'size': _size, 'pnl_pct': _pnl_feed,
+                                'profit_usd': _rpnl,
+                                'reason': f'RUNNER TRAIL STOP: {_pnl_feed:.2%}',
+                                'duration': (datetime.now() - position['opened_at']).total_seconds()})
+                            logger.info(f"🏃 RUNNER CLOSED {symbol}: trail stop at {_pnl_feed:.2%} ({_rpnl:+.2f} USD)")
+                            del self.open_positions[symbol]
+                            self.runners.discard(symbol)
+                            self.exempt.discard(symbol)
+                            if getattr(self, 'partial', None) is not None:
+                                self.partial.positions.pop(symbol, None)
+                            _trailer.clear(symbol)
+                    continue
+                if symbol in getattr(self, 'exempt', set()):
+                    continue
                 
                 # Calculate P&L
                 entry_price = position['entry_price']
@@ -118,6 +186,64 @@ class AutoProfitTaker:
                     pnl_pct = (entry_price - current_price) / entry_price
                 
                 profit_target = position['profit_target']
+
+                # Intelligent ladder (profit side) before the fixed
+                # table: one rung per check banks a slice as profit
+                # appears; TP3 arms the runner instead of closing.
+                # A fired rung is this pass's only action.
+                if getattr(self, 'partial', None) is not None:
+                    try:
+                        _orders = await self.partial.check_tp_levels(symbol, _feed)
+                    except Exception:
+                        _orders = []
+                    _acted = False
+                    for _ord in _orders or []:
+                        if _ord.get('runner'):
+                            self.runners.add(symbol)
+                            self.exempt.add(symbol)
+                            if _trailer is not None:
+                                try:
+                                    _trailer.stop_losses[symbol] = max(
+                                        _trailer.stop_losses.get(symbol, 0),
+                                        _entry * 1.0)
+                                    _trailer.highest_prices[symbol] = max(
+                                        _trailer.highest_prices.get(symbol, 0),
+                                        _feed)
+                                except Exception:
+                                    pass
+                            logger.info(f"🏃 RUNNER armed {symbol}: ladder banked, final slice rides the trailing stop (breakeven floor)")
+                            _acted = True
+                            continue
+                        _rung_size = float(_ord.get('size') or 0)
+                        if _rung_size <= 0:
+                            continue
+                        if getattr(self, 'close_handler', None) is not None:
+                            self.close_handler(symbol, side, _rung_size, current_price, _ord.get('tp_level', 'TP'))
+                        elif _is_long:
+                            await asyncio.to_thread(
+                                self.exchange.create_market_sell_order,
+                                symbol, _rung_size)
+                        else:
+                            await asyncio.to_thread(
+                                self.exchange.create_market_buy_order,
+                                symbol, current_price * _rung_size)
+                        position['size'] = max(0.0, position['size'] - _rung_size)
+                        _rpnl = _rung_size * _entry * pnl_pct
+                        self.total_closed += 1
+                        self.total_profit += _rpnl
+                        if _rpnl > 0:
+                            self.winning_closes += 1
+                        closed_positions.append({
+                            'symbol': symbol, 'side': side,
+                            'entry_price': _entry, 'exit_price': current_price,
+                            'size': _rung_size, 'pnl_pct': pnl_pct,
+                            'profit_usd': _rpnl,
+                            'reason': f"LADDER {_ord.get('tp_level')}: partial banked at {pnl_pct:.2%}",
+                            'duration': (datetime.now() - position['opened_at']).total_seconds()})
+                        logger.info(f"🪜 LADDER {_ord.get('tp_level')} {symbol}: banked {_rung_size} at {pnl_pct:.2%} ({_rpnl:+.2f} USD)")
+                        _acted = True
+                    if _acted:
+                        continue
                 
                 # Check if should close
                 should_close = False
@@ -187,6 +313,14 @@ class AutoProfitTaker:
                     
                     # Remove from tracking
                     del self.open_positions[symbol]
+                    self.runners.discard(symbol)
+                    self.exempt.discard(symbol)
+                    if getattr(self, 'partial', None) is not None:
+                        self.partial.positions.pop(symbol, None)
+                    if getattr(self, 'trailer', None) is not None:
+                        self.trailer.clear(symbol)
+                    if getattr(self, 'trailer_inv', None) is not None:
+                        self.trailer_inv.clear(symbol)
             
             except Exception as e:
                 logger.debug(f"Position check error for {symbol}: {e}")
