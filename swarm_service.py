@@ -196,6 +196,14 @@ class SwarmExecutor:
             return None
         qty = min(qty, _held)
         self.positions[raw] = {'qty': qty, 'entry': price, 'ts': time.time(), 'symbol': sym}
+        try:
+            _lad = getattr(self, '_ladder', None)
+            if _lad is None:
+                from critical_features_addon import PartialTPManager as _PTM
+                _lad = self._ladder = _PTM()
+            _lad.add_position(raw, price, qty)
+        except Exception:
+            pass
         logger.info(f'SWARM REAL BUY {sym} qty {qty} @ {price:.4f} conf {signal.confidence:.2f}')
         tg(f'SWARM BUY {sym} qty {qty} @ ${price:.4f} (conf {signal.confidence:.2f})')
         return {'id': hashlib.md5(f"{signal.agent_id}_{signal.timestamp}".encode()).hexdigest()[:8],
@@ -241,6 +249,15 @@ class SwarmExecutor:
             return False
         del self.positions[raw]
         try:
+            if getattr(self, '_ladder', None) is not None:
+                self._ladder.positions.pop(raw, None)
+            if getattr(self, '_trailer', None) is not None:
+                self._trailer.clear(raw)
+            if getattr(self, '_runners', None) is not None:
+                self._runners.discard(raw)
+        except Exception:
+            pass
+        try:
             t = await asyncio.to_thread(self.ex.fetch_ticker, perp)
             xp = float(t.get('last') or pos['entry'])
         except Exception:
@@ -253,6 +270,41 @@ class SwarmExecutor:
         except Exception:
             pass
         tg(f'SWARM SELL {pos["symbol"]} @ ${xp:.4f} pnl ${pnl:+.2f} ({reason})')
+        return True
+
+    async def _close_partial(self, raw, qty, reason):
+        """Partial close for ladder rungs: sell a slice, keep the
+        position with its remaining qty, book the slice's pnl."""
+        pos = self.positions.get(raw)
+        if not pos:
+            return False
+        perp = pos['symbol'] + ':USDT'
+        try:
+            step, _m = await asyncio.to_thread(self._market_step_min, perp)
+            qty = quantize(qty, step) or qty
+        except Exception:
+            pass
+        if qty <= 0 or qty >= pos['qty']:
+            return await self._close_raw(raw, reason)
+        try:
+            await asyncio.to_thread(self.tn.create_market_sell_reduce, raw, qty_str(qty))
+        except Exception as e:
+            logger.warning(f'swarm partial SELL failed {pos["symbol"]}: {e}')
+            return False
+        pos['qty'] -= qty
+        try:
+            t = await asyncio.to_thread(self.ex.fetch_ticker, perp)
+            xp = float(t.get('last') or pos['entry'])
+        except Exception:
+            xp = pos['entry']
+        pnl = (xp - pos['entry']) * qty
+        logger.info(f'SWARM PARTIAL SELL {pos["symbol"]} qty {qty} @ {xp} pnl ${pnl:+.4f} ({reason})')
+        try:
+            import being_ledger as _ledger
+            _ledger.record_close('swarm', pos['symbol'], pnl, real=True)
+        except Exception:
+            pass
+        tg(f'SWARM PARTIAL SELL {pos["symbol"]} @ ${xp:.4f} pnl ${pnl:+.2f} ({reason})')
         return True
 
     async def close_swarm(self, symbol):
@@ -274,6 +326,60 @@ class SwarmExecutor:
                         cur = 0
                     if cur:
                         pct = (cur - pos['entry']) / pos['entry']
+                        # LADDER + RUNNER (2026-10-28, Princewill:
+                        # wire them all): the built PartialTPManager
+                        # banks slices at +1%/+2%; TP3 arms a runner
+                        # whose final slice rides the
+                        # TrailingStopManager (breakeven floor)
+                        # instead of the flat +2% full close. The
+                        # fixed stop/timeout stay as backstops.
+                        _runners = getattr(self, '_runners', None)
+                        if _runners is None:
+                            _runners = self._runners = set()
+                        if raw in _runners:
+                            _tr = getattr(self, '_trailer', None)
+                            if _tr is not None:
+                                _tr.update(raw, cur, pos['entry'], pos['entry'])
+                                _st = _tr.get_stop(raw)
+                                if _st is not None and cur <= _st:
+                                    await self._close_raw(raw, 'runner trail stop')
+                                    continue
+                            if pct <= -0.015:
+                                await self._close_raw(raw, 'stop -1.5%')
+                                continue
+                            if time.time() - pos['ts'] > 3600:
+                                await self._close_raw(raw, 'runner timeout 60m')
+                            continue
+                        _lad = getattr(self, '_ladder', None)
+                        if _lad is not None and raw in _lad.positions:
+                            try:
+                                _orders = await _lad.check_tp_levels(raw, cur)
+                            except Exception:
+                                _orders = []
+                            _acted = False
+                            for _ord in _orders or []:
+                                if _ord.get('runner'):
+                                    try:
+                                        from critical_features_addon import TrailingStopManager as _TSM
+                                        if getattr(self, '_trailer', None) is None:
+                                            self._trailer = _TSM(trail_percent=0.02)
+                                        self._trailer.stop_losses[raw] = max(
+                                            self._trailer.stop_losses.get(raw, 0),
+                                            pos['entry'] * 1.0)
+                                        self._trailer.highest_prices[raw] = max(
+                                            self._trailer.highest_prices.get(raw, 0), cur)
+                                        _runners.add(raw)
+                                        logger.info(f'SWARM RUNNER armed {pos["symbol"]}: ladder banked, final slice trails')
+                                    except Exception:
+                                        pass
+                                    _acted = True
+                                    continue
+                                _sz = float(_ord.get('size') or 0)
+                                if _sz > 0:
+                                    await self._close_partial(raw, _sz, f"ladder {_ord.get('tp_level')}")
+                                    _acted = True
+                            if _acted:
+                                continue
                         if pct >= 0.02:
                             await self._close_raw(raw, 'take profit +2%')
                             continue
