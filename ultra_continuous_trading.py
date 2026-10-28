@@ -725,7 +725,41 @@ class UltraContinuousTradingOrchestrator:
                     cur = (md or {}).get('close') or 0
                     if cur:
                         pct = (cur - session.entry_price) / session.entry_price
-                        if pct >= self.config.profit_taking_threshold or pct <= -0.015:
+                        # RUNNER (2026-10-28, Princewill: wire them
+                        # all): the profit threshold arms the built
+                        # TrailingStopManager (breakeven floor)
+                        # instead of closing flat; the trailed
+                        # breach closes. Stop/timeout unchanged.
+                        _key = f"{session.symbol}|{session.start_time}"
+                        _trs = getattr(self, '_cont_trailers', None)
+                        if _trs is None:
+                            _trs = self._cont_trailers = {}
+                        if _key in _trs:
+                            _mgr = _trs[_key]
+                            _stop = _mgr.update(_key, cur, session.entry_price, session.entry_price)
+                            if _stop is not None and cur <= _stop:
+                                _trs.pop(_key, None)
+                                return True
+                            if pct <= -0.015:
+                                _trs.pop(_key, None)
+                                return True
+                            return False
+                        if pct >= self.config.profit_taking_threshold:
+                            try:
+                                from critical_features_addon import TrailingStopManager as _TSM
+                                _mgr = _TSM(trail_percent=0.02)
+                                _mgr.update(_key, cur, session.entry_price, session.entry_price)
+                                _mgr.stop_losses[_key] = max(
+                                    _mgr.stop_losses.get(_key, 0),
+                                    session.entry_price)
+                                _trs[_key] = _mgr
+                                self.logger.info(
+                                    f"🏃 CONT RUNNER armed {session.symbol} "
+                                    f"at {pct:.2%}: trails from breakeven")
+                            except Exception:
+                                return True
+                            return False
+                        if pct <= -0.015:
                             return True
                 except Exception:
                     pass
