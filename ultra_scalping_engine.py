@@ -618,7 +618,66 @@ class UltraScalpingEngine:
                         _mark = float((_pos or {}).get('markPrice') or 0)
                         if _mark > 0:
                             _hit = self._real_exit_hit(signal, _mark)
-                            if _hit is not None:
+                            # RUNNER TRAILING - REAL BRANCH (2026-10-28,
+                            # Princewill: wire them all): the paper
+                            # branch has armed a breakeven-floored
+                            # trailing runner at target since
+                            # 2026-10-25, but real positions still
+                            # closed flat at target. Same pattern here,
+                            # in the testnet frame: target touch arms
+                            # the runner; the trailed floor (never
+                            # below breakeven) decides the exit; the
+                            # stop and the 3600s backstop are unchanged.
+                            if getattr(signal, '_real_runner', False):
+                                _mgr = signal._real_trail_mgr
+                                _entry_r = float(signal.real_entry)
+                                _long_r = (signal.target_price
+                                           > signal.entry_price)
+                                _feed = (_mark if _long_r
+                                         else 1.0 / _mark)
+                                _fent = (_entry_r if _long_r
+                                         else 1.0 / _entry_r)
+                                _stop = _mgr.update(signal.symbol, _feed,
+                                                    _fent, _fent)
+                                _floor = (_stop if _long_r
+                                          else 1.0 / _stop)
+                                _floor = (max(_floor, _entry_r) if _long_r
+                                          else min(_floor, _entry_r))
+                                _breach = (_mark <= _floor if _long_r
+                                           else _mark >= _floor)
+                                if _breach:
+                                    signal._exit_reason = 'trail'
+                                    await self._close_scalp_position(
+                                        position_id, signal, _mark,
+                                        (_mark >= _entry_r) if _long_r
+                                        else (_mark <= _entry_r))
+                                elif _hit is False:
+                                    signal._exit_reason = 'stop'
+                                    await self._close_scalp_position(
+                                        position_id, signal, _mark, False)
+                                elif current_time - signal.timestamp > 3600:
+                                    signal._exit_reason = 'trail_timeout'
+                                    await self._close_scalp_position(
+                                        position_id, signal, _mark, False)
+                            elif _hit is True:
+                                try:
+                                    from critical_features_addon import (
+                                        TrailingStopManager as _TSM)
+                                    _tgt_f = abs(
+                                        (signal.target_price
+                                         - signal.entry_price)
+                                        / signal.entry_price)
+                                    signal._real_trail_mgr = _TSM(_tgt_f)
+                                    signal._real_runner = True
+                                    signal._exit_reason = 'trail'
+                                    self.logger.info(
+                                        f"RUNNER armed (real) "
+                                        f"{signal.symbol}: target reached, "
+                                        f"final slice trails from breakeven")
+                                except Exception:
+                                    await self._close_scalp_position(
+                                        position_id, signal, _mark, True)
+                            elif _hit is not None:
                                 await self._close_scalp_position(
                                     position_id, signal, _mark, _hit)
                             elif current_time - signal.timestamp > 3600:
